@@ -26,6 +26,7 @@ except ImportError as e:
 UPLOAD_DIR = "/tmp/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+@app.route("/api/index", methods=["GET", "POST", "DELETE"]) 
 @app.route("/", methods=["GET", "POST", "DELETE"])
 def main_route():
     # Проверка на случай, если база не подключилась
