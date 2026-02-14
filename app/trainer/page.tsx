@@ -30,7 +30,7 @@ export default function TrainerPage() {
   useEffect(() => {
     const loadWords = async () => {
       try {
-        const res = await fetch("/api?action=words&level=A1");
+        const res = await fetch(`/api/index?action=words&level=A1`);
         if (!res.ok) throw new Error("Failed to fetch");
         const data = await res.json();
         setWords(data);
