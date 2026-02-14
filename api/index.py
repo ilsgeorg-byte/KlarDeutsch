@@ -27,7 +27,7 @@ UPLOAD_DIR = "/tmp/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @app.route("/", methods=["GET", "POST", "DELETE"])
-def handler():
+def main_route():
     # Проверка на случай, если база не подключилась
     if get_db_connection is None:
         return jsonify({"error": "Database module not found"}), 500
@@ -97,9 +97,10 @@ def handler():
 def serve_file(filename):
     return send_from_directory(UPLOAD_DIR, filename)
 
+
+
+
+
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(debug=True)
 
-
-
-# Force update
