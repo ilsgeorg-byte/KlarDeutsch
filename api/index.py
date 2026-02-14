@@ -3,8 +3,19 @@ from flask_cors import CORS
 import os
 from datetime import datetime
 
-# Импортируем подключение к БД
-from db import get_db_connection
+
+import sys
+import os
+
+# Явно добавляем папку, где лежит этот скрипт, в пути поиска модулей
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+try:
+    from db import get_db_connection
+except ImportError:
+    # Запасной вариант, если запуск идет не из api
+    from api.db import get_db_connection
+
 
 app = Flask(__name__)
 CORS(app)
