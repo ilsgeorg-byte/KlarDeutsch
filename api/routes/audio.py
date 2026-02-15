@@ -1,7 +1,10 @@
 from flask import Blueprint, request, jsonify
-from db import get_db_connection
 from datetime import datetime
 import os
+import sys
+
+# Добавляем родительскую директорию в path
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 audio_bp = Blueprint('audio', __name__, url_prefix='/api')
 

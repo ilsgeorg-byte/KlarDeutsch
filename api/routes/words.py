@@ -1,4 +1,10 @@
 from flask import Blueprint, request, jsonify
+import sys
+import os
+
+# Добавляем родительскую директорию в path
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
 from db import get_db_connection
 
 words_bp = Blueprint('words', __name__, url_prefix='/api')

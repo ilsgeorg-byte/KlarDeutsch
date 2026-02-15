@@ -9,6 +9,9 @@ import sys
 from datetime import datetime
 from dotenv import load_dotenv
 
+# Добавляем текущую директорию в path для импортов
+sys.path.insert(0, os.path.dirname(__file__))
+
 # Загружаем переменные окружения
 env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env.local')
 load_dotenv(env_path)
