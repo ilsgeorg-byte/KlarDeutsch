@@ -70,6 +70,10 @@ def upload_audio():
         file_size = file.tell()
         file.seek(0)
         
+        print(f"Загрузка: {file.filename}, размер: {file_size} байт", file=sys.stderr)
+        if file_size == 0:
+            return jsonify({"error": "Файл пустой (0 байт)"}), 400
+
         if file_size > MAX_FILE_SIZE:
             return jsonify({"error": "Файл слишком большой"}), 413
         
