@@ -1,7 +1,8 @@
-from flask import Blueprint, request, jsonify, redirect, send_from_directory
+from flask import Blueprint, request, jsonify, redirect, send_from_directory, send_file
 from datetime import datetime
 import os
 import sys
+import io
 
 # Добавляем родительскую директорию в path
 api_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -78,6 +79,7 @@ def upload_audio():
         # Определяем куда сохранять (S3 или локально)
         use_s3 = S3_BUCKET and S3_ACCESS_KEY and S3_SECRET_KEY and boto3
         url = ""
+        file_data = None
 
         if use_s3:
             content_type = file.content_type or 'application/octet-stream'
@@ -90,6 +92,10 @@ def upload_audio():
                  url = f"{S3_ENDPOINT}/{S3_BUCKET}/{filename}"
             else:
                  url = f"https://{S3_BUCKET}.s3.{S3_REGION}.amazonaws.com/{filename}"
+        elif os.environ.get("STORAGE_TYPE") == "db":
+            # Сохранение в БД (читаем байты)
+            file_data = file.read()
+            url = f"/api/files/{filename}"
         else:
             # Локальное сохранение
             filepath = os.path.join(UPLOAD_FOLDER, filename)
@@ -100,17 +106,27 @@ def upload_audio():
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Создаем таблицу если нет (для надежности, лучше вынести в миграции)
+        # Обновленная структура таблицы (добавляем file_data и mimetype если их нет)
+        # Примечание: В продакшене лучше использовать миграции (ALTER TABLE)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS recordings (
                 id SERIAL PRIMARY KEY,
                 filename TEXT NOT NULL,
                 url TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                file_data BYTEA,
+                mimetype TEXT
             )
         """)
         
-        cur.execute("INSERT INTO recordings (filename, url) VALUES (%s, %s) RETURNING id", (filename, url))
+        # Пытаемся добавить колонки, если таблица старая (грубая миграция)
+        try:
+            cur.execute("ALTER TABLE recordings ADD COLUMN IF NOT EXISTS file_data BYTEA")
+            cur.execute("ALTER TABLE recordings ADD COLUMN IF NOT EXISTS mimetype TEXT")
+        except:
+            conn.rollback()
+
+        cur.execute("INSERT INTO recordings (filename, url, file_data, mimetype) VALUES (%s, %s, %s, %s) RETURNING id", (filename, url, file_data, file.content_type))
         record_id = cur.fetchone()[0]
         conn.commit()
         cur.close()
@@ -150,14 +166,19 @@ def get_file(filename):
         conn = get_db_connection()
         cur = conn.cursor()
         
-        cur.execute("SELECT url FROM recordings WHERE filename = %s", (filename,))
+        cur.execute("SELECT url, file_data, mimetype FROM recordings WHERE filename = %s", (filename,))
         row = cur.fetchone()
         
         cur.close()
         conn.close()
         
         if row:
-            url = row[0]
+            url, file_data, mimetype = row
+            
+            # Если есть данные в БД, отдаем их напрямую
+            if file_data:
+                return send_file(io.BytesIO(file_data), mimetype=mimetype or 'audio/webm', as_attachment=False, download_name=filename)
+
             if url.startswith("http"):
                 return redirect(url)
             
