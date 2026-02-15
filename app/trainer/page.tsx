@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import Link from "next/link"; // Для кнопки "Домой"
+import Link from "next/link"; // Для кнопки "Домой" 1
 import { Mic, Square, Volume2, ArrowRight, Eye, EyeOff, Home } from "lucide-react";
 import styles from "../styles/Shared.module.css";
 
