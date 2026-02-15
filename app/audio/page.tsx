@@ -9,7 +9,7 @@ export default function AudioPage() {
 
   const loadFiles = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:5000/api/list_audio");
+      const res = await fetch("/api/list_audio");
       const data = await res.json();
       setFiles(data);
     } catch (e) {
@@ -23,7 +23,7 @@ export default function AudioPage() {
     if (!confirm("Удалить запись?")) return;
     setLoading(true);
     try {
-      const res = await fetch("http://127.0.0.1:5000/api/delete_audio", {
+      const res = await fetch("/api/delete_audio", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ filename })
@@ -73,7 +73,7 @@ export default function AudioPage() {
               }}>
                 <div style={{display: 'flex', flexDirection: 'column', gap: '5px', flex: 1}}>
                   <span className={styles.label}>{file}</span>
-                  <audio controls src={`http://127.0.0.1:5000/api/files/${file}`} style={{height: '30px', maxWidth: '250px'}} />
+                  <audio controls src={`/api/files/${file}`} style={{height: '30px', maxWidth: '250px'}} />
                 </div>
                 
                 <button 

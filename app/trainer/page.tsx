@@ -68,7 +68,7 @@ export default function TrainerPage() {
     formData.append("file", blob, "recording.webm");
 
     try {
-      const res = await fetch("http://127.0.0.1:5000/api/audio", {
+      const res = await fetch("/api/audio", {
         method: "POST",
         body: formData,
       });
@@ -92,7 +92,7 @@ export default function TrainerPage() {
     const loadWords = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`http://127.0.0.1:5000/api/words?level=${level}`);
+        const res = await fetch(`/api/words?level=${level}`);
         if (!res.ok) throw new Error("Failed");
         const data = await res.json();
         setWords(data.data);
