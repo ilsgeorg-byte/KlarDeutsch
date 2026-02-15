@@ -111,8 +111,13 @@ export default function TrainerPage() {
 
   const currentWord = words[index];
 
-   return (
-    <div className={styles.pageWrapper}>
+
+
+
+  return (
+    <div className="flex flex-col items-center min-h-screen bg-gray-50 p-4">
+      
+      {/* --- ШАПКА  --- */}
       <header className={styles.header}>
         <a href="/" className={styles.logo}>
           <span>🇩🇪</span> KlarDeutsch
@@ -124,21 +129,6 @@ export default function TrainerPage() {
           {/* Добавленная ссылка на страницу аудио */}
           <a href="/audio" className={styles.navLink}>Записи</a>
         </nav>
-      </header>     
-       </div>
-  );
-}
-
-  return (
-    <div className="flex flex-col items-center min-h-screen bg-gray-50 p-4">
-      
-      {/* --- ШАПКА (ВРЕМЕННАЯ) --- */}
-      <header className="w-full max-w-4xl flex justify-between items-center mb-8 p-4 bg-white rounded-xl shadow-sm">
-        <Link href="/" className="flex items-center gap-2 text-gray-600 hover:text-blue-600 font-medium">
-          <Home size={20} />
-          <span>На главную</span>
-        </Link>
-        <h1 className="text-xl font-bold text-gray-800">KlarDeutsch Тренажер</h1>
       </header>
       {/* ------------------------- */}
 
@@ -241,4 +231,5 @@ export default function TrainerPage() {
       </div>
     </div>
   );
+}
 
