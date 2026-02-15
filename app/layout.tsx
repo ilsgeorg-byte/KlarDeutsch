@@ -1,8 +1,6 @@
 import "./globals.css";
 import React from "react";
-
-<link rel="icon" href="/icon.svg" type="image/svg+xml" />
-
+import ErrorBoundary from "./components/ErrorBoundary";
 
 export const metadata = {
   title: "KlarDeutsch",
@@ -17,8 +15,11 @@ export default function RootLayout({
   return (
     <html lang="de">
       <body style={{ margin: 0, padding: 0 }}>
-        {children}
+        <ErrorBoundary>
+          {children}
+        </ErrorBoundary>
       </body>
     </html>
   );
 }
+

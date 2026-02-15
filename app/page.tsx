@@ -1,10 +1,7 @@
 "use client";
 
 import React from "react";
-// Используем тот же CSS модуль, так как структура похожа
-// Но нам нужно будет импортировать его из папки trainer или перенести CSS в общий файл.
-// Для простоты сейчас импортируем прямо оттуда:
-import styles from "./trainer/Trainer.module.css"; 
+import styles from "./styles/Shared.module.css"; 
 
 export default function HomePage() {
   return (
@@ -17,7 +14,7 @@ export default function HomePage() {
         <nav className={styles.nav}>
           <a href="/" className={styles.navLink}>Главная</a>
           {/* Ссылка на текущую страницу (Тренажер) */}
-          <a href="/trainer" className={`${styles.navLink} ${styles.navLinkActive}`}>Тренажер</a>
+          <a href="/trainer" className={styles.navLink}>Тренажер</a>
           {/* Добавленная ссылка на страницу аудио */}
           <a href="/audio" className={styles.navLink}>Записи</a>
         </nav>

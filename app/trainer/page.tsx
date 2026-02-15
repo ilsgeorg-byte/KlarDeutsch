@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link"; // Для кнопки "Домой"
 import { Mic, Square, Volume2, ArrowRight, Eye, EyeOff, Home } from "lucide-react";
-import styles from "../trainer/Trainer.module.css";
+import styles from "../styles/Shared.module.css";
 
 interface Word {
   id: number;

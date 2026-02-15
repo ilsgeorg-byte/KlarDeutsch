@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import styles from "../trainer/Trainer.module.css"; // Путь на уровень выше
+import styles from "../styles/Shared.module.css"; // Путь на уровень выше
 
 export default function AudioPage() {
   const [files, setFiles] = useState<string[]>([]);
