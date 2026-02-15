@@ -128,7 +128,7 @@ export default function TrainerPage() {
       </div>
 
       {/* Основной контент */}
-      <main className="flex-1 flex flex-col items-center p-4 w-full max-w-4xl mx-auto mt-6"> {/* <-- mt-6 добавит небольшой отступ */}
+      <main className="flex-1 flex flex-col items-center p-4 w-full max-w-4xl mx-auto mt-4">
       
         {/* КНОПКИ УРОВНЕЙ */}
         <div className="flex flex-wrap gap-2 mb-8 justify-center">
