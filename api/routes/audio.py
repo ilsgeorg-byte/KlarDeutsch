@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, redirect
 from datetime import datetime
 import os
 import sys
@@ -107,13 +107,33 @@ def list_audio():
         if not cur.fetchone()[0]:
              return jsonify([]), 200
 
-        cur.execute("SELECT filename, url, created_at FROM recordings ORDER BY created_at DESC")
+        cur.execute("SELECT filename FROM recordings ORDER BY created_at DESC")
         rows = cur.fetchall()
-        files = [{"filename": r[0], "url": r[1], "created_at": r[2]} for r in rows]
+        files = [r[0] for r in rows]
         
         cur.close()
         conn.close()
         return jsonify(files), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@audio_bp.route('/files/<filename>', methods=['GET'])
+def get_file(filename):
+    """Получить файл (редирект на S3 URL)"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        cur.execute("SELECT url FROM recordings WHERE filename = %s", (filename,))
+        row = cur.fetchone()
+        
+        cur.close()
+        conn.close()
+        
+        if row:
+            return redirect(row[0])
+        else:
+            return jsonify({"error": "Файл не найден"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
