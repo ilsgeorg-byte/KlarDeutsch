@@ -112,23 +112,21 @@ export default function TrainerPage() {
   const currentWord = words[index];
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className={styles.pageWrapper}>
       {/* Шапка */}
-      <div className={styles.pageWrapper}>
-        <header className={styles.header}>
-          <a href="/" className={styles.logo}>
-            <span>🇩🇪</span> KlarDeutsch
-          </a>
-          <nav className={styles.nav}>
-            <a href="/" className={styles.navLink}>Главная</a>
-            <a href="/trainer" className={`${styles.navLink} ${styles.navLinkActive}`}>Тренажер</a>
-            <a href="/audio" className={styles.navLink}>Записи</a>
-          </nav>
-        </header>
-      </div>
+      <header className={styles.header}>
+        <a href="/" className={styles.logo}>
+          <span>🇩🇪</span> KlarDeutsch
+        </a>
+        <nav className={styles.nav}>
+          <a href="/" className={styles.navLink}>Главная</a>
+          <a href="/trainer" className={`${styles.navLink} ${styles.navLinkActive}`}>Тренажер</a>
+          <a href="/audio" className={styles.navLink}>Записи</a>
+        </nav>
+      </header>
 
       {/* Основной контент */}
-      <main className="flex-1 flex flex-col items-center p-4 w-full max-w-4xl mx-auto mt-0">
+      <main className="flex-1 flex flex-col items-center px-4 py-6 w-full">
       
         {/* КНОПКИ УРОВНЕЙ */}
         <div className="flex flex-wrap gap-2 mb-8 justify-center">
