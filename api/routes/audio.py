@@ -12,9 +12,21 @@ from db import get_db_connection
 
 audio_bp = Blueprint('audio', __name__, url_prefix='/api')
 
-# Директория для загрузок - используем постоянное хранилище
-UPLOAD_DIR = os.getenv("UPLOAD_DIR", os.path.join(os.path.dirname(__file__), "uploads"))
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+# Директория для загрузок.
+# На Vercel файловая система для кода read-only; используем временную директорию (tmp) по умолчанию
+import tempfile
+env_upload = os.getenv("UPLOAD_DIR")
+if env_upload:
+    UPLOAD_DIR = env_upload
+else:
+    UPLOAD_DIR = os.path.join(tempfile.gettempdir(), "klar_deutsch_uploads")
+
+try:
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    STORAGE_WRITABLE = True
+except OSError as e:
+    print(f"Warning: upload dir not writable: {e}")
+    STORAGE_WRITABLE = False
 
 # Константы безопасности
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
