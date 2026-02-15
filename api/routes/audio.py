@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from datetime import datetime
 import os
 import sys
+import boto3
 
 # Добавляем родительскую директорию в path
 api_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -12,21 +13,18 @@ from db import get_db_connection
 
 audio_bp = Blueprint('audio', __name__, url_prefix='/api')
 
-# Директория для загрузок.
-# На Vercel файловая система для кода read-only; используем временную директорию (tmp) по умолчанию
-import tempfile
-env_upload = os.getenv("UPLOAD_DIR")
-if env_upload:
-    UPLOAD_DIR = env_upload
-else:
-    UPLOAD_DIR = os.path.join(tempfile.gettempdir(), "klar_deutsch_uploads")
+# S3 Configuration
+S3_BUCKET = os.getenv("S3_BUCKET")
+S3_ACCESS_KEY = os.getenv("S3_ACCESS_KEY")
+S3_SECRET_KEY = os.getenv("S3_SECRET_KEY")
+S3_ENDPOINT = os.getenv("S3_ENDPOINT")
+S3_REGION = os.getenv("S3_REGION", "us-east-1")
 
-try:
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-    STORAGE_WRITABLE = True
-except OSError as e:
-    print(f"Warning: upload dir not writable: {e}")
-    STORAGE_WRITABLE = False
+def get_s3_client():
+    return boto3.client(
+        's3', aws_access_key_id=S3_ACCESS_KEY, aws_secret_access_key=S3_SECRET_KEY,
+        region_name=S3_REGION, endpoint_url=S3_ENDPOINT
+    )
 
 # Константы безопасности
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
@@ -42,50 +40,79 @@ def upload_audio():
     try:
         file = request.files.get("file")
         if not file or file.filename == '':
-            print("Ошибка: файл не выбран")
             return jsonify({"error": "Файл не выбран"}), 400
-        
-        print(f"Получен файл: {file.filename}")
         
         # Проверяем расширение
         if not allowed_file(file.filename):
-            print(f"Ошибка: недопустимое расширение {file.filename}")
             return jsonify({"error": "Недопустимый формат файла"}), 400
         
         # Проверяем размер
         file.seek(0, os.SEEK_END)
         file_size = file.tell()
-        print(f"Размер файла: {file_size} байт")
-        
-        if file_size > MAX_FILE_SIZE:
-            print(f"Ошибка: файл слишком большой ({file_size} > {MAX_FILE_SIZE})")
-            return jsonify({"error": "Файл слишком большой"}), 413
         file.seek(0)
         
-        # Сохраняем файл с безопасным именем
-        filename = datetime.now().strftime("%Y%m%d-%H%M%S") + ".webm"
-        filepath = os.path.join(UPLOAD_DIR, filename)
-        file.save(filepath)
+        if file_size > MAX_FILE_SIZE:
+            return jsonify({"error": "Файл слишком большой"}), 413
         
-        # Проверяем, что файл действительно сохранен
-        saved_size = os.path.getsize(filepath)
-        print(f"Файл сохранен: {filename} ({saved_size} байт)")
+        # Генерируем имя и загружаем в S3
+        filename = datetime.now().strftime("%Y%m%d-%H%M%S") + "_" + file.filename
+        content_type = file.content_type or 'application/octet-stream'
+
+        s3 = get_s3_client()
+        s3.upload_fileobj(
+            file, S3_BUCKET, filename,
+            ExtraArgs={'ContentType': content_type, 'ACL': 'public-read'}
+        )
         
-        return jsonify({"status": "ok", "filename": filename, "size": saved_size}), 201
+        # Формируем URL
+        if S3_ENDPOINT:
+             url = f"{S3_ENDPOINT}/{S3_BUCKET}/{filename}"
+        else:
+             url = f"https://{S3_BUCKET}.s3.{S3_REGION}.amazonaws.com/{filename}"
+        
+        # Сохраняем в БД
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Создаем таблицу если нет (для надежности, лучше вынести в миграции)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS recordings (
+                id SERIAL PRIMARY KEY,
+                filename TEXT NOT NULL,
+                url TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        cur.execute("INSERT INTO recordings (filename, url) VALUES (%s, %s) RETURNING id", (filename, url))
+        record_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return jsonify({"status": "ok", "url": url, "id": record_id}), 201
     
     except Exception as e:
-        print(f"Исключение при загрузке: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @audio_bp.route('/list_audio', methods=['GET'])
 def list_audio():
     """Получить список всех аудиофайлов"""
     try:
-        if os.path.exists(UPLOAD_DIR):
-            files = sorted(os.listdir(UPLOAD_DIR), reverse=True)
-            files = [f for f in files if allowed_file(f)]
-        else:
-            files = []
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Проверяем существование таблицы
+        cur.execute("SELECT to_regclass('public.recordings')")
+        if not cur.fetchone()[0]:
+             return jsonify([]), 200
+
+        cur.execute("SELECT filename, url, created_at FROM recordings ORDER BY created_at DESC")
+        rows = cur.fetchall()
+        files = [{"filename": r[0], "url": r[1], "created_at": r[2]} for r in rows]
+        
+        cur.close()
+        conn.close()
         return jsonify(files), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -100,30 +127,18 @@ def delete_audio():
         if not filename:
             return jsonify({"error": "Имя файла не указано"}), 400
         
-        # Безопасность: проверяем, что файл в нужной директории
-        filepath = os.path.join(UPLOAD_DIR, filename)
-        if not os.path.abspath(filepath).startswith(os.path.abspath(UPLOAD_DIR)):
-            return jsonify({"error": "Доступ запрещён"}), 403
+        # Удаляем из S3
+        s3 = get_s3_client()
+        s3.delete_object(Bucket=S3_BUCKET, Key=filename)
         
-        if os.path.exists(filepath):
-            os.remove(filepath)
-            return jsonify({"status": "deleted"}), 200
-        else:
-            return jsonify({"error": "Файл не найден"}), 404
-    
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@audio_bp.route('/files/<path:filename>', methods=['GET'])
-def serve_file(filename):
-    """Скачать аудиофайл"""
-    from flask import send_from_directory
-    try:
-        # Безопасность: проверяем путь
-        filepath = os.path.join(UPLOAD_DIR, filename)
-        if not os.path.abspath(filepath).startswith(os.path.abspath(UPLOAD_DIR)):
-            return jsonify({"error": "Доступ запрещён"}), 403
+        # Удаляем из БД
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM recordings WHERE filename = %s", (filename,))
+        conn.commit()
+        cur.close()
+        conn.close()
         
-        return send_from_directory(UPLOAD_DIR, filename), 200
+        return jsonify({"status": "deleted"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
