@@ -23,15 +23,23 @@ def upload_audio():
     try:
         file = request.files.get("file")
         if not file or file.filename == '':
+            print("Ошибка: файл не выбран")
             return jsonify({"error": "Файл не выбран"}), 400
+        
+        print(f"Получен файл: {file.filename}")
         
         # Проверяем расширение
         if not allowed_file(file.filename):
+            print(f"Ошибка: недопустимое расширение {file.filename}")
             return jsonify({"error": "Недопустимый формат файла"}), 400
         
         # Проверяем размер
         file.seek(0, os.SEEK_END)
-        if file.tell() > MAX_FILE_SIZE:
+        file_size = file.tell()
+        print(f"Размер файла: {file_size} байт")
+        
+        if file_size > MAX_FILE_SIZE:
+            print(f"Ошибка: файл слишком большой ({file_size} > {MAX_FILE_SIZE})")
             return jsonify({"error": "Файл слишком большой"}), 413
         file.seek(0)
         
@@ -40,9 +48,14 @@ def upload_audio():
         filepath = os.path.join(UPLOAD_DIR, filename)
         file.save(filepath)
         
-        return jsonify({"status": "ok", "filename": filename}), 201
+        # Проверяем, что файл действительно сохранен
+        saved_size = os.path.getsize(filepath)
+        print(f"Файл сохранен: {filename} ({saved_size} байт)")
+        
+        return jsonify({"status": "ok", "filename": filename, "size": saved_size}), 201
     
     except Exception as e:
+        print(f"Исключение при загрузке: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @audio_bp.route('/list_audio', methods=['GET'])

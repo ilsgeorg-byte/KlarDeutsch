@@ -62,6 +62,8 @@ export default function TrainerPage() {
 
   const uploadAudio = async (blob: Blob) => {
     setAudioStatus("Отправка...");
+    console.log("Размер блоба:", blob.size, "байт");
+    
     const formData = new FormData();
     formData.append("file", blob, "recording.webm");
 
@@ -70,9 +72,17 @@ export default function TrainerPage() {
         method: "POST",
         body: formData,
       });
-      if (res.ok) setAudioStatus("Записано! ✅");
-      else setAudioStatus("Ошибка загрузки ❌");
+      if (res.ok) {
+        const data = await res.json();
+        console.log("Загрузка успешна:", data);
+        setAudioStatus("Записано! ✅");
+      } else {
+        const error = await res.json();
+        console.error("Ошибка сервера:", error);
+        setAudioStatus("Ошибка загрузки ❌");
+      }
     } catch (e) {
+      console.error("Ошибка сети:", e);
       setAudioStatus("Ошибка сети");
     }
   };

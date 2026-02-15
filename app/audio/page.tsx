@@ -22,14 +22,23 @@ export default function AudioPage() {
   const deleteFile = async (filename: string) => {
     if (!confirm("Удалить запись?")) return;
     setLoading(true);
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
-    await fetch(`${apiUrl}/api/delete_audio`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filename })
-    });
-    await loadFiles();
-    setLoading(false);
+    try {
+      const res = await fetch("http://127.0.0.1:5000/api/delete_audio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename })
+      });
+      if (res.ok) {
+        await loadFiles();
+      } else {
+        alert("Ошибка при удалении");
+      }
+    } catch (e) {
+      console.error("Ошибка удаления:", e);
+      alert("Ошибка сети");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -64,7 +73,7 @@ export default function AudioPage() {
               }}>
                 <div style={{display: 'flex', flexDirection: 'column', gap: '5px', flex: 1}}>
                   <span className={styles.label}>{file}</span>
-                  <audio controls src={`/api/files/${file}`} style={{height: '30px', maxWidth: '250px'}} />
+                  <audio controls src={`http://127.0.0.1:5000/api/files/${file}`} style={{height: '30px', maxWidth: '250px'}} />
                 </div>
                 
                 <button 
