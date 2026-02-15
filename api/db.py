@@ -15,10 +15,17 @@ def get_db_connection():
         url = os.environ.get("DATABASE_URL")
     
     if not url:
-        raise Exception("POSTGRES_URL not found in .env.local")
+        print("Ошибка: POSTGRES_URL не найдена!")
+        print(f"Доступные переменные окружения: {list(os.environ.keys())[:10]}")
+        raise Exception("POSTGRES_URL не найдена в переменных окружения")
 
-    conn = psycopg2.connect(url)
-    return conn
+    try:
+        conn = psycopg2.connect(url)
+        print("✅ Успешное подключение к БД")
+        return conn
+    except Exception as e:
+        print(f"❌ Ошибка подключения к БД: {str(e)}")
+        raise
 
 def init_db():
     try:

@@ -58,7 +58,10 @@ def method_not_allowed(error):
 @app.errorhandler(500)
 def internal_error(error):
     """Обработка ошибки 500"""
-    return jsonify({"error": "Внутренняя ошибка сервера"}), 500
+    import traceback
+    print(f"500 Error: {str(error)}")
+    print(traceback.format_exc())
+    return jsonify({"error": "Внутренняя ошибка сервера", "details": str(error)}), 500
 
 # Логирование запросов
 from flask import request

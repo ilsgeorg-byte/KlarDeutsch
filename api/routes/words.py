@@ -17,19 +17,25 @@ def get_words():
         skip = int(request.args.get("skip", 0))
         limit = min(int(request.args.get("limit", 100)), 500)  # Максимум 500
         
+        print(f"📝 Запрос слов: level={level}, skip={skip}, limit={limit}")
+        
         # Валидация уровня
         allowed_levels = ["A1", "A2", "B1", "B2", "C1"]
         if level not in allowed_levels:
             return jsonify({"error": f"Неверный уровень. Допустимые: {', '.join(allowed_levels)}"}), 400
         
+        print(f"🔗 Подключение к БД...")
         conn = get_db_connection()
         cur = conn.cursor()
         
         # Получаем общее количество слов для уровня
+        print(f"📊 Подсчет слов для уровня {level}...")
         cur.execute("SELECT COUNT(*) FROM words WHERE level = %s", (level,))
         total = cur.fetchone()[0]
+        print(f"✅ Найдено слов: {total}")
         
         # Получаем слова с пагинацией
+        print(f"📥 Получение слов с LIMIT {limit} OFFSET {skip}...")
         cur.execute("""
             SELECT id, level, topic, de, ru, article, example_de, example_ru, audio_url
             FROM words 
@@ -43,6 +49,8 @@ def get_words():
         for row in cur.fetchall():
             results.append(dict(zip(columns, row)))
         
+        print(f"✅ Возвращаем {len(results)} слов")
+        
         cur.close()
         conn.close()
         
@@ -54,9 +62,13 @@ def get_words():
         }), 200
     
     except ValueError as e:
+        print(f"❌ ValueError: {str(e)}")
         return jsonify({"error": f"Неверные параметры: {str(e)}"}), 400
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"❌ Exception: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 @words_bp.route('/words/<int:word_id>', methods=['GET'])
 def get_word(word_id: int):
