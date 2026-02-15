@@ -33,34 +33,48 @@ def get_words():
             return jsonify({"error": f"Неверный уровень. Допустимые: {', '.join(allowed_levels)}"}), 400
         
         print(f"🔗 Подключение к БД...")
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        # Получаем общее количество слов для уровня
-        print(f"📊 Подсчет слов для уровня {level}...")
-        cur.execute("SELECT COUNT(*) FROM words WHERE level = %s", (level,))
-        total = cur.fetchone()[0]
-        print(f"✅ Найдено слов: {total}")
-        
-        # Получаем слова с пагинацией
-        print(f"📥 Получение слов с LIMIT {limit} OFFSET {skip}...")
-        cur.execute("""
-            SELECT id, level, topic, de, ru, article, example_de, example_ru, audio_url
-            FROM words 
-            WHERE level = %s
-            ORDER BY id
-            LIMIT %s OFFSET %s
-        """, (level, limit, skip))
-        
-        columns = [desc[0] for desc in cur.description]
-        results = []
-        for row in cur.fetchall():
-            results.append(dict(zip(columns, row)))
-        
-        print(f"✅ Возвращаем {len(results)} слов")
-        
-        cur.close()
-        conn.close()
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+
+            # Получаем общее количество слов для уровня
+            print(f"📊 Подсчет слов для уровня {level}...")
+            cur.execute("SELECT COUNT(*) FROM words WHERE level = %s", (level,))
+            total = cur.fetchone()[0]
+            print(f"✅ Найдено слов: {total}")
+
+            # Получаем слова с пагинацией
+            print(f"📥 Получение слов с LIMIT {limit} OFFSET {skip}...")
+            cur.execute("""
+                SELECT id, level, topic, de, ru, article, example_de, example_ru, audio_url
+                FROM words 
+                WHERE level = %s
+                ORDER BY id
+                LIMIT %s OFFSET %s
+            """, (level, limit, skip))
+
+            columns = [desc[0] for desc in cur.description]
+            results = []
+            for row in cur.fetchall():
+                results.append(dict(zip(columns, row)))
+
+            print(f"✅ Возвращаем {len(results)} слов")
+
+            cur.close()
+            conn.close()
+        except Exception as db_exc:
+            # Если БД недоступна в продакшене — возвращаем встроенный набор слов (fallback)
+            print(f"❌ Ошибка БД, используем fallback: {str(db_exc)}")
+            try:
+                from data_words import WORDS
+            except Exception:
+                # альтернативный импорт, если пакеты устроены иначе
+                from ..data_words import WORDS
+
+            # Фильтруем слова по уровню
+            fallback = [w for w in WORDS if w.get("level", "").upper() == level]
+            total = len(fallback)
+            results = fallback[skip: skip + limit]
         
         return jsonify({
             "data": results,
