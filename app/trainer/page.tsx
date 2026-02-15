@@ -111,27 +111,25 @@ export default function TrainerPage() {
 
   const currentWord = words[index];
 
-
-
-
   return (
-    <div className="flex flex-col items-center min-h-screen bg-gray-50 p-4">
+    <div>
+      <div className={styles.pageWrapper}>
+        <header className={styles.header}>
+          <a href="/" className={styles.logo}>
+            <span>🇩🇪</span> KlarDeutsch
+          </a>
+          <nav className={styles.nav}>
+            <a href="/" className={styles.navLink}>Главная</a>
+            {/* Ссылка на текущую страницу (Тренажер) */}
+            <a href="/trainer" className={`${styles.navLink} ${styles.navLinkActive}`}>Тренажер</a>
+            {/* Добавленная ссылка на страницу аудио */}
+            <a href="/audio" className={styles.navLink}>Записи</a>
+          </nav>
+        </header>
+      </div>
+      <div className="flex flex-col items-center min-h-screen bg-gray-50 p-4">
       
-      {/* --- ШАПКА  --- */}
-      <header className={styles.header}>
-        <a href="/" className={styles.logo}>
-          <span>🇩🇪</span> KlarDeutsch
-        </a>
-        <nav className={styles.nav}>
-          <a href="/" className={styles.navLink}>Главная</a>
-          {/* Ссылка на текущую страницу (Тренажер) */}
-          <a href="/trainer" className={`${styles.navLink} ${styles.navLinkActive}`}>Тренажер</a>
-          {/* Добавленная ссылка на страницу аудио */}
-          <a href="/audio" className={styles.navLink}>Записи</a>
-        </nav>
-      </header>
-      {/* ------------------------- */}
-
+     
       {/* КНОПКИ УРОВНЕЙ */}
       <div className="flex flex-wrap gap-2 mb-6 justify-center">
         {["A1", "A2", "B1", "B2", "C1"].map((lvl) => (
@@ -229,6 +227,7 @@ export default function TrainerPage() {
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }
