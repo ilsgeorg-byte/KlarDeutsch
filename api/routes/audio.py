@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, redirect, send_from_directory, send_file
-from datetime import datetime
+from werkzeug.utils import secure_filename
+from datetime import datetime, timedelta
 import os
 import sys
 import io
@@ -78,7 +79,8 @@ def upload_audio():
             return jsonify({"error": "Файл слишком большой"}), 413
         
         # Генерируем имя
-        filename = datetime.now().strftime("%Y%m%d-%H%M%S") + "_" + file.filename
+        safe_filename = secure_filename(file.filename)
+        filename = datetime.now().strftime("%Y%m%d-%H%M%S") + "_" + safe_filename
         
         # Определяем куда сохранять (S3 или локально)
         use_s3 = S3_BUCKET and S3_ACCESS_KEY and S3_SECRET_KEY and boto3
@@ -123,6 +125,9 @@ def upload_audio():
             )
         """)
         
+        # Создаем индекс для ускорения сортировки (если нет)
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_recordings_created_at ON recordings(created_at DESC)")
+        
         # Пытаемся добавить колонки, если таблица старая (грубая миграция)
         try:
             cur.execute("ALTER TABLE recordings ADD COLUMN IF NOT EXISTS file_data BYTEA")
@@ -145,6 +150,9 @@ def upload_audio():
 def list_audio():
     """Получить список всех аудиофайлов"""
     try:
+        limit = request.args.get('limit', 50, type=int)
+        offset = request.args.get('offset', 0, type=int)
+
         conn = get_db_connection()
         cur = conn.cursor()
         
@@ -153,7 +161,7 @@ def list_audio():
         if not cur.fetchone()[0]:
              return jsonify([]), 200
 
-        cur.execute("SELECT filename FROM recordings ORDER BY created_at DESC")
+        cur.execute("SELECT filename FROM recordings ORDER BY created_at DESC LIMIT %s OFFSET %s", (limit, offset))
         rows = cur.fetchall()
         files = [r[0] for r in rows]
         
@@ -226,5 +234,78 @@ def delete_audio():
         conn.close()
         
         return jsonify({"status": "deleted"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@audio_bp.route('/stats', methods=['GET'])
+def get_stats():
+    """Получить статистику (количество записей и слов)"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Количество записей
+        cur.execute("SELECT COUNT(*) FROM recordings")
+        recordings_count = cur.fetchone()[0]
+        
+        # Количество слов (если таблица words существует)
+        words_count = 0
+        cur.execute("SELECT to_regclass('public.words')")
+        if cur.fetchone()[0]:
+            cur.execute("SELECT COUNT(*) FROM words")
+            words_count = cur.fetchone()[0]
+            
+        cur.close()
+        conn.close()
+        
+        return jsonify({
+            "recordings": recordings_count,
+            "words": words_count
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@audio_bp.route('/cleanup', methods=['POST'])
+def cleanup_old_recordings():
+    """Удалить старые записи (старше N дней)"""
+    try:
+        days = request.args.get('days', 30, type=int)
+        cutoff_date = datetime.now() - timedelta(days=days)
+        
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Находим старые записи
+        cur.execute("SELECT filename FROM recordings WHERE created_at < %s", (cutoff_date,))
+        rows = cur.fetchall()
+        filenames = [r[0] for r in rows]
+        
+        deleted_count = 0
+        s3 = get_s3_client() if (S3_BUCKET and boto3) else None
+        
+        for filename in filenames:
+            # Удаляем из S3
+            if s3:
+                try:
+                    s3.delete_object(Bucket=S3_BUCKET, Key=filename)
+                except:
+                    pass
+            
+            # Удаляем локально
+            local_path = os.path.join(UPLOAD_FOLDER, filename)
+            if os.path.exists(local_path):
+                os.remove(local_path)
+                
+            deleted_count += 1
+
+        # Удаляем из БД
+        if filenames:
+            cur.execute("DELETE FROM recordings WHERE filename = ANY(%s)", (filenames,))
+            conn.commit()
+            
+        cur.close()
+        conn.close()
+        
+        return jsonify({"status": "ok", "deleted": deleted_count, "days": days}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
