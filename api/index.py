@@ -35,8 +35,8 @@ CORS(app, resources={
 })
 
 # Регистрируем blueprints (маршруты)
-from routes.words import words_bp
-from routes.audio import audio_bp
+from .routes.words import words_bp
+from .routes.audio import audio_bp
 
 app.register_blueprint(words_bp)
 app.register_blueprint(audio_bp)

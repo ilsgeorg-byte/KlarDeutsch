@@ -3,7 +3,9 @@ import sys
 import os
 
 # Добавляем родительскую директорию в path
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+api_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if api_dir not in sys.path:
+    sys.path.insert(0, api_dir)
 
 from db import get_db_connection
 
