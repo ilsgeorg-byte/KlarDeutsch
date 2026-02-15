@@ -20,8 +20,14 @@ audio_bp = Blueprint('audio', __name__, url_prefix='/api')
 
 # Папка для локальных загрузок
 UPLOAD_FOLDER = os.path.join(api_dir, 'uploads')
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
+try:
+    if not os.path.exists(UPLOAD_FOLDER):
+        os.makedirs(UPLOAD_FOLDER)
+except OSError:
+    # Если файловая система доступна только для чтения (например, Vercel), используем /tmp
+    UPLOAD_FOLDER = '/tmp/uploads'
+    if not os.path.exists(UPLOAD_FOLDER):
+        os.makedirs(UPLOAD_FOLDER)
 
 # S3 Configuration
 S3_BUCKET = os.getenv("S3_BUCKET")
