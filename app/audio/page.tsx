@@ -9,7 +9,7 @@ export default function AudioPage() {
 
   const loadFiles = async () => {
     try {
-      const res = await fetch("/api?action=list_audio");
+      const res = await fetch("http://127.0.0.1:5000/api/list_audio");
       const data = await res.json();
       setFiles(data);
     } catch (e) {
@@ -22,7 +22,8 @@ export default function AudioPage() {
   const deleteFile = async (filename: string) => {
     if (!confirm("Удалить запись?")) return;
     setLoading(true);
-    await fetch("/api?action=delete_audio", {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+    await fetch(`${apiUrl}/api/delete_audio`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ filename })
