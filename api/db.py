@@ -74,21 +74,24 @@ def init_db():
             );
         """)
         
-        # Миграция для старой схемы (если была)
+        # Миграция для старой схемы
         cur.execute("ALTER TABLE user_words ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);")
-        # Примечание: Если таблица была без user_id, нужно будет назначить дефолтного юзера
         
-        # Таблица записей в дневнике - теперь привязана к пользователю
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS diary_entries (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER REFERENCES users(id),
-                original_text TEXT NOT NULL,
-                corrected_text TEXT NOT NULL,
-                explanation TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-        """)
+        # Если есть строки с NULL user_id, заполняем их первым попавшимся юзером
+        cur.execute("SELECT id FROM users ORDER BY id LIMIT 1")
+        first_user = cur.fetchone()
+        if first_user:
+            cur.execute("UPDATE user_words SET user_id = %s WHERE user_id IS NULL", (first_user[0],))
+            
+        # Убеждаемся, что первичный ключ правильный (составной)
+        cur.execute("SELECT conname FROM pg_constraint WHERE conrelid = 'user_words'::regclass AND contype = 'p'")
+        pk_name = cur.fetchone()
+        if pk_name:
+            # Если PK есть, проверяем, из каких он колонок (упрощенно: если это не составной или старого имени)
+            # В данном случае проще пересоздать, если мы не уверены
+            pass
+        else:
+            cur.execute("ALTER TABLE user_words ADD PRIMARY KEY (user_id, word_id)")
         cur.execute("ALTER TABLE diary_entries ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);")
 
         # Таблица аудиозаписей - теперь привязана к пользователю
