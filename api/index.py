@@ -37,9 +37,11 @@ CORS(app, resources={
 # Регистрируем blueprints (маршруты)
 from .routes.words import words_bp
 from .routes.audio import audio_bp
+from .routes.diary import diary_bp
 
 app.register_blueprint(words_bp)
 app.register_blueprint(audio_bp)
+app.register_blueprint(diary_bp)
 
 # Health check endpoint
 @app.route('/health', methods=['GET'])
