@@ -17,11 +17,44 @@ def correct_with_gemini(text):
     
     try:
         genai.configure(api_key=api_key)
-        # Пробуем более стабильное имя модели
-        model = genai.GenerativeModel('gemini-1.5-flash')
         
-        # Для отладки
-        print(f"Попытка исправления текста через Gemini: {text[:30]}...")
+        # Динамический поиск доступной модели
+        available_models = []
+        try:
+            for m in genai.list_models():
+                if 'generateContent' in m.supported_generation_methods:
+                    available_models.append(m.name)
+        except Exception as list_err:
+            print(f"Ошибка при получении списка моделей: {list_err}")
+
+        # Пытаемся выбрать лучшую из доступных
+        model_name = None
+        # Приоритет 1: gemini-1.5-flash (имена могут начинаться с models/)
+        for m in available_models:
+            if 'gemini-1.5-flash' in m:
+                model_name = m
+                break
+        
+        # Приоритет 2: любая 1.5 модель
+        if not model_name:
+            for m in available_models:
+                if 'gemini-1.5' in m:
+                    model_name = m
+                    break
+        
+        # Приоритет 3: любая gemini модель
+        if not model_name:
+            for m in available_models:
+                if 'gemini' in m:
+                    model_name = m
+                    break
+
+        if not model_name:
+            models_list_str = ", ".join(available_models) if available_models else "None"
+            return None, f"Не найдено подходящих моделей Gemini. Доступно: {models_list_str}. Проверьте лимиты вашего API ключа."
+
+        print(f"Используем модель: {model_name}")
+        model = genai.GenerativeModel(model_name)
         
         prompt = f"""
         Ты - помощник по изучению немецкого языка. 
