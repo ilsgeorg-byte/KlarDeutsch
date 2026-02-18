@@ -106,38 +106,57 @@ export default function TrainerPage() {
   };
   // ---------------------
 
-  useEffect(() => {
-    const loadWords = async () => {
-      setLoading(true);
-      try {
-        const token = localStorage.getItem("token");
-        const res = await fetch(`/api/trainer/words?level=${level}`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
-        if (res.status === 401) {
-          router.push("/login");
-          return;
-        }
-        if (!res.ok) throw new Error("Failed");
-        const data = await res.json();
+  const loadWords = async (isManual = false) => {
+    if (!isManual) setLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`/api/trainer/words?level=${level}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (res.status === 401) {
+        router.push("/login");
+        return;
+      }
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+
+      if (isManual) {
+        setWords((prev) => [...prev, ...data]);
+      } else {
         setWords(data);
         setIndex(0);
         setShowAnswer(false);
-      } catch (e) {
-        console.error("Ошибка при загрузке слов:", e);
-        setAudioStatus("Ошибка загрузки слов");
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch (e) {
+      console.error("Ошибка при загрузке слов:", e);
+      setAudioStatus("Ошибка загрузки слов");
+    } finally {
+      if (!isManual) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadWords();
   }, [level]);
 
   const handleNext = () => {
     setShowAnswer(false);
     setAudioStatus(null);
-    if (words.length > 0) {
-      setIndex((prev) => (prev + 1) % words.length);
+
+    // Удаляем текущее слово из списка
+    const newWords = [...words];
+    newWords.splice(index, 1);
+
+    if (newWords.length === 0) {
+      // Если слова кончились, подгружаем новые
+      setWords([]);
+      loadWords();
+    } else {
+      setWords(newWords);
+      // Если мы удалили последний элемент, сдвигаем индекс назад
+      if (index >= newWords.length) {
+        setIndex(0);
+      }
     }
   };
 
