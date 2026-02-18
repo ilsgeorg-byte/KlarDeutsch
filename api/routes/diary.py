@@ -1,8 +1,4 @@
-from flask import Blueprint, request, jsonify
-import os
-import google.generativeai as genai
-from openai import OpenAI
-from dotenv import load_dotenv
+from .words import get_db_connection
 
 diary_bp = Blueprint('diary', __name__, url_prefix='/api/diary')
 
@@ -142,4 +138,48 @@ def correct_text():
              }), 500
         return jsonify({"error": f"Ошибка AI: {error}"}), 500
     
+    # СОХРАНЕНИЕ В БД
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO diary_entries (original_text, corrected_text, explanation)
+            VALUES (%s, %s, %s)
+        """, (text, result['corrected'], result['explanation']))
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as db_err:
+        print(f"Ошибка сохранения в БД: {db_err}")
+        # Не возвращаем ошибку пользователю, так как коррекция уже получена
+    
     return jsonify(result), 200
+
+@diary_bp.route('/history', methods=['GET'])
+def get_history():
+    """Получить историю записей"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, original_text, corrected_text, explanation, created_at
+            FROM diary_entries
+            ORDER BY created_at DESC
+            LIMIT 50
+        """)
+        
+        columns = [desc[0] for desc in cur.description]
+        results = []
+        for row in cur.fetchall():
+            item = dict(zip(columns, row))
+            # Форматируем дату для фронтенда
+            if item['created_at']:
+                item['created_at'] = item['created_at'].strftime("%Y-%m-%d %H:%M")
+            results.append(item)
+            
+        cur.close()
+        conn.close()
+        return jsonify(results), 200
+    except Exception as e:
+        print(f"History Error: {str(e)}")
+        return jsonify({"error": str(e)}), 500

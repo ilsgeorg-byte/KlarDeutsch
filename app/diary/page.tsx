@@ -4,11 +4,30 @@ import React, { useState } from "react";
 import styles from "./Diary.module.css";
 import { Sparkles, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 
+import Header from "../components/Header";
+
 export default function DiaryPage() {
   const [text, setText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<{ corrected: string; explanation: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<any[]>([]);
+
+  const loadHistory = async () => {
+    try {
+      const res = await fetch("/api/diary/history");
+      if (res.ok) {
+        const data = await res.json();
+        setHistory(data);
+      }
+    } catch (err) {
+      console.error("Ошибка загрузки истории:", err);
+    }
+  };
+
+  React.useEffect(() => {
+    loadHistory();
+  }, []);
 
   const handleCheck = async () => {
     if (!text.trim()) return;
@@ -36,6 +55,9 @@ export default function DiaryPage() {
         corrected: data.corrected,
         explanation: data.explanation,
       });
+
+      // Обновляем историю после успешной проверки
+      loadHistory();
     } catch (err: any) {
       setError(err.message || "Произошла ошибка. Попробуйте позже.");
     } finally {
@@ -45,17 +67,7 @@ export default function DiaryPage() {
 
   return (
     <div className={styles.pageWrapper}>
-      <header className={styles.header}>
-        <a href="/" className={styles.logo}>
-          <span>🇩🇪</span> KlarDeutsch
-        </a>
-        <nav className={styles.nav}>
-          <a href="/" className={styles.navLink}>Главная</a>
-          <a href="/trainer" className={styles.navLink}>Тренажер</a>
-          <a href="/audio" className={styles.navLink}>Записи</a>
-          <a href="/diary" className={styles.navLink} style={{ color: '#3b82f6', fontWeight: 600 }}>Дневник</a>
-        </nav>
-      </header>
+      <Header />
 
       <main className={styles.container}>
         <h1 className={styles.title}>Мой дневник</h1>
@@ -101,7 +113,7 @@ export default function DiaryPage() {
                 <CheckCircle2 color="#22c55e" size={24} />
                 Результат проверки:
               </h3>
-              
+
               <div className={styles.correctedText}>
                 {result.corrected}
               </div>
@@ -113,6 +125,29 @@ export default function DiaryPage() {
             </div>
           )}
         </div>
+
+        {history.length > 0 && (
+          <div className={styles.historySection}>
+            <h3 className={styles.resultTitle}>История записей</h3>
+            <div className={styles.historyList}>
+              {history.map((item) => (
+                <div key={item.id} className={styles.historyItem}>
+                  <div className={styles.historyHeader}>
+                    <span className={styles.historyDate}>{item.created_at}</span>
+                  </div>
+                  <div className={styles.historyContent}>
+                    <div className={styles.historyOriginal}>
+                      <strong>Я написал:</strong> {item.original_text}
+                    </div>
+                    <div className={styles.historyCorrected}>
+                      <strong>ИИ исправил:</strong> {item.corrected_text}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

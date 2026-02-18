@@ -57,6 +57,17 @@ def init_db():
             );
         """)
         
+        # Таблица записей в дневнике
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS diary_entries (
+                id SERIAL PRIMARY KEY,
+                original_text TEXT NOT NULL,
+                corrected_text TEXT NOT NULL,
+                explanation TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        
         conn.commit()
         cur.close()
         conn.close()

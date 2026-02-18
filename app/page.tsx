@@ -3,23 +3,12 @@
 import React from "react";
 import styles from "./styles/Shared.module.css";
 
+import Header from "./components/Header";
+
 export default function HomePage() {
   return (
     <div className={styles.pageWrapper}>
-      {/* Шапка (такая же как в тренажере) */}
-      <header className={styles.header}>
-        <a href="/" className={styles.logo}>
-          <span>🇩🇪</span> KlarDeutsch
-        </a>
-        <nav className={styles.nav}>
-          <a href="/" className={styles.navLink}>Главная</a>
-          {/* Ссылка на текущую страницу (Тренажер) */}
-          <a href="/trainer" className={styles.navLink}>Тренажер</a>
-          {/* Добавленная ссылка на страницу аудио */}
-          <a href="/audio" className={styles.navLink}>Записи</a>
-          <a href="/diary" className={styles.navLink}>Дневник</a>
-        </nav>
-      </header>
+      <Header />
 
       {/* Контент главной */}
       <main className={styles.container} style={{ textAlign: 'center', maxWidth: '800px' }}>
