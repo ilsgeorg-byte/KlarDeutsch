@@ -10,6 +10,7 @@ api_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if api_dir not in sys.path:
     sys.path.insert(0, api_dir)
 
+from .auth import token_required
 from db import get_db_connection
 
 # Попытка импорта boto3 (опционально)
@@ -55,6 +56,7 @@ def allowed_file(filename: str) -> bool:
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 @audio_bp.route('/audio', methods=['POST'])
+@token_required
 def upload_audio():
     """Загрузка аудиофайла"""
     try:
@@ -112,30 +114,7 @@ def upload_audio():
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Обновленная структура таблицы (добавляем file_data и mimetype если их нет)
-        # Примечание: В продакшене лучше использовать миграции (ALTER TABLE)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS recordings (
-                id SERIAL PRIMARY KEY,
-                filename TEXT NOT NULL,
-                url TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                file_data BYTEA,
-                mimetype TEXT
-            )
-        """)
-        
-        # Создаем индекс для ускорения сортировки (если нет)
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_recordings_created_at ON recordings(created_at DESC)")
-        
-        # Пытаемся добавить колонки, если таблица старая (грубая миграция)
-        try:
-            cur.execute("ALTER TABLE recordings ADD COLUMN IF NOT EXISTS file_data BYTEA")
-            cur.execute("ALTER TABLE recordings ADD COLUMN IF NOT EXISTS mimetype TEXT")
-        except:
-            conn.rollback()
-
-        cur.execute("INSERT INTO recordings (filename, url, file_data, mimetype) VALUES (%s, %s, %s, %s) RETURNING id", (filename, url, file_data, file.content_type))
+        cur.execute("INSERT INTO recordings (user_id, filename, url, file_data, mimetype) VALUES (%s, %s, %s, %s, %s) RETURNING id", (request.user_id, filename, url, file_data, file.content_type))
         record_id = cur.fetchone()[0]
         conn.commit()
         cur.close()
@@ -147,6 +126,7 @@ def upload_audio():
         return jsonify({"error": str(e)}), 500
 
 @audio_bp.route('/list_audio', methods=['GET'])
+@token_required
 def list_audio():
     """Получить список всех аудиофайлов"""
     try:
@@ -161,7 +141,7 @@ def list_audio():
         if not cur.fetchone()[0]:
              return jsonify([]), 200
 
-        cur.execute("SELECT filename FROM recordings ORDER BY created_at DESC LIMIT %s OFFSET %s", (limit, offset))
+        cur.execute("SELECT filename FROM recordings WHERE user_id = %s ORDER BY created_at DESC LIMIT %s OFFSET %s", (request.user_id, limit, offset))
         rows = cur.fetchall()
         files = [r[0] for r in rows]
         
@@ -203,6 +183,7 @@ def get_file(filename):
         return jsonify({"error": str(e)}), 500
 
 @audio_bp.route('/delete_audio', methods=['POST'])
+@token_required
 def delete_audio():
     """Удалить аудиофайл"""
     try:
@@ -228,7 +209,7 @@ def delete_audio():
         # Удаляем из БД
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("DELETE FROM recordings WHERE filename = %s", (filename,))
+        cur.execute("DELETE FROM recordings WHERE filename = %s AND user_id = %s", (filename, request.user_id))
         conn.commit()
         cur.close()
         conn.close()

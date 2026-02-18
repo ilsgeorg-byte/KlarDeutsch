@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Header from "../components/Header";
 import { BookOpen, CheckCircle, TrendingUp, Award, Layers } from "lucide-react";
 import styles from "../styles/Shared.module.css";
@@ -18,11 +19,24 @@ interface Stats {
 export default function ProfilePage() {
     const [stats, setStats] = useState<Stats | null>(null);
     const [loading, setLoading] = useState(true);
+    const router = useRouter();
 
     useEffect(() => {
         const fetchStats = async () => {
+            const token = localStorage.getItem("token");
+            if (!token) {
+                router.push("/login");
+                return;
+            }
+
             try {
-                const res = await fetch("/api/trainer/stats");
+                const res = await fetch("/api/trainer/stats", {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+                if (res.status === 401) {
+                    router.push("/login");
+                    return;
+                }
                 if (res.ok) {
                     const data = await res.json();
                     setStats(data);

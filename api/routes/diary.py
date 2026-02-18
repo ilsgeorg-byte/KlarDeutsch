@@ -1,9 +1,5 @@
-from flask import Blueprint, request, jsonify
-import os
-import google.generativeai as genai
-from openai import OpenAI
-from dotenv import load_dotenv
-from .words import get_db_connection
+from .auth import token_required
+from api.db import get_db_connection
 
 diary_bp = Blueprint('diary', __name__, url_prefix='/api/diary')
 
@@ -122,6 +118,7 @@ def correct_with_openai(text):
         return None, str(e)
 
 @diary_bp.route('/correct', methods=['POST'])
+@token_required
 def correct_text():
     data = request.get_json()
     text = data.get("text", "")
@@ -148,9 +145,9 @@ def correct_text():
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO diary_entries (original_text, corrected_text, explanation)
-            VALUES (%s, %s, %s)
-        """, (text, result['corrected'], result['explanation']))
+            INSERT INTO diary_entries (user_id, original_text, corrected_text, explanation)
+            VALUES (%s, %s, %s, %s)
+        """, (request.user_id, text, result['corrected'], result['explanation']))
         conn.commit()
         cur.close()
         conn.close()
@@ -161,6 +158,7 @@ def correct_text():
     return jsonify(result), 200
 
 @diary_bp.route('/history', methods=['GET'])
+@token_required
 def get_history():
     """Получить историю записей"""
     try:
@@ -169,8 +167,9 @@ def get_history():
         cur.execute("""
             SELECT id, original_text, corrected_text, explanation, created_at
             FROM diary_entries
+            WHERE user_id = %s
             ORDER BY created_at DESC
-        """)
+        """, (request.user_id,))
         
         columns = [desc[0] for desc in cur.description]
         results = []
@@ -189,12 +188,13 @@ def get_history():
         return jsonify({"error": str(e)}), 500
 
 @diary_bp.route('/history/<int:entry_id>', methods=['DELETE'])
+@token_required
 def delete_entry(entry_id):
     """Удалить запись из истории"""
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("DELETE FROM diary_entries WHERE id = %s", (entry_id,))
+        cur.execute("DELETE FROM diary_entries WHERE id = %s AND user_id = %s", (entry_id, request.user_id))
         conn.commit()
         cur.close()
         conn.close()
@@ -204,6 +204,7 @@ def delete_entry(entry_id):
         return jsonify({"error": str(e)}), 500
 
 @diary_bp.route('/extract-words', methods=['POST'])
+@token_required
 def extract_words():
     """Извлечь слова из исправления для добавления в тренажер"""
     try:
@@ -241,6 +242,7 @@ def extract_words():
         return jsonify({"error": str(e)}), 500
 
 @diary_bp.route('/add-words', methods=['POST'])
+@token_required
 def add_diary_words():
     """Добавить слова из дневника напрямую в тренажер"""
     try:
@@ -270,10 +272,10 @@ def add_diary_words():
             if word_id:
                 # 2. Добавляем в список изучения пользователя
                 cur.execute("""
-                    INSERT INTO user_words (word_id, status, next_review)
-                    VALUES (%s, 'learning', CURRENT_TIMESTAMP)
-                    ON CONFLICT (word_id) DO NOTHING
-                """, (word_id,))
+                    INSERT INTO user_words (user_id, word_id, status, next_review)
+                    VALUES (%s, %s, 'learning', CURRENT_TIMESTAMP)
+                    ON CONFLICT (user_id, word_id) DO NOTHING
+                """, (request.user_id, word_id))
                 added_count += 1
                 
         conn.commit()

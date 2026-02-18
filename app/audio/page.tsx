@@ -1,17 +1,34 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import styles from "../styles/Shared.module.css"; // Путь на уровень выше
+import { useRouter } from "next/navigation";
+import styles from "../styles/Shared.module.css";
 
 import Header from "../components/Header";
 
 export default function AudioPage() {
   const [files, setFiles] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
+
+  // Проверка авторизации
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      router.push("/login");
+    }
+  }, []);
 
   const loadFiles = async () => {
     try {
-      const res = await fetch("/api/list_audio");
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/list_audio", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (res.status === 401) {
+        router.push("/login");
+        return;
+      }
       const data = await res.json();
       setFiles(data);
     } catch (e) {
@@ -25,9 +42,13 @@ export default function AudioPage() {
     if (!confirm("Удалить запись?")) return;
     setLoading(true);
     try {
+      const token = localStorage.getItem("token");
       const res = await fetch("/api/delete_audio", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify({ filename })
       });
       if (res.ok) {

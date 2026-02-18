@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import styles from "./Diary.module.css";
 import { Sparkles, CheckCircle2, AlertCircle, Loader2, Trash2, Calendar } from "lucide-react";
 
+import { useRouter } from "next/navigation";
 import Header from "../components/Header";
 
 export default function DiaryPage() {
@@ -14,10 +15,26 @@ export default function DiaryPage() {
   const [history, setHistory] = useState<any[]>([]);
   const [extractedWords, setExtractedWords] = useState<any[]>([]);
   const [isAddingWords, setIsAddingWords] = useState(false);
+  const router = useRouter();
+
+  // Проверка авторизации
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      router.push("/login");
+    }
+  }, []);
 
   const loadHistory = async () => {
     try {
-      const res = await fetch("/api/diary/history");
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/diary/history", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (res.status === 401) {
+        router.push("/login");
+        return;
+      }
       if (res.ok) {
         const data = await res.json();
         setHistory(data);
@@ -35,8 +52,10 @@ export default function DiaryPage() {
     if (!confirm("Удалить эту запись из истории?")) return;
 
     try {
+      const token = localStorage.getItem("token");
       const res = await fetch(`/api/diary/history/${id}`, {
         method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
       });
       if (res.ok) {
         setHistory(prev => prev.filter(item => item.id !== id));
@@ -51,9 +70,13 @@ export default function DiaryPage() {
 
   const handleExtractWords = async (original: string, corrected: string) => {
     try {
+      const token = localStorage.getItem("token");
       const res = await fetch("/api/diary/extract-words", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify({ original, corrected }),
       });
       if (res.ok) {
@@ -69,9 +92,13 @@ export default function DiaryPage() {
     if (extractedWords.length === 0) return;
     setIsAddingWords(true);
     try {
+      const token = localStorage.getItem("token");
       const res = await fetch("/api/diary/add-words", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify(extractedWords),
       });
       if (res.ok) {
@@ -93,10 +120,12 @@ export default function DiaryPage() {
     setResult(null);
 
     try {
+      const token = localStorage.getItem("token");
       const response = await fetch("/api/diary/correct", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({ text }),
       });

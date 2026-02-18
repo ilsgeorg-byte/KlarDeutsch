@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import Link from "next/link"; // Для кнопки "Домой" 1
-import { Mic, Square, Volume2, ArrowRight, Eye, EyeOff, Home } from "lucide-react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Mic, Square, Volume2, ArrowRight, Eye, EyeOff, Home, Loader2 } from "lucide-react";
 import styles from "../styles/Shared.module.css";
 
 interface Word {
@@ -25,6 +26,15 @@ export default function TrainerPage() {
   const [showAnswer, setShowAnswer] = useState(false);
   const [loading, setLoading] = useState(false);
   const [audioStatus, setAudioStatus] = useState<string | null>(null);
+  const router = useRouter();
+
+  // Проверка авторизации
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      router.push("/login");
+    }
+  }, []);
 
   // --- ЛОГИКА ЗАПИСИ ---
   const [isRecording, setIsRecording] = useState(false);
@@ -72,8 +82,12 @@ export default function TrainerPage() {
     formData.append("file", blob, "recording.webm");
 
     try {
+      const token = localStorage.getItem("token");
       const res = await fetch("/api/audio", {
         method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        },
         body: formData,
       });
       if (res.ok) {
@@ -96,7 +110,14 @@ export default function TrainerPage() {
     const loadWords = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/trainer/words?level=${level}`);
+        const token = localStorage.getItem("token");
+        const res = await fetch(`/api/trainer/words?level=${level}`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (res.status === 401) {
+          router.push("/login");
+          return;
+        }
         if (!res.ok) throw new Error("Failed");
         const data = await res.json();
         setWords(data);
@@ -124,9 +145,13 @@ export default function TrainerPage() {
     if (!currentWord) return;
 
     try {
+      const token = localStorage.getItem("token");
       const res = await fetch("/api/trainer/rate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify({
           word_id: currentWord.id,
           rating: rating

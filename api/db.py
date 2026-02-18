@@ -32,6 +32,17 @@ def init_db():
         conn = get_db_connection()
         cur = conn.cursor()
         
+        # Таблица пользователей
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(50) UNIQUE NOT NULL,
+                email VARCHAR(100) UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+
         # Таблица слов
         cur.execute("""
             CREATE TABLE IF NOT EXISTS words (
@@ -48,35 +59,51 @@ def init_db():
             );
         """)
         
-        # Таблица прогресса (SRS)
+        # Таблица прогресса (SRS) - теперь привязана к пользователю
         cur.execute("""
             CREATE TABLE IF NOT EXISTS user_words (
-                word_id INTEGER PRIMARY KEY REFERENCES words(id),
+                user_id INTEGER REFERENCES users(id),
+                word_id INTEGER REFERENCES words(id),
                 ease_factor FLOAT DEFAULT 2.5,
                 interval INTEGER DEFAULT 0,
                 reps INTEGER DEFAULT 0,
                 next_review TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 status VARCHAR(20) DEFAULT 'learning',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, word_id)
             );
         """)
         
-        # Добавляем колонки, если таблица уже существует (миграция)
-        cur.execute("ALTER TABLE user_words ADD COLUMN IF NOT EXISTS ease_factor FLOAT DEFAULT 2.5;")
-        cur.execute("ALTER TABLE user_words ADD COLUMN IF NOT EXISTS interval INTEGER DEFAULT 0;")
-        cur.execute("ALTER TABLE user_words ADD COLUMN IF NOT EXISTS reps INTEGER DEFAULT 0;")
-        cur.execute("ALTER TABLE user_words ADD COLUMN IF NOT EXISTS next_review TIMESTAMP DEFAULT CURRENT_TIMESTAMP;")
+        # Миграция для старой схемы (если была)
+        cur.execute("ALTER TABLE user_words ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);")
+        # Примечание: Если таблица была без user_id, нужно будет назначить дефолтного юзера
         
-        # Таблица записей в дневнике
+        # Таблица записей в дневнике - теперь привязана к пользователю
         cur.execute("""
             CREATE TABLE IF NOT EXISTS diary_entries (
                 id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id),
                 original_text TEXT NOT NULL,
                 corrected_text TEXT NOT NULL,
                 explanation TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
+        cur.execute("ALTER TABLE diary_entries ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);")
+
+        # Таблица аудиозаписей - теперь привязана к пользователю
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS recordings (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id),
+                filename TEXT NOT NULL,
+                url TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                file_data BYTEA,
+                mimetype TEXT
+            );
+        """)
+        cur.execute("ALTER TABLE recordings ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);")
         
         conn.commit()
         cur.close()

@@ -8,11 +8,13 @@ api_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if api_dir not in sys.path:
     sys.path.insert(0, api_dir)
 
+from .auth import token_required
 from db import get_db_connection
 
-trainer_bp = Blueprint('trainer', __name__, url_prefix='/api/trainer')
+trainer_bp = Blueprint('trainer', __name__)
 
 @trainer_bp.route('/words', methods=['GET'])
+@token_required
 def get_training_words():
     """
     Получить слова для тренировки:
@@ -32,10 +34,10 @@ def get_training_words():
                    uw.interval, uw.ease_factor, uw.reps, uw.next_review
             FROM words w
             JOIN user_words uw ON w.id = uw.word_id
-            WHERE w.level = %s AND uw.next_review <= CURRENT_TIMESTAMP
+            WHERE w.level = %s AND uw.user_id = %s AND uw.next_review <= CURRENT_TIMESTAMP AND uw.status = 'learning'
             ORDER BY uw.next_review ASC
             LIMIT %s
-        """, (level, limit))
+        """, (level, request.user_id, limit))
         
         columns = [desc[0] for desc in cur.description]
         cards_to_review = [dict(zip(columns, row)) for row in cur.fetchall()]
@@ -46,10 +48,10 @@ def get_training_words():
             cur.execute("""
                 SELECT id, level, topic, de, ru, article, example_de, example_ru
                 FROM words
-                WHERE level = %s AND id NOT IN (SELECT word_id FROM user_words)
+                WHERE level = %s AND id NOT IN (SELECT word_id FROM user_words WHERE user_id = %s)
                 ORDER BY id
                 LIMIT %s
-            """, (level, remaining))
+            """, (level, request.user_id, remaining))
             
             columns = [desc[0] for desc in cur.description]
             new_words = [dict(zip(columns, row)) for row in cur.fetchall()]
@@ -63,6 +65,7 @@ def get_training_words():
         return jsonify({"error": str(e)}), 500
 
 @trainer_bp.route('/rate', methods=['POST'])
+@token_required
 def rate_word():
     """
     Обновить прогресс слова по алгоритму SM-2
@@ -82,13 +85,13 @@ def rate_word():
         if rating == 0:
             # Пометить как "известное" навсегда
             cur.execute("""
-                INSERT INTO user_words (word_id, status, next_review)
-                VALUES (%s, 'known', '2099-01-01')
-                ON CONFLICT (word_id) DO UPDATE SET status = 'known', next_review = '2099-01-01'
-            """, (word_id,))
+                INSERT INTO user_words (user_id, word_id, status, next_review)
+                VALUES (%s, %s, 'known', '2099-01-01')
+                ON CONFLICT (user_id, word_id) DO UPDATE SET status = 'known', next_review = '2099-01-01'
+            """, (request.user_id, word_id))
         else:
             # Получаем текущий прогресс
-            cur.execute("SELECT interval, ease_factor, reps FROM user_words WHERE word_id = %s", (word_id,))
+            cur.execute("SELECT interval, ease_factor, reps FROM user_words WHERE word_id = %s AND user_id = %s", (word_id, request.user_id))
             row = cur.fetchone()
             
             if not row:
@@ -116,15 +119,15 @@ def rate_word():
             next_review = datetime.now() + timedelta(days=interval)
             
             cur.execute("""
-                INSERT INTO user_words (word_id, interval, ease_factor, reps, next_review, status)
-                VALUES (%s, %s, %s, %s, %s, 'learning')
-                ON CONFLICT (word_id) DO UPDATE SET
+                INSERT INTO user_words (user_id, word_id, interval, ease_factor, reps, next_review, status)
+                VALUES (%s, %s, %s, %s, %s, %s, 'learning')
+                ON CONFLICT (user_id, word_id) DO UPDATE SET
                     interval = EXCLUDED.interval,
                     ease_factor = EXCLUDED.ease_factor,
                     reps = EXCLUDED.reps,
                     next_review = EXCLUDED.next_review,
                     status = 'learning'
-            """, (word_id, interval, ease_factor, reps, next_review))
+            """, (request.user_id, word_id, interval, ease_factor, reps, next_review))
         
         conn.commit()
         cur.close()
@@ -135,6 +138,7 @@ def rate_word():
         return jsonify({"error": str(e)}), 500
 
 @trainer_bp.route('/stats', methods=['GET'])
+@token_required
 def get_stats():
     """Статистика по изучению слов"""
     try:
@@ -146,7 +150,7 @@ def get_stats():
         total_by_level = dict(cur.fetchall())
         
         # Кол-во слов в разных статусах (learning, known)
-        cur.execute("SELECT status, COUNT(*) FROM user_words GROUP BY status")
+        cur.execute("SELECT status, COUNT(*) FROM user_words WHERE user_id = %s GROUP BY status", (request.user_id,))
         user_status_counts = dict(cur.fetchall())
         
         # Детально по уровням для пользователя
@@ -154,8 +158,9 @@ def get_stats():
             SELECT w.level, uw.status, COUNT(*) 
             FROM user_words uw
             JOIN words w ON uw.word_id = w.id
+            WHERE uw.user_id = %s
             GROUP BY w.level, uw.status
-        """)
+        """, (request.user_id,))
         
         user_detailed = []
         for row in cur.fetchall():
