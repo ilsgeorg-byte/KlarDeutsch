@@ -17,9 +17,11 @@ def correct_with_gemini(text):
     
     try:
         genai.configure(api_key=api_key)
+        # Пробуем более стабильное имя модели
         model = genai.GenerativeModel('gemini-1.5-flash')
         
-        prompt = f"""
+        # Для отладки
+        print(f"Попытка исправления текста через Gemini: {text[:30]}...")
         Ты — помощник по изучению немецкого языка. 
         Исправь грамматические и стилистические ошибки в следующем тексте на немецком языке.
         Текст: "{text}"
