@@ -38,6 +38,10 @@ CORS(app, resources={
 from .routes.words import words_bp
 from .routes.audio import audio_bp
 from .routes.diary import diary_bp
+from .db import init_db
+
+# Инициализируем базу данных (создаем таблицы если их нет)
+init_db()
 
 app.register_blueprint(words_bp)
 app.register_blueprint(audio_bp)

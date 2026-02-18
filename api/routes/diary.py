@@ -1,3 +1,8 @@
+from flask import Blueprint, request, jsonify
+import os
+import google.generativeai as genai
+from openai import OpenAI
+from dotenv import load_dotenv
 from .words import get_db_connection
 
 diary_bp = Blueprint('diary', __name__, url_prefix='/api/diary')
