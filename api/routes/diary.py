@@ -12,7 +12,7 @@ load_dotenv(env_path)
 
 def correct_with_gemini(text):
     api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
+    if not api_key or api_key == "Ваш_Ключ_Здесь":
         return None, "GEMINI_API_KEY не настроен"
     
     try:
