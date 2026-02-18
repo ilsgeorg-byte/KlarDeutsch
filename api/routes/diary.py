@@ -98,7 +98,9 @@ def correct_text():
     if error:
         # Если оба не сработали
         if "API_KEY не настроен" in error:
-             return jsonify({"error": "AI API ключи не настроены в .env.local. Пожалуйста, добавьте GEMINI_API_KEY или OPENAI_API_KEY."}), 500
+             return jsonify({
+                 "error": "AI-ключи не настроены. Для работы дневника добавьте GEMINI_API_KEY в настройки (Vercel Environment Variables или .env.local)."
+             }), 500
         return jsonify({"error": f"Ошибка AI: {error}"}), 500
     
     return jsonify(result), 200
