@@ -1,0 +1,131 @@
+from flask import Blueprint, request, jsonify
+from datetime import datetime, timedelta
+import os
+import sys
+
+# Добавляем родительскую директорию в path
+api_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if api_dir not in sys.path:
+    sys.path.insert(0, api_dir)
+
+from db import get_db_connection
+
+trainer_bp = Blueprint('trainer', __name__, url_prefix='/api/trainer')
+
+@trainer_bp.route('/words', methods=['GET'])
+def get_training_words():
+    """
+    Получить слова для тренировки:
+    1. Слова, которые пора повторить (next_review <= now)
+    2. Новые слова из выбранного уровня (которых еще нет в user_words)
+    """
+    try:
+        level = request.args.get("level", "A1").upper()
+        limit = int(request.args.get("limit", 10))
+        
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # 1. Получаем слова, которые пора повторить
+        cur.execute("""
+            SELECT w.id, w.level, w.topic, w.de, w.ru, w.article, w.example_de, w.example_ru, 
+                   uw.interval, uw.ease_factor, uw.reps, uw.next_review
+            FROM words w
+            JOIN user_words uw ON w.id = uw.word_id
+            WHERE w.level = %s AND uw.next_review <= CURRENT_TIMESTAMP
+            ORDER BY uw.next_review ASC
+            LIMIT %s
+        """, (level, limit))
+        
+        columns = [desc[0] for desc in cur.description]
+        cards_to_review = [dict(zip(columns, row)) for row in cur.fetchall()]
+        
+        # 2. Если слов меньше лимита, добавляем новые
+        remaining = limit - len(cards_to_review)
+        if remaining > 0:
+            cur.execute("""
+                SELECT id, level, topic, de, ru, article, example_de, example_ru
+                FROM words
+                WHERE level = %s AND id NOT IN (SELECT word_id FROM user_words)
+                ORDER BY id
+                LIMIT %s
+            """, (level, remaining))
+            
+            columns = [desc[0] for desc in cur.description]
+            new_words = [dict(zip(columns, row)) for row in cur.fetchall()]
+            cards_to_review.extend(new_words)
+            
+        cur.close()
+        conn.close()
+        
+        return jsonify(cards_to_review), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@trainer_bp.route('/rate', methods=['POST'])
+def rate_word():
+    """
+    Обновить прогресс слова по алгоритму SM-2
+    Rating: 1 (Сложно), 3 (Хорошо), 5 (Легко)
+    """
+    try:
+        data = request.json
+        word_id = data.get('word_id')
+        rating = int(data.get('rating')) # 1, 3, 5
+        
+        if not word_id or rating not in [1, 3, 5]:
+            return jsonify({"error": "Неверные данные"}), 400
+            
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Получаем текущий прогресс
+        cur.execute("SELECT interval, ease_factor, reps FROM user_words WHERE word_id = %s", (word_id,))
+        row = cur.fetchone()
+        
+        if not row:
+            # Если записи нет, создаем ее (начальные значения)
+            interval, ease_factor, reps = 0, 2.5, 0
+        else:
+            interval, ease_factor, reps = row
+            
+        # Алгоритм SM-2
+        if rating >= 3:
+            if reps == 0:
+                interval = 1
+            elif reps == 1:
+                interval = 6
+            else:
+                interval = round(interval * ease_factor)
+            
+            reps += 1
+            # Корректировка фактора легкости
+            ease_factor = ease_factor + (0.1 - (5 - rating) * (0.08 + (5 - rating) * 0.02))
+        else:
+            # Если ошибка/сложно, сбрасываем прогресс
+            reps = 0
+            interval = 1
+            ease_factor = max(1.3, ease_factor - 0.2)
+            
+        ease_factor = max(1.3, ease_factor)
+        next_review = datetime.now() + timedelta(days=interval)
+        
+        # Сохраняем/Обновляем
+        cur.execute("""
+            INSERT INTO user_words (word_id, interval, ease_factor, reps, next_review, status)
+            VALUES (%s, %s, %s, %s, %s, 'learning')
+            ON CONFLICT (word_id) DO UPDATE SET
+                interval = EXCLUDED.interval,
+                ease_factor = EXCLUDED.ease_factor,
+                reps = EXCLUDED.reps,
+                next_review = EXCLUDED.next_review,
+                status = 'learning'
+        """, (word_id, interval, ease_factor, reps, next_review))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return jsonify({"status": "success", "next_review": next_review.isoformat()}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

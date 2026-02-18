@@ -47,15 +47,24 @@ def init_db():
             );
         """)
         
-        # Таблица прогресса
+        # Таблица прогресса (SRS)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS user_words (
-                word_id INTEGER REFERENCES words(id),
-                status VARCHAR(20) DEFAULT 'new',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (word_id)
+                word_id INTEGER PRIMARY KEY REFERENCES words(id),
+                ease_factor FLOAT DEFAULT 2.5,
+                interval INTEGER DEFAULT 0,
+                reps INTEGER DEFAULT 0,
+                next_review TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                status VARCHAR(20) DEFAULT 'learning',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
+        
+        # Добавляем колонки, если таблица уже существует (миграция)
+        cur.execute("ALTER TABLE user_words ADD COLUMN IF NOT EXISTS ease_factor FLOAT DEFAULT 2.5;")
+        cur.execute("ALTER TABLE user_words ADD COLUMN IF NOT EXISTS interval INTEGER DEFAULT 0;")
+        cur.execute("ALTER TABLE user_words ADD COLUMN IF NOT EXISTS reps INTEGER DEFAULT 0;")
+        cur.execute("ALTER TABLE user_words ADD COLUMN IF NOT EXISTS next_review TIMESTAMP DEFAULT CURRENT_TIMESTAMP;")
         
         # Таблица записей в дневнике
         cur.execute("""

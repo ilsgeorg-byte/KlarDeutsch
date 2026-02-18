@@ -94,10 +94,10 @@ export default function TrainerPage() {
     const loadWords = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/words?level=${level}`);
+        const res = await fetch(`/api/trainer/words?level=${level}`);
         if (!res.ok) throw new Error("Failed");
         const data = await res.json();
-        setWords(data.data);
+        setWords(data);
         setIndex(0);
         setShowAnswer(false);
       } catch (e) {
@@ -113,7 +113,30 @@ export default function TrainerPage() {
   const handleNext = () => {
     setShowAnswer(false);
     setAudioStatus(null);
-    setIndex((prev) => (prev + 1) % words.length);
+    if (words.length > 0) {
+      setIndex((prev) => (prev + 1) % words.length);
+    }
+  };
+
+  const handleRate = async (rating: number) => {
+    if (!currentWord) return;
+
+    try {
+      const res = await fetch("/api/trainer/rate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          word_id: currentWord.id,
+          rating: rating
+        })
+      });
+
+      if (res.ok) {
+        handleNext();
+      }
+    } catch (err) {
+      console.error("Ошибка сохранения прогресса:", err);
+    }
   };
 
   const playAudio = (text: string) => {
@@ -128,10 +151,8 @@ export default function TrainerPage() {
     <div className={styles.pageWrapper}>
       <Header />
 
-      {/* Основной контент */}
       <main className="flex-1 flex flex-col items-center px-4 py-6 w-full">
 
-        {/* КНОПКИ УРОВНЕЙ */}
         <div className="flex flex-wrap gap-2 mb-8 justify-center">
           {["A1", "A2", "B1", "B2", "C1"].map((lvl) => (
             <button
@@ -147,51 +168,84 @@ export default function TrainerPage() {
           ))}
         </div>
 
-        {/* КАРТОЧКА */}
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col relative min-h-[450px]">
-          {/* ... тут весь код карточки без изменений ... */}
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col relative min-h-[500px]">
           {loading ? (
             <div className="flex-1 flex items-center justify-center flex-col gap-4">
               <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-gray-500">Загрузка...</p>
+              <p className="text-gray-500">Подготовка сессии...</p>
             </div>
           ) : !currentWord ? (
             <div className="flex-1 flex items-center justify-center p-8 text-center text-gray-500">
-              Нет слов для этого уровня :(
+              Пока нет слов для повторения на уровне {level}. <br />Попробуйте другой уровень или зайдите позже!
             </div>
           ) : (
             <div className="flex-1 flex flex-col p-6">
-              {/* ... содержимое карточки ... */}
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-xs font-bold text-blue-500 uppercase tracking-wider">{currentWord.level}</span>
+                {/* @ts-ignore */}
+                {currentWord.next_review && (
+                  <span className="text-[10px] text-gray-400 bg-gray-50 px-2 py-1 rounded">Повторение</span>
+                )}
+              </div>
 
-              {/* (вставь сюда то, что было внутри карточки) */}
               <div className="flex flex-col items-center text-center mb-6 mt-4">
-                <h2 className="text-4xl font-bold text-gray-800 mb-4">{currentWord.de}</h2>
+                <h2 className="text-4xl font-bold text-gray-800 mb-4">
+                  {/* @ts-ignore */}
+                  {currentWord.article && <span className="text-blue-500 text-2xl mr-2">{currentWord.article}</span>}
+                  {currentWord.de}
+                </h2>
                 <button onClick={() => playAudio(currentWord.de)} className="p-3 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition"><Volume2 size={28} /></button>
               </div>
 
               <div className={`transition-all duration-300 overflow-hidden ${showAnswer ? "max-h-60 opacity-100 mb-6" : "max-h-0 opacity-0"}`}>
                 <div className="bg-gray-50 p-4 rounded-xl text-center border border-gray-100">
                   <p className="text-xl text-green-700 font-medium mb-1">{currentWord.ru}</p>
-                  {currentWord.example_de && <div className="text-sm text-gray-500 mt-2 pt-2 border-t border-gray-200 italic">{currentWord.example_de}</div>}
+                  {currentWord.example_de && (
+                    <div className="text-sm text-gray-500 mt-2 pt-2 border-t border-gray-200 italic">
+                      {currentWord.example_de}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div className="mt-auto grid grid-cols-2 gap-3">
-                <button onClick={() => setShowAnswer(!showAnswer)} className={`py-3 px-4 rounded-xl font-semibold flex justify-center items-center gap-2 transition ${showAnswer ? "bg-gray-100 text-gray-700" : "bg-blue-600 text-white shadow-lg"}`}>
-                  {showAnswer ? <EyeOff size={18} /> : <Eye size={18} />} {showAnswer ? "Скрыть" : "Перевод"}
-                </button>
-                <button onClick={handleNext} className="py-3 px-4 bg-gray-800 text-white rounded-xl font-semibold flex justify-center items-center gap-2 hover:bg-black transition">
-                  Далее <ArrowRight size={18} />
-                </button>
+              <div className="mt-auto">
+                {!showAnswer ? (
+                  <button onClick={() => setShowAnswer(true)} className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:bg-blue-700 transition flex items-center justify-center gap-2">
+                    <Eye size={20} /> Показать перевод
+                  </button>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      onClick={() => handleRate(1)}
+                      className="flex flex-col items-center gap-1 py-3 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition border border-red-100"
+                    >
+                      <span className="font-bold text-sm">Сложно</span>
+                      <span className="text-[10px] opacity-70">Завтра</span>
+                    </button>
+                    <button
+                      onClick={() => handleRate(3)}
+                      className="flex flex-col items-center gap-1 py-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition border border-blue-100"
+                    >
+                      <span className="font-bold text-sm">Норма</span>
+                      <span className="text-[10px] opacity-70">3-4 дня</span>
+                    </button>
+                    <button
+                      onClick={() => handleRate(5)}
+                      className="flex flex-col items-center gap-1 py-3 bg-green-50 text-green-600 rounded-xl hover:bg-green-100 transition border border-green-100"
+                    >
+                      <span className="font-bold text-sm">Легко</span>
+                      <span className="text-[10px] opacity-70">Неделя+</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
-              <div className="flex justify-center mt-4 pt-4 border-t border-gray-100">
+              <div className="flex justify-center mt-6 pt-4 border-t border-gray-100">
                 <button onClick={isRecording ? stopRecording : startRecording} className={`p-4 rounded-full transition-all shadow-md ${isRecording ? "bg-red-500 text-white animate-pulse scale-110" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
                   {isRecording ? <Square size={24} fill="currentColor" /> : <Mic size={24} />}
                 </button>
               </div>
               {audioStatus && <p className="text-center text-xs text-gray-400 mt-2 h-4">{audioStatus}</p>}
-
             </div>
           )}
         </div>
