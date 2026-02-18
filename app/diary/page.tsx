@@ -12,6 +12,8 @@ export default function DiaryPage() {
   const [result, setResult] = useState<{ corrected: string; explanation: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<any[]>([]);
+  const [extractedWords, setExtractedWords] = useState<any[]>([]);
+  const [isAddingWords, setIsAddingWords] = useState(false);
 
   const loadHistory = async () => {
     try {
@@ -47,6 +49,42 @@ export default function DiaryPage() {
     }
   };
 
+  const handleExtractWords = async (original: string, corrected: string) => {
+    try {
+      const res = await fetch("/api/diary/extract-words", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ original, corrected }),
+      });
+      if (res.ok) {
+        const words = await res.json();
+        setExtractedWords(words);
+      }
+    } catch (err) {
+      console.error("Ошибка при извлечении слов:", err);
+    }
+  };
+
+  const handleAddWordsToTrainer = async () => {
+    if (extractedWords.length === 0) return;
+    setIsAddingWords(true);
+    try {
+      const res = await fetch("/api/diary/add-words", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(extractedWords),
+      });
+      if (res.ok) {
+        alert(`Добавлено ${extractedWords.length} слов в тренажер!`);
+        setExtractedWords([]);
+      }
+    } catch (err) {
+      console.error("Ошибка при добавлении слов:", err);
+    } finally {
+      setIsAddingWords(false);
+    }
+  };
+
   const handleCheck = async () => {
     if (!text.trim()) return;
 
@@ -73,6 +111,9 @@ export default function DiaryPage() {
         corrected: data.corrected,
         explanation: data.explanation,
       });
+
+      // Извлекаем слова для изучения
+      handleExtractWords(text, data.corrected);
 
       // Обновляем историю после успешной проверки
       loadHistory();
@@ -167,6 +208,40 @@ export default function DiaryPage() {
                   <h4>Что мы исправили:</h4>
                   <p>{result.explanation}</p>
                 </div>
+
+                {extractedWords.length > 0 && (
+                  <div className="mt-8 p-6 bg-blue-50/50 rounded-2xl border border-blue-100/50 animate-in fade-in slide-in-from-top-4 duration-500">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                      <div>
+                        <h4 className="font-bold text-blue-900 flex items-center gap-2 text-lg">
+                          <Sparkles size={20} className="text-blue-500" /> Выучите новые слова:
+                        </h4>
+                        <p className="text-xs text-blue-600/70 mt-1">ИИ нашел полезные выражения в вашем тексте</p>
+                      </div>
+                      <button
+                        onClick={handleAddWordsToTrainer}
+                        disabled={isAddingWords}
+                        className="w-full sm:w-auto bg-blue-600 text-white px-5 py-2 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-md active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {isAddingWords ? (
+                          <Loader2 className="animate-spin" size={18} />
+                        ) : (
+                          <CheckCircle2 size={18} />
+                        )}
+                        {isAddingWords ? "Добавляем..." : "Добавить в тренажер"}
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {extractedWords.map((w, idx) => (
+                        <div key={idx} className="bg-white px-3 py-1.5 rounded-xl text-sm shadow-sm border border-blue-100 flex items-center gap-2 hover:border-blue-300 transition-colors group">
+                          {w.article && <span className="text-blue-500 font-bold opacity-70 group-hover:opacity-100">{w.article}</span>}
+                          <span className="font-semibold text-gray-800">{w.de}</span>
+                          <span className="text-gray-400 font-medium">— {w.ru}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

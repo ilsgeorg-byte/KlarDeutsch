@@ -12,6 +12,8 @@ interface Word {
   example_de?: string;
   example_ru?: string;
   level: string;
+  article?: string;
+  next_review?: string;
 }
 
 import Header from "../components/Header";
@@ -191,7 +193,9 @@ export default function TrainerPage() {
               <div className="flex flex-col items-center text-center mb-6 mt-4">
                 <h2 className="text-4xl font-bold text-gray-800 mb-4">
                   {/* @ts-ignore */}
-                  {currentWord.article && <span className="text-blue-500 text-2xl mr-2">{currentWord.article}</span>}
+                  {currentWord.article && !currentWord.de.toLowerCase().startsWith(currentWord.article.toLowerCase() + " ") && (
+                    <span className="text-blue-500 text-2xl mr-2">{currentWord.article}</span>
+                  )}
                   {currentWord.de}
                 </h2>
                 <button onClick={() => playAudio(currentWord.de)} className="p-3 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition"><Volume2 size={28} /></button>
@@ -214,7 +218,14 @@ export default function TrainerPage() {
                     <Eye size={20} /> Показать перевод
                   </button>
                 ) : (
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <button
+                      onClick={() => handleRate(0)}
+                      className="flex flex-col items-center gap-1 py-3 bg-gray-100 text-gray-500 rounded-xl hover:bg-gray-200 transition border border-gray-200"
+                    >
+                      <span className="font-bold text-sm">Знаю</span>
+                      <span className="text-[10px] opacity-70">Убрать</span>
+                    </button>
                     <button
                       onClick={() => handleRate(1)}
                       className="flex flex-col items-center gap-1 py-3 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition border border-red-100"

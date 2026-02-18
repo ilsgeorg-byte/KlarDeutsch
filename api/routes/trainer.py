@@ -66,66 +66,112 @@ def get_training_words():
 def rate_word():
     """
     Обновить прогресс слова по алгоритму SM-2
-    Rating: 1 (Сложно), 3 (Хорошо), 5 (Легко)
+    Rating: 0 (Знаю - пропускать), 1 (Сложно), 3 (Хорошо), 5 (Легко)
     """
     try:
         data = request.json
         word_id = data.get('word_id')
-        rating = int(data.get('rating')) # 1, 3, 5
+        rating = int(data.get('rating', -1))
         
-        if not word_id or rating not in [1, 3, 5]:
+        if not word_id or rating not in [0, 1, 3, 5]:
             return jsonify({"error": "Неверные данные"}), 400
             
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Получаем текущий прогресс
-        cur.execute("SELECT interval, ease_factor, reps FROM user_words WHERE word_id = %s", (word_id,))
-        row = cur.fetchone()
-        
-        if not row:
-            # Если записи нет, создаем ее (начальные значения)
-            interval, ease_factor, reps = 0, 2.5, 0
+        if rating == 0:
+            # Пометить как "известное" навсегда
+            cur.execute("""
+                INSERT INTO user_words (word_id, status, next_review)
+                VALUES (%s, 'known', '2099-01-01')
+                ON CONFLICT (word_id) DO UPDATE SET status = 'known', next_review = '2099-01-01'
+            """, (word_id,))
         else:
-            interval, ease_factor, reps = row
+            # Получаем текущий прогресс
+            cur.execute("SELECT interval, ease_factor, reps FROM user_words WHERE word_id = %s", (word_id,))
+            row = cur.fetchone()
             
-        # Алгоритм SM-2
-        if rating >= 3:
-            if reps == 0:
-                interval = 1
-            elif reps == 1:
-                interval = 6
+            if not row:
+                interval, ease_factor, reps = 0, 2.5, 0
             else:
-                interval = round(interval * ease_factor)
+                interval, ease_factor, reps = row
+                
+            # Алгоритм SM-2
+            if rating >= 3:
+                if reps == 0:
+                    interval = 1
+                elif reps == 1:
+                    interval = 6
+                else:
+                    interval = round(interval * ease_factor)
+                
+                reps += 1
+                ease_factor = ease_factor + (0.1 - (5 - rating) * (0.08 + (5 - rating) * 0.02))
+            else:
+                reps = 0
+                interval = 1
+                ease_factor = max(1.3, ease_factor - 0.2)
+                
+            ease_factor = max(1.3, ease_factor)
+            next_review = datetime.now() + timedelta(days=interval)
             
-            reps += 1
-            # Корректировка фактора легкости
-            ease_factor = ease_factor + (0.1 - (5 - rating) * (0.08 + (5 - rating) * 0.02))
-        else:
-            # Если ошибка/сложно, сбрасываем прогресс
-            reps = 0
-            interval = 1
-            ease_factor = max(1.3, ease_factor - 0.2)
-            
-        ease_factor = max(1.3, ease_factor)
-        next_review = datetime.now() + timedelta(days=interval)
-        
-        # Сохраняем/Обновляем
-        cur.execute("""
-            INSERT INTO user_words (word_id, interval, ease_factor, reps, next_review, status)
-            VALUES (%s, %s, %s, %s, %s, 'learning')
-            ON CONFLICT (word_id) DO UPDATE SET
-                interval = EXCLUDED.interval,
-                ease_factor = EXCLUDED.ease_factor,
-                reps = EXCLUDED.reps,
-                next_review = EXCLUDED.next_review,
-                status = 'learning'
-        """, (word_id, interval, ease_factor, reps, next_review))
+            cur.execute("""
+                INSERT INTO user_words (word_id, interval, ease_factor, reps, next_review, status)
+                VALUES (%s, %s, %s, %s, %s, 'learning')
+                ON CONFLICT (word_id) DO UPDATE SET
+                    interval = EXCLUDED.interval,
+                    ease_factor = EXCLUDED.ease_factor,
+                    reps = EXCLUDED.reps,
+                    next_review = EXCLUDED.next_review,
+                    status = 'learning'
+            """, (word_id, interval, ease_factor, reps, next_review))
         
         conn.commit()
         cur.close()
         conn.close()
         
-        return jsonify({"status": "success", "next_review": next_review.isoformat()}), 200
+        return jsonify({"status": "success"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@trainer_bp.route('/stats', methods=['GET'])
+def get_stats():
+    """Статистика по изучению слов"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Общее кол-во слов в базе по уровням
+        cur.execute("SELECT level, COUNT(*) FROM words GROUP BY level")
+        total_by_level = dict(cur.fetchall())
+        
+        # Кол-во слов в разных статусах (learning, known)
+        cur.execute("SELECT status, COUNT(*) FROM user_words GROUP BY status")
+        user_status_counts = dict(cur.fetchall())
+        
+        # Детально по уровням для пользователя
+        cur.execute("""
+            SELECT w.level, uw.status, COUNT(*) 
+            FROM user_words uw
+            JOIN words w ON uw.word_id = w.id
+            GROUP BY w.level, uw.status
+        """)
+        
+        user_detailed = []
+        for row in cur.fetchall():
+            user_detailed.append({
+                "level": row[0],
+                "status": row[1],
+                "count": row[2]
+            })
+            
+        cur.close()
+        conn.close()
+        
+        return jsonify({
+            "total_words": total_by_level,
+            "user_progress": user_status_counts,
+            "detailed": user_detailed
+        }), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500

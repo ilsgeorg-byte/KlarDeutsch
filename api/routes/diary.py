@@ -202,3 +202,85 @@ def delete_entry(entry_id):
     except Exception as e:
         print(f"Delete Error: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+@diary_bp.route('/extract-words', methods=['POST'])
+def extract_words():
+    """Извлечь слова из исправления для добавления в тренажер"""
+    try:
+        data = request.json
+        original = data.get('original')
+        corrected = data.get('corrected')
+        
+        prompt = f"""
+        Extract the most important German words from this correction that a student should learn.
+        Original: {original}
+        Corrected: {corrected}
+        
+        Return ONLY a JSON list of objects:
+        [
+          {{"de": "Wort", "ru": "Слово", "article": "der/die/das", "level": "A1/A2/B1"}}
+        ]
+        If no important words, return empty list [].
+        """
+        
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content(prompt)
+        text = response.text.replace('```json', '').replace('```', '').strip()
+        
+        import json
+        import re
+        json_match = re.search(r'\[.*\]', text, re.DOTALL)
+        if json_match:
+            words = json.loads(json_match.group(0))
+        else:
+            words = []
+            
+        return jsonify(words), 200
+    except Exception as e:
+        print(f"Extraction Error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@diary_bp.route('/add-words', methods=['POST'])
+def add_diary_words():
+    """Добавить слова из дневника напрямую в тренажер"""
+    try:
+        words = request.json # Список объектов {{de, ru, article, level}}
+        if not words:
+            return jsonify({{"status": "ok"}}), 200
+            
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Сначала убедимся, что есть индекс для ON CONFLICT
+        # cur.execute("ALTER TABLE words ADD CONSTRAINT unique_word UNIQUE (de, ru);") # Это лучше сделать в init_db
+        
+        added_count = 0
+        for w in words:
+            # 1. Добавляем в общую базу слов (через дедукцию ID)
+            cur.execute("""
+                INSERT INTO words (de, ru, article, level, topic)
+                VALUES (%s, %s, %s, %s, 'Дневник')
+                ON CONFLICT (de, ru) DO UPDATE SET de = EXCLUDED.de
+                RETURNING id
+            """, (w['de'], w['ru'], w.get('article', ''), w.get('level', 'A1')))
+            
+            row = cur.fetchone()
+            word_id = row[0] if row else None
+                
+            if word_id:
+                # 2. Добавляем в список изучения пользователя
+                cur.execute("""
+                    INSERT INTO user_words (word_id, status, next_review)
+                    VALUES (%s, 'learning', CURRENT_TIMESTAMP)
+                    ON CONFLICT (word_id) DO NOTHING
+                """, (word_id,))
+                added_count += 1
+                
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return jsonify({"status": "success", "added_count": added_count}), 200
+    except Exception as e:
+        print(f"Add words error: {{e}}")
+        return jsonify({"error": str(e)}), 500

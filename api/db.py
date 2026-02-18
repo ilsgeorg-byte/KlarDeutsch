@@ -21,10 +21,10 @@ def get_db_connection():
 
     try:
         conn = psycopg2.connect(url)
-        print("✅ Успешное подключение к БД")
+        print("Successfully connected to DB")
         return conn
     except Exception as e:
-        print(f"❌ Ошибка подключения к БД: {str(e)}")
+        print(f"Error connecting to DB: {str(e)}")
         raise
 
 def init_db():
@@ -43,7 +43,8 @@ def init_db():
                 article VARCHAR(10),
                 example_de TEXT,
                 example_ru TEXT,
-                audio_url TEXT
+                audio_url TEXT,
+                UNIQUE(de, ru)
             );
         """)
         

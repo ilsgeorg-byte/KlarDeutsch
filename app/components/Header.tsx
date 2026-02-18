@@ -12,6 +12,7 @@ export default function Header() {
         { name: "Тренажер", href: "/trainer" },
         { name: "Записи", href: "/audio" },
         { name: "Дневник", href: "/diary" },
+        { name: "Профиль", href: "/profile" },
     ];
 
     return (
