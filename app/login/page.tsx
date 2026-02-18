@@ -26,7 +26,16 @@ export default function LoginPage() {
                 body: JSON.stringify({ email, password }),
             });
 
-            const data = await response.json();
+            let data;
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.includes("application/json")) {
+                data = await response.json();
+            } else {
+                const text = await response.text();
+                setError(text.includes("<!doctype html>") ? "Ошибка сервера (404/500)" : text);
+                setIsLoading(false);
+                return;
+            }
 
             if (response.ok) {
                 localStorage.setItem("token", data.token);
@@ -35,8 +44,8 @@ export default function LoginPage() {
             } else {
                 setError(data.error || "Ошибка входа");
             }
-        } catch (err) {
-            setError("Не удалось подключиться к серверу");
+        } catch (err: any) {
+            setError("Не удалось подключиться к серверу. Убедитесь, что бэкенд запущен (api/app.py)");
         } finally {
             setIsLoading(false);
         }

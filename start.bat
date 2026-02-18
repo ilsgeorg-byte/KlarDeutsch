@@ -62,18 +62,18 @@ if %ERRORLEVEL% NEQ 0 (
 echo [4/5] Семена БД словами...
 python api\seed.py
 
+echo [5/5] Запуск серверов...
+start "KlarDeutsch Backend" cmd /k "call api\venv\Scripts\activate.bat && cd api && python app.py"
+start "KlarDeutsch Frontend" cmd /k "npm run dev"
+
 echo.
 echo ========================================
-echo Запуск серверов...
+echo Серверы запускаются в новых окнах!
 echo ========================================
 echo.
 echo Flask: http://127.0.0.1:5000
 echo Next.js: http://localhost:3000
 echo.
-echo Откройте 2 терминала и запустите:
-echo   Терминал 1: cd api && python app.py
-echo   Терминал 2: npm run dev
+echo Оставьте те окна открытыми. Для выхода закройте их.
 echo.
-echo Нажмите любую клавишу...
-
 pause

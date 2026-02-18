@@ -1,14 +1,20 @@
+import os
+import re
 import jwt
 import datetime
 import bcrypt
 from flask import Blueprint, request, jsonify, current_app
 from functools import wraps
-from api.db import get_db_connection
+from db import get_db_connection
 
-auth_bp = Blueprint('auth', __name__)
+auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
 # Секретный ключ (в продакшене должен быть в .env.local)
-SECRET_KEY = "klardeutsch-super-secret-key"
+SECRET_KEY = os.environ.get("JWT_SECRET", "klardeutsch-super-secret-key")
+
+def is_valid_email(email):
+    """Простая проверка формата email"""
+    return re.match(r"[^@]+@[^@]+\.[^@]+", email) is not None
 
 def token_required(f):
     @wraps(f)
@@ -43,6 +49,9 @@ def register():
     if not all([username, email, password]):
         return jsonify({'error': 'Заполните все поля'}), 400
 
+    if not is_valid_email(email):
+        return jsonify({'error': 'Неверный формат email'}), 400
+
     password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
     try:
@@ -57,7 +66,23 @@ def register():
         cur.close()
         conn.close()
 
-        return jsonify({'status': 'success', 'message': 'Пользователь зарегистрирован'}), 201
+        # Автоматический вход после регистрации (генерируем токен)
+        token = jwt.encode({
+            'user_id': user_id,
+            'username': username,
+            'exp': datetime.datetime.utcnow() + datetime.timedelta(days=7)
+        }, SECRET_KEY, algorithm="HS256")
+
+        return jsonify({
+            'status': 'success', 
+            'message': 'Пользователь зарегистрирован',
+            'token': token,
+            'user': {
+                'id': user_id,
+                'username': username,
+                'email': email
+            }
+        }), 201
     except Exception as e:
         if "unique" in str(e).lower():
             return jsonify({'error': 'Такой пользователь или email уже существует'}), 400

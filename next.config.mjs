@@ -7,8 +7,8 @@ const nextConfig = {
         // Для разработки: проксируем API запросы на Flask
         {
           source: '/api/:path*',
-          destination: process.env.NODE_ENV === 'development' 
-            ? 'http://127.0.0.1:5000/:path*'
+          destination: process.env.NODE_ENV === 'development'
+            ? 'http://127.0.0.1:5000/api/:path*'
             : '/api/:path*'
         },
         // Для сервирования заложенных файлов (audio)

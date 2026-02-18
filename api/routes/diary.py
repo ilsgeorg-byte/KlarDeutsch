@@ -1,5 +1,11 @@
+from flask import Blueprint, request, jsonify
+import os
+import sys
+import google.generativeai as genai
+from openai import OpenAI
+from dotenv import load_dotenv
 from .auth import token_required
-from api.db import get_db_connection
+from db import get_db_connection
 
 diary_bp = Blueprint('diary', __name__, url_prefix='/api/diary')
 
@@ -284,5 +290,5 @@ def add_diary_words():
         
         return jsonify({"status": "success", "added_count": added_count}), 200
     except Exception as e:
-        print(f"Add words error: {{e}}")
+        print(f"Add words error: {e}")
         return jsonify({"error": str(e)}), 500

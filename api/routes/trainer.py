@@ -11,7 +11,7 @@ if api_dir not in sys.path:
 from .auth import token_required
 from db import get_db_connection
 
-trainer_bp = Blueprint('trainer', __name__)
+trainer_bp = Blueprint('trainer', __name__, url_prefix='/api/trainer')
 
 @trainer_bp.route('/words', methods=['GET'])
 @token_required

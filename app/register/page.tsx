@@ -11,6 +11,7 @@ export default function RegisterPage() {
     const [username, setUsername] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
     const [error, setError] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
@@ -20,6 +21,18 @@ export default function RegisterPage() {
         setError("");
         setIsLoading(true);
 
+        if (password !== confirmPassword) {
+            setError("Пароли не совпадают");
+            setIsLoading(false);
+            return;
+        }
+
+        if (password.length < 6) {
+            setError("Пароль должен быть не менее 6 символов");
+            setIsLoading(false);
+            return;
+        }
+
         try {
             const response = await fetch("/api/auth/register", {
                 method: "POST",
@@ -27,16 +40,28 @@ export default function RegisterPage() {
                 body: JSON.stringify({ username, email, password }),
             });
 
-            const data = await response.json();
+            let data;
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.includes("application/json")) {
+                data = await response.json();
+            } else {
+                const text = await response.text();
+                setError(text.includes("<!doctype html>") ? "Ошибка сервера (404/500)" : text);
+                setIsLoading(false);
+                return;
+            }
 
             if (response.ok) {
-                // После регистрации отправляем на логин
-                router.push("/login?registered=true");
+                // Сохраняем токен и пользователя для автоматического входа
+                localStorage.setItem("token", data.token);
+                localStorage.setItem("user", JSON.stringify(data.user));
+                // Отправляем в профиль
+                router.push("/profile");
             } else {
                 setError(data.error || "Ошибка регистрации");
             }
-        } catch (err) {
-            setError("Не удалось подключиться к серверу");
+        } catch (err: any) {
+            setError("Не удалось подключиться к серверу. Убедитесь, что бэкенд запущен (api/app.py)");
         } finally {
             setIsLoading(false);
         }
@@ -89,6 +114,18 @@ export default function RegisterPage() {
                             placeholder="••••••••"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
+                            required
+                        />
+                    </div>
+
+                    <div className={styles.inputGroup}>
+                        <label className={styles.label}>Подтвердите пароль</label>
+                        <input
+                            type="password"
+                            className={styles.input}
+                            placeholder="••••••••"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
                             required
                         />
                     </div>

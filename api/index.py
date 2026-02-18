@@ -35,12 +35,20 @@ CORS(app, resources={
 })
 
 # Регистрируем blueprints (маршруты)
-from .routes.words import words_bp
-from .routes.audio import audio_bp
-from .routes.diary import diary_bp
-from .routes.trainer import trainer_bp
-from .routes.auth import auth_bp
-from .db import init_db
+try:
+    from routes.words import words_bp
+    from routes.audio import audio_bp
+    from routes.diary import diary_bp
+    from routes.trainer import trainer_bp
+    from routes.auth import auth_bp
+    from db import init_db
+except ImportError:
+    from .routes.words import words_bp
+    from .routes.audio import audio_bp
+    from .routes.diary import diary_bp
+    from .routes.trainer import trainer_bp
+    from .routes.auth import auth_bp
+    from .db import init_db
 
 # Инициализируем базу данных (создаем таблицы если их нет)
 init_db()
