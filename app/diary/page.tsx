@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import styles from "./Diary.module.css";
-import { Sparkles, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { Sparkles, CheckCircle2, AlertCircle, Loader2, Trash2, Calendar } from "lucide-react";
 
 import Header from "../components/Header";
 
@@ -25,9 +25,27 @@ export default function DiaryPage() {
     }
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     loadHistory();
   }, []);
+
+  const handleDelete = async (id: number) => {
+    if (!confirm("Удалить эту запись из истории?")) return;
+
+    try {
+      const res = await fetch(`/api/diary/history/${id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setHistory(prev => prev.filter(item => item.id !== id));
+      } else {
+        alert("Ошибка при удалении");
+      }
+    } catch (err) {
+      console.error("Ошибка удаления:", err);
+      alert("Ошибка сети");
+    }
+  };
 
   const handleCheck = async () => {
     if (!text.trim()) return;
@@ -65,6 +83,32 @@ export default function DiaryPage() {
     }
   };
 
+  // Группировка истории по датам
+  const groupHistoryByDate = (historyItems: any[]) => {
+    const groups: { [key: string]: any[] } = {};
+    const today = new Date().toLocaleDateString();
+    const yesterday = new Date(Date.now() - 86400000).toLocaleDateString();
+
+    historyItems.forEach(item => {
+      if (!item.created_at) return;
+
+      const dateStr = item.created_at.split(' ')[0]; // ГГГГ-ММ-ДД
+      const date = new Date(dateStr);
+      let label = date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+
+      const itemLocaleDate = date.toLocaleDateString();
+      if (itemLocaleDate === today) label = "Сегодня";
+      else if (itemLocaleDate === yesterday) label = "Вчера";
+
+      if (!groups[label]) groups[label] = [];
+      groups[label].push(item);
+    });
+
+    return groups;
+  };
+
+  const groupedHistory = groupHistoryByDate(history);
+
   return (
     <div className={styles.pageWrapper}>
       <Header />
@@ -73,81 +117,105 @@ export default function DiaryPage() {
         <h1 className={styles.title}>Мой дневник</h1>
         <p className={styles.subtitle}>Пишите на немецком, и ИИ поможет исправить ошибки</p>
 
-        <div className={styles.card}>
-          <textarea
-            className={styles.textArea}
-            placeholder="Напишите что-нибудь на немецком... (например: Ich habe ein Hund)"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            disabled={isLoading}
-          />
+        <section className={styles.mainContent}>
+          <div className={styles.card}>
+            <textarea
+              className={styles.textArea}
+              placeholder="Напишите что-нибудь на немецком... (например: Ich habe ein Hund)"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              disabled={isLoading}
+            />
 
-          <button
-            className={styles.checkBtn}
-            onClick={handleCheck}
-            disabled={isLoading || !text.trim()}
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="animate-spin" size={20} />
-                Проверяем...
-              </>
-            ) : (
-              <>
-                <Sparkles size={20} />
-                Проверить
-              </>
+            <button
+              className={styles.checkBtn}
+              onClick={handleCheck}
+              disabled={isLoading || !text.trim()}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="animate-spin" size={20} />
+                  Проверяем...
+                </>
+              ) : (
+                <>
+                  <Sparkles size={20} />
+                  Проверить
+                </>
+              )}
+            </button>
+
+            {error && (
+              <div style={{ marginTop: '20px', color: '#ef4444', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <AlertCircle size={20} />
+                <span>{error}</span>
+              </div>
             )}
-          </button>
 
-          {error && (
-            <div style={{ marginTop: '20px', color: '#ef4444', display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <AlertCircle size={20} />
-              <span>{error}</span>
-            </div>
-          )}
+            {result && (
+              <div className={styles.resultSection}>
+                <h3 className={styles.resultTitle}>
+                  <CheckCircle2 color="#22c55e" size={24} />
+                  Результат проверки:
+                </h3>
 
-          {result && (
-            <div className={styles.resultSection}>
-              <h3 className={styles.resultTitle}>
-                <CheckCircle2 color="#22c55e" size={24} />
-                Результат проверки:
-              </h3>
+                <div className={styles.correctedText}>
+                  {result.corrected}
+                </div>
 
-              <div className={styles.correctedText}>
-                {result.corrected}
+                <div className={styles.explanation}>
+                  <h4>Что мы исправили:</h4>
+                  <p>{result.explanation}</p>
+                </div>
               </div>
+            )}
+          </div>
+        </section>
 
-              <div className={styles.explanation}>
-                <h4>Что мы исправили:</h4>
-                <p>{result.explanation}</p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {history.length > 0 && (
-          <div className={styles.historySection}>
-            <h3 className={styles.resultTitle}>История записей</h3>
+        <aside className={styles.historySection}>
+          <h3 className={styles.resultTitle}>История записей</h3>
+          {history.length === 0 ? (
+            <p style={{ color: '#94a3b8', textAlign: 'center', marginTop: '40px' }}>У вас пока нет записей</p>
+          ) : (
             <div className={styles.historyList}>
-              {history.map((item) => (
-                <div key={item.id} className={styles.historyItem}>
-                  <div className={styles.historyHeader}>
-                    <span className={styles.historyDate}>{item.created_at}</span>
+              {Object.entries(groupedHistory).map(([dateLabel, items]) => (
+                <div key={dateLabel} className={styles.dateGroup}>
+                  <div className={styles.dateHeader}>
+                    <Calendar size={14} />
+                    {dateLabel}
                   </div>
-                  <div className={styles.historyContent}>
-                    <div className={styles.historyOriginal}>
-                      <strong>Я написал:</strong> {item.original_text}
+                  {items.map((item) => (
+                    <div key={item.id} className={styles.historyItem}>
+                      <button
+                        className={styles.deleteBtn}
+                        onClick={() => handleDelete(item.id)}
+                        title="Удалить запись"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                      <div className={styles.historyHeader}>
+                        <span className={styles.historyDate}>{item.created_at.split(' ')[1]}</span>
+                      </div>
+                      <div className={styles.historyContent}>
+                        <div className={styles.historyOriginal}>
+                          <strong>Текст:</strong> {item.original_text}
+                        </div>
+                        <div className={styles.historyCorrected}>
+                          {item.corrected_text}
+                        </div>
+                        {item.explanation && (
+                          <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '8px', paddingLeft: '12px', borderLeft: '2px solid #e2e8f0' }}>
+                            {item.explanation}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className={styles.historyCorrected}>
-                      <strong>ИИ исправил:</strong> {item.corrected_text}
-                    </div>
-                  </div>
+                  ))}
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </aside>
       </main>
     </div>
   );

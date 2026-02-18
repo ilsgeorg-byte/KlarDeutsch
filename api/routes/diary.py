@@ -170,7 +170,6 @@ def get_history():
             SELECT id, original_text, corrected_text, explanation, created_at
             FROM diary_entries
             ORDER BY created_at DESC
-            LIMIT 50
         """)
         
         columns = [desc[0] for desc in cur.description]
@@ -187,4 +186,19 @@ def get_history():
         return jsonify(results), 200
     except Exception as e:
         print(f"History Error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@diary_bp.route('/history/<int:entry_id>', methods=['DELETE'])
+def delete_entry(entry_id):
+    """Удалить запись из истории"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM diary_entries WHERE id = %s", (entry_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"status": "success"}), 200
+    except Exception as e:
+        print(f"Delete Error: {str(e)}")
         return jsonify({"error": str(e)}), 500

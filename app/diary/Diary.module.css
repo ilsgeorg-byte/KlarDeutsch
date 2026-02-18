@@ -5,69 +5,41 @@
   background-color: #f8fafc;
 }
 
-.header {
-  background: white;
-  height: 64px;
-  padding: 0 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-
-.logo {
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: #1e293b;
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.logo span {
-  color: #3b82f6;
-}
-
-.nav {
-  display: flex;
-  gap: 24px;
-}
-
-.navLink {
-  text-decoration: none;
-  color: #64748b;
-  font-weight: 500;
-  font-size: 0.95rem;
-  transition: color 0.2s;
-}
-
-.navLink:hover {
-  color: #3b82f6;
-}
-
 .container {
-  max-width: 800px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 40px 20px;
-  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 40px;
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .container {
+    grid-template-columns: 1.2fr 1fr;
+  }
 }
 
 .title {
-  font-size: 2rem;
+  grid-column: 1 / -1;
+  font-size: 2.5rem;
   font-weight: 800;
   color: #1e293b;
   margin-bottom: 8px;
-  text-align: center;
+  text-align: left;
 }
 
 .subtitle {
+  grid-column: 1 / -1;
   color: #64748b;
-  text-align: center;
+  text-align: left;
   margin-bottom: 32px;
+}
+
+.mainContent {
+  width: 100%;
+  animation: slideUp 0.4s ease-out;
 }
 
 .card {
@@ -76,6 +48,8 @@
   padding: 32px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   border: 1px solid #e2e8f0;
+  position: sticky;
+  top: 100px;
 }
 
 .textArea {
@@ -170,14 +144,53 @@
 }
 
 .historySection {
-  margin-top: 48px;
-  animation: slideUp 0.6s ease-out;
+  margin-top: 0;
+  animation: slideInRight 0.6s ease-out;
 }
 
 .historyList {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 24px;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding-right: 12px;
+}
+
+.historyList::-webkit-scrollbar {
+  width: 6px;
+}
+
+.historyList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.historyList::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+.dateGroup {
+  margin-bottom: 24px;
+}
+
+.dateHeader {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #3b82f6;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dateHeader::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #e2e8f0;
 }
 
 .historyItem {
@@ -185,24 +198,52 @@
   border-radius: 16px;
   padding: 20px;
   border: 1px solid #e2e8f0;
-  transition: transform 0.2s;
+  transition: all 0.2s ease;
+  position: relative;
+  margin-bottom: 16px;
 }
 
 .historyItem:hover {
-  transform: translateX(4px);
+  transform: translateY(-2px);
   border-color: #3b82f6;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.deleteBtn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: #fff1f2;
+  color: #e11d48;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.2s;
+}
+
+.historyItem:hover .deleteBtn {
+  opacity: 1;
+}
+
+.deleteBtn:hover {
+  background: #e11d48;
+  color: white;
 }
 
 .historyHeader {
-  margin-bottom: 12px;
-  border-bottom: 1px solid #f1f5f9;
-  padding-bottom: 8px;
+  margin-bottom: 8px;
 }
 
 .historyDate {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: #94a3b8;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .historyContent {
@@ -212,18 +253,32 @@
 }
 
 .historyOriginal {
-  font-size: 1rem;
+  font-size: 0.95rem;
   color: #64748b;
+  line-height: 1.5;
 }
 
 .historyCorrected {
   font-size: 1rem;
   color: #1e293b;
   font-weight: 500;
-  padding: 10px;
+  padding: 12px;
   background: #f0fdf4;
-  border-radius: 8px;
+  border-radius: 12px;
   border-left: 4px solid #22c55e;
+  line-height: 1.5;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 @keyframes slideUp {
@@ -238,6 +293,12 @@
   }
 }
 
+@media (max-width: 1023px) {
+  .card {
+    position: static;
+  }
+}
+
 @media (max-width: 640px) {
   .container {
     padding: 20px;
@@ -245,5 +306,14 @@
 
   .card {
     padding: 20px;
+  }
+
+  .title {
+    font-size: 2rem;
+    text-align: center;
+  }
+
+  .subtitle {
+    text-align: center;
   }
 }
