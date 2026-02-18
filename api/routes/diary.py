@@ -22,7 +22,9 @@ def correct_with_gemini(text):
         
         # Для отладки
         print(f"Попытка исправления текста через Gemini: {text[:30]}...")
-        Ты — помощник по изучению немецкого языка. 
+        
+        prompt = f"""
+        Ты - помощник по изучению немецкого языка. 
         Исправь грамматические и стилистические ошибки в следующем тексте на немецком языке.
         Текст: "{text}"
         
@@ -50,6 +52,7 @@ def correct_with_gemini(text):
         import json
         return json.loads(content), None
     except Exception as e:
+        print(f"Gemini Error: {str(e)}")
         return None, str(e)
 
 def correct_with_openai(text):
@@ -81,6 +84,7 @@ def correct_with_openai(text):
         import json
         return json.loads(response.choices[0].message.content), None
     except Exception as e:
+        print(f"OpenAI Error: {str(e)}")
         return None, str(e)
 
 @diary_bp.route('/correct', methods=['POST'])
