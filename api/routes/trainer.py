@@ -25,6 +25,13 @@ def get_training_words():
         level = request.args.get("level", "A1").upper()
         limit = int(request.args.get("limit", 10))
         
+        # Определяем список уровней для выборки (кумулятивно)
+        all_levels = ["A1", "A2", "B1", "B2", "C1"]
+        if level in all_levels:
+            target_levels = all_levels[:all_levels.index(level) + 1]
+        else:
+            target_levels = [level]
+            
         conn = get_db_connection()
         cur = conn.cursor()
         
@@ -34,10 +41,10 @@ def get_training_words():
                    uw.interval, uw.ease_factor, uw.reps, uw.next_review
             FROM words w
             JOIN user_words uw ON w.id = uw.word_id
-            WHERE w.level = %s AND uw.user_id = %s AND uw.next_review <= CURRENT_TIMESTAMP AND uw.status = 'learning'
+            WHERE w.level IN %s AND uw.user_id = %s AND uw.next_review <= CURRENT_TIMESTAMP AND uw.status = 'learning'
             ORDER BY uw.next_review ASC
             LIMIT %s
-        """, (level, request.user_id, limit))
+        """, (tuple(target_levels), request.user_id, limit))
         
         columns = [desc[0] for desc in cur.description]
         cards_to_review = [dict(zip(columns, row)) for row in cur.fetchall()]
@@ -48,10 +55,10 @@ def get_training_words():
             cur.execute("""
                 SELECT id, level, topic, de, ru, article, example_de, example_ru
                 FROM words
-                WHERE level = %s AND id NOT IN (SELECT word_id FROM user_words WHERE user_id = %s)
+                WHERE level IN %s AND id NOT IN (SELECT word_id FROM user_words WHERE user_id = %s)
                 ORDER BY id
                 LIMIT %s
-            """, (level, request.user_id, remaining))
+            """, (tuple(target_levels), request.user_id, remaining))
             
             columns = [desc[0] for desc in cur.description]
             new_words = [dict(zip(columns, row)) for row in cur.fetchall()]
