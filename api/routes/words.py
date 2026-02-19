@@ -229,6 +229,8 @@ def search_words():
         query = request.args.get("q", "").strip()
         limit = min(int(request.args.get("limit", 50)), 100)
         
+        search_pattern = f"%{query}%"
+        
         if len(query) < 2:
             return jsonify({"data": [], "message": "Запрос слишком короткий (мин. 2 символа)"}), 200
             
