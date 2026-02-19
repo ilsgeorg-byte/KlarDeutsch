@@ -56,7 +56,8 @@ def init_db():
                 example_de TEXT,
                 example_ru TEXT,
                 audio_url TEXT,
-                UNIQUE(de, ru)
+                user_id INTEGER REFERENCES users(id),
+                UNIQUE(de, ru, user_id)
             );
         """)
         
@@ -93,8 +94,22 @@ def init_db():
             pass
         else:
             cur.execute("ALTER TABLE user_words ADD PRIMARY KEY (user_id, word_id)")
-        cur.execute("ALTER TABLE diary_entries ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);")
+        cur.execute("ALTER TABLE user_words ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);")
         cur.execute("ALTER TABLE words ADD COLUMN IF NOT EXISTS verb_forms TEXT;")
+        cur.execute("ALTER TABLE words ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);")
+        
+        # Обновляем уникальный индекс для слов (чтобы разные юзеры могли иметь одинаковые личные слова)
+        try:
+            cur.execute("ALTER TABLE words DROP CONSTRAINT IF EXISTS words_de_ru_key;")
+            # Уникальность по de, ru и user_id (где user_id может быть NULL)
+            # В PostgreSQL NULL в уникальном индексе считается уникальным, 
+            # но мы хотим чтобы один "общий" вариант (user_id is NULL) был уникален по de, ru.
+            cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_words_de_ru_public ON words (de, ru) WHERE user_id IS NULL;")
+            cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_words_de_ru_private ON words (de, ru, user_id) WHERE user_id IS NOT NULL;")
+        except Exception as e:
+            print(f"Warning during words index update: {e}")
+            conn.rollback() 
+            # Если не вышло, продолжаем (в проде лучше быть осторожнее)
 
         # Таблица аудиозаписей - теперь привязана к пользователю
         cur.execute("""
@@ -109,6 +124,16 @@ def init_db():
             );
         """)
         cur.execute("ALTER TABLE recordings ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);")
+
+        # Таблица избранного
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS user_favorites (
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                word_id INTEGER REFERENCES words(id) ON DELETE CASCADE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, word_id)
+            );
+        """)
         
         conn.commit()
         cur.close()

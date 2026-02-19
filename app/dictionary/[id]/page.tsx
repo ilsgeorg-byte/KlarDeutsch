@@ -17,6 +17,7 @@ interface Word {
     example_de?: string;
     example_ru?: string;
     audio_url?: string;
+    is_favorite?: boolean;
 }
 
 export default function WordDetailPage() {
@@ -25,14 +26,19 @@ export default function WordDetailPage() {
     const [word, setWord] = useState<Word | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [isFavorite, setIsFavorite] = useState(false);
 
     useEffect(() => {
         const fetchWord = async () => {
             try {
-                const response = await fetch(`/api/words/${params.id}`);
+                const token = localStorage.getItem('token');
+                const response = await fetch(`/api/words/${params.id}`, {
+                    headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                });
                 if (!response.ok) throw new Error("Слово не найдено");
                 const data = await response.json();
                 setWord(data);
+                setIsFavorite(data.is_favorite || false);
             } catch (err) {
                 console.error("Fetch error:", err);
                 setError("Не удалось загрузить информацию о слове");
@@ -45,6 +51,27 @@ export default function WordDetailPage() {
             fetchWord();
         }
     }, [params.id]);
+
+    const toggleFavorite = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                alert("Пожалуйста, войдите в систему, чтобы добавлять слова в избранное");
+                return;
+            }
+
+            const response = await fetch(`/api/words/${params.id}/favorite`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (response.ok) {
+                setIsFavorite(!isFavorite);
+            }
+        } catch (err) {
+            console.error("Favorite error:", err);
+        }
+    };
 
     const playAudio = (url: string) => {
         const audio = new Audio(url);
@@ -77,24 +104,44 @@ export default function WordDetailPage() {
             <Header />
 
             <main className={styles.container} style={{ maxWidth: '700px', justifyContent: 'flex-start' }}>
-                <button
-                    onClick={() => router.back()}
-                    style={{
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: '#64748b',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        marginBottom: '30px',
-                        padding: 0,
-                        fontSize: '1rem'
-                    }}
-                >
-                    <ArrowLeft size={20} />
-                    Назад к словарю
-                </button>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '30px' }}>
+                    <button
+                        onClick={() => router.back()}
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: '#64748b',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: 0,
+                            fontSize: '1rem'
+                        }}
+                    >
+                        <ArrowLeft size={20} />
+                        Назад
+                    </button>
+
+                    <button
+                        onClick={toggleFavorite}
+                        style={{
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '12px',
+                            padding: '8px 16px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            color: isFavorite ? '#f59e0b' : '#64748b',
+                            fontWeight: '600'
+                        }}
+                    >
+                        <Star size={20} fill={isFavorite ? '#f59e0b' : 'none'} />
+                        {isFavorite ? 'В избранном' : 'В избранное'}
+                    </button>
+                </div>
 
                 <div className={styles.card} style={{ width: '100%', minHeight: 'auto', padding: '40px', alignItems: 'flex-start', textAlign: 'left', cursor: 'default' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginBottom: '20px' }}>
@@ -114,27 +161,34 @@ export default function WordDetailPage() {
                         </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '10px', width: '100%' }}>
-                        <h1 style={{ margin: 0, fontSize: '3rem', color: '#1e293b' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', marginBottom: '10px' }}>
+                        <h1 style={{ margin: 0, fontSize: '3rem', color: '#1e293b', flex: 1 }}>
                             {word.article && <span style={{ color: '#3b82f6', fontSize: '1.5rem', marginRight: '10px', fontWeight: 'bold' }}>{word.article}</span>}
                             {word.de}
                         </h1>
+
                         {word.audio_url && (
                             <button
                                 onClick={() => playAudio(word.audio_url!)}
                                 style={{
-                                    background: '#f1f5f9',
+                                    background: '#3498db',
                                     border: 'none',
                                     cursor: 'pointer',
-                                    color: '#3498db',
-                                    padding: '12px',
-                                    borderRadius: '50%',
+                                    color: 'white',
+                                    padding: '12px 24px',
+                                    borderRadius: '30px',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                                    gap: '10px',
+                                    boxShadow: '0 4px 6px rgba(52, 152, 219, 0.3)',
+                                    fontWeight: 'bold',
+                                    transition: 'all 0.2s'
                                 }}
+                                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                                onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
                             >
                                 <Volume2 size={24} />
+                                Прослушать
                             </button>
                         )}
                     </div>
