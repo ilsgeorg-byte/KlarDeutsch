@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Header from "../../components/Header";
 import styles from "../../styles/Shared.module.css";
-import { ArrowLeft, Volume2, BookOpen, Tag, Info } from "lucide-react";
+import { ArrowLeft, Volume2, BookOpen, Tag, Info, Star } from "lucide-react";
 
 interface Word {
     id: number;
