@@ -14,9 +14,9 @@ def check_schema():
     try:
         conn = psycopg2.connect(url)
         cur = conn.cursor()
-        cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'users'")
+        cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'words'")
         columns = cur.fetchall()
-        print(f"Columns in 'users' table: {[col[0] for col in columns]}")
+        print(f"Columns in 'words' table: {[col[0] for col in columns]}")
         cur.close()
         conn.close()
     except Exception as e:

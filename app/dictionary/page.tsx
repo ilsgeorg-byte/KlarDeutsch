@@ -51,11 +51,11 @@ export default function DictionaryPage() {
                     setMessage("");
                 }
             } else {
-                setMessage("Ошибка при поиске");
+                setMessage(data.error || "Ошибка при поиске");
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Search error:", error);
-            setMessage("Ошибка соединения с сервером");
+            setMessage(error.message || "Ошибка соединения с сервером");
         } finally {
             setLoading(false);
         }
