@@ -52,6 +52,7 @@ def init_db():
                 de TEXT NOT NULL,
                 ru TEXT NOT NULL,
                 article VARCHAR(10),
+                verb_forms TEXT,
                 example_de TEXT,
                 example_ru TEXT,
                 audio_url TEXT,
@@ -93,6 +94,7 @@ def init_db():
         else:
             cur.execute("ALTER TABLE user_words ADD PRIMARY KEY (user_id, word_id)")
         cur.execute("ALTER TABLE diary_entries ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);")
+        cur.execute("ALTER TABLE words ADD COLUMN IF NOT EXISTS verb_forms TEXT;")
 
         # Таблица аудиозаписей - теперь привязана к пользователю
         cur.execute("""

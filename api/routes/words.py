@@ -39,7 +39,7 @@ def get_words():
 
         # Получаем слова с пагинацией
         cur.execute("""
-            SELECT id, level, topic, de, ru, article, example_de, example_ru, audio_url
+            SELECT id, level, topic, de, ru, article, verb_forms, example_de, example_ru, audio_url
             FROM words 
             WHERE level = %s
             ORDER BY id
@@ -74,7 +74,7 @@ def get_word(word_id: int):
         cur = conn.cursor()
         
         cur.execute("""
-            SELECT id, level, topic, de, ru, article, example_de, example_ru, audio_url
+            SELECT id, level, topic, de, ru, article, verb_forms, example_de, example_ru, audio_url
             FROM words 
             WHERE id = %s
         """, (word_id,))
@@ -86,7 +86,7 @@ def get_word(word_id: int):
         if not row:
             return jsonify({"error": "Слово не найдено"}), 404
         
-        columns = ['id', 'level', 'topic', 'de', 'ru', 'article', 'example_de', 'example_ru', 'audio_url']
+        columns = ['id', 'level', 'topic', 'de', 'ru', 'article', 'verb_forms', 'example_de', 'example_ru', 'audio_url']
         result = dict(zip(columns, row))
         
         return jsonify(result), 200
@@ -112,7 +112,7 @@ def get_words_by_topic(topic: str):
             return jsonify({"error": "Тема не найдена"}), 404
         
         cur.execute("""
-            SELECT id, level, topic, de, ru, article, example_de, example_ru, audio_url
+            SELECT id, level, topic, de, ru, article, verb_forms, example_de, example_ru, audio_url
             FROM words 
             WHERE topic = %s
             ORDER BY id
@@ -200,7 +200,7 @@ def search_words():
         search_pattern = f"%{query}%"
         
         cur.execute("""
-            SELECT id, level, topic, de, ru, article, example_de, example_ru, audio_url
+            SELECT id, level, topic, de, ru, article, verb_forms, example_de, example_ru, audio_url
             FROM words 
             WHERE de ILIKE %s OR ru ILIKE %s
             ORDER BY 
