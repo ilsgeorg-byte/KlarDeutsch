@@ -11,6 +11,7 @@ interface Word {
     de: string;
     ru: string;
     article?: string;
+    verb_forms?: string;
     level: string;
     topic: string;
     example_de?: string;
