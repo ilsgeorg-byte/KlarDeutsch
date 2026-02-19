@@ -24,6 +24,7 @@ export default function Header() {
 
     const navLinks = [
         { name: "Главная", href: "/" },
+        { name: "Словарь", href: "/dictionary" },
         { name: "Тренажер", href: "/trainer" },
         { name: "Записи", href: "/audio" },
         { name: "Дневник", href: "/diary" },

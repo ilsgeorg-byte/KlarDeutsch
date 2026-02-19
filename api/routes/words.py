@@ -178,3 +178,50 @@ def get_topics():
     
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@words_bp.route('/words/search', methods=['GET'])
+def search_words():
+    """
+    Поиск слов по тексту (немецкий или русский).
+    Query параметры:
+    - q: поисковый запрос (минимум 2 символа)
+    - limit: максимум результатов (по умолчанию 50)
+    """
+    try:
+        query = request.args.get("q", "").strip()
+        limit = min(int(request.args.get("limit", 50)), 100)
+        
+        if len(query) < 2:
+            return jsonify({"data": [], "message": "Запрос слишком короткий (мин. 2 символа)"}), 200
+            
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        search_pattern = f"%{query}%"
+        
+        cur.execute("""
+            SELECT id, level, topic, de, ru, article, example_de, example_ru, audio_url
+            FROM words 
+            WHERE de ILIKE %s OR ru ILIKE %s
+            ORDER BY 
+                CASE 
+                    WHEN de ILIKE %s THEN 1  -- Точное совпадение или начало слова приоритетнее (почти)
+                    WHEN ru ILIKE %s THEN 2
+                    ELSE 3 
+                END, 
+                de
+            LIMIT %s
+        """, (search_pattern, search_pattern, query, query, limit))
+        
+        columns = [desc[0] for desc in cur.description]
+        results = []
+        for row in cur.fetchall():
+            results.append(dict(zip(columns, row)))
+            
+        cur.close()
+        conn.close()
+        
+        return jsonify({"data": results, "query": query}), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
