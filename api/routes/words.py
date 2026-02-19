@@ -234,7 +234,11 @@ def search_words():
         if len(query) < 2:
             return jsonify({"data": [], "message": "Запрос слишком короткий (мин. 2 символа)"}), 200
             
+
         user_id = get_current_user_id()
+        
+        conn = get_db_connection()
+        cur = conn.cursor()
         
         if user_id:
             cur.execute("""
