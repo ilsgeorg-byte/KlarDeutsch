@@ -21,7 +21,7 @@ def get_gemini_answer(de: str, ru: str) -> dict:
         raise RuntimeError("GEMINI_API_KEY не задан в окружении")
 
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-2.0-flash-lite")
 
     prompt = f"""Ты — эксперт по немецкому языку. Проанализируй слово и верни JSON.
 
@@ -46,16 +46,40 @@ def get_gemini_answer(de: str, ru: str) -> dict:
 - examples: 2-3 коротких практичных примера уровня A1-B1
 - Весь JSON должен быть валидным, без комментариев
 """
+    # Пробуем модели по очереди (на случай квоты или недоступности)
+    models_to_try = [
+        "gemini-2.0-flash-lite",
+        "gemini-2.0-flash",
+        "gemini-pro",
+    ]
 
-    response = model.generate_content(prompt)
-    text = response.text.strip()
+    last_error = None
+    for model_name in models_to_try:
+        try:
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(prompt)
+            text = response.text.strip()
 
-    # Убираем markdown-обёртки если есть
-    if text.startswith("```"):
-        lines = text.split("\n")
-        text = "\n".join(lines[1:-1]) if lines[-1] == "```" else "\n".join(lines[1:])
+            # Убираем markdown-обёртки если есть
+            if text.startswith("```"):
+                lines = text.split("\n")
+                # убираем первую строку (```json) и последнюю (```)
+                inner = lines[1:]
+                if inner and inner[-1].strip() == "```":
+                    inner = inner[:-1]
+                text = "\n".join(inner)
 
-    return json.loads(text)
+            return json.loads(text)
+
+        except Exception as e:
+            last_error = e
+            err_str = str(e)
+            # Если квота или модель не найдена — пробуем следующую
+            if "429" in err_str or "404" in err_str or "quota" in err_str.lower() or "not found" in err_str.lower():
+                continue
+            raise  # другие ошибки — пробрасываем сразу
+
+    raise last_error
 
 
 @ai_enrich_bp.route('/words/ai-enrich', methods=['POST'])
