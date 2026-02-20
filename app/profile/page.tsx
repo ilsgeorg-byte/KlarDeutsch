@@ -59,7 +59,7 @@ export default function ProfilePage() {
                 });
                 if (favsRes.ok) {
                     const data = await favsRes.json();
-                    setFavorites(data.words || []);
+                    setFavorites(Array.isArray(data) ? data : (data.words || []));
                 }
             } catch (err) {
                 console.error("Failed to fetch data:", err);
