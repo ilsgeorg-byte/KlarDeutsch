@@ -56,6 +56,8 @@ def init_db():
                 example_de TEXT,
                 example_ru TEXT,
                 audio_url TEXT,
+                examples JSONB,
+                plural TEXT,
                 user_id INTEGER REFERENCES users(id),
                 UNIQUE(de, ru, user_id)
             );
@@ -134,6 +136,21 @@ def init_db():
                 PRIMARY KEY (user_id, word_id)
             );
         """)
+
+        # Таблица заметок пользователя к словам
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS user_word_notes (
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                word_id INTEGER REFERENCES words(id) ON DELETE CASCADE,
+                note TEXT NOT NULL DEFAULT '',
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, word_id)
+            );
+        """)
+
+        # Миграции для новых колонок в words
+        cur.execute("ALTER TABLE words ADD COLUMN IF NOT EXISTS examples JSONB;")
+        cur.execute("ALTER TABLE words ADD COLUMN IF NOT EXISTS plural TEXT;")
         
         conn.commit()
         cur.close()
