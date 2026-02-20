@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { Mic, Square, Volume2, ArrowRight, Eye, EyeOff, Home, Loader2 } from "lucide-react";
+import { Mic, Square, Volume2, Eye, Loader2 } from "lucide-react";
 import styles from "../styles/Shared.module.css";
+import Header from "../components/Header";
 
 interface Word {
   id: number;
@@ -16,8 +16,6 @@ interface Word {
   article?: string;
   next_review?: string;
 }
-
-import Header from "../components/Header";
 
 export default function TrainerPage() {
   const [words, setWords] = useState<Word[]>([]);
@@ -31,9 +29,7 @@ export default function TrainerPage() {
   // Проверка авторизации
   useEffect(() => {
     const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/login");
-    }
+    if (!token) router.push("/login");
   }, []);
 
   // --- ЛОГИКА ЗАПИСИ ---
@@ -76,8 +72,6 @@ export default function TrainerPage() {
 
   const uploadAudio = async (blob: Blob) => {
     setAudioStatus("Отправка...");
-    console.log("Размер блоба:", blob.size, "байт");
-
     const formData = new FormData();
     formData.append("file", blob, "recording.webm");
 
@@ -85,26 +79,15 @@ export default function TrainerPage() {
       const token = localStorage.getItem("token");
       const res = await fetch("/api/audio", {
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`
-        },
+        headers: { "Authorization": `Bearer ${token}` },
         body: formData,
       });
-      if (res.ok) {
-        const data = await res.json();
-        console.log("Загрузка успешна:", data);
-        setAudioStatus("Записано! ✅");
-      } else {
-        const error = await res.json();
-        console.error("Ошибка сервера:", error);
-        setAudioStatus("Ошибка загрузки ❌");
-      }
+      if (res.ok) setAudioStatus("Записано! ✅");
+      else setAudioStatus("Ошибка загрузки ❌");
     } catch (e) {
-      console.error("Ошибка сети:", e);
       setAudioStatus("Ошибка сети");
     }
   };
-  // ---------------------
 
   const loadWords = async (isManual = false) => {
     if (!isManual) setLoading(true);
@@ -113,10 +96,7 @@ export default function TrainerPage() {
       const res = await fetch(`/api/trainer/words?level=${level}`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
-      if (res.status === 401) {
-        router.push("/login");
-        return;
-      }
+      if (res.status === 401) return router.push("/login");
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
 
@@ -128,64 +108,44 @@ export default function TrainerPage() {
         setShowAnswer(false);
       }
     } catch (e) {
-      console.error("Ошибка при загрузке слов:", e);
       setAudioStatus("Ошибка загрузки слов");
     } finally {
       if (!isManual) setLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadWords();
-  }, [level]);
+  useEffect(() => { loadWords(); }, [level]);
 
   const handleNext = () => {
     setShowAnswer(false);
     setAudioStatus(null);
-
-    // Удаляем текущее слово из списка
     const newWords = [...words];
     newWords.splice(index, 1);
 
-    if (newWords.length === 0) {
-      // Если слова кончились, подгружаем новые
-      setWords([]);
-      loadWords();
-    } else {
+    if (newWords.length === 0) loadWords();
+    else {
       setWords(newWords);
-      // Если мы удалили последний элемент, сдвигаем индекс назад
-      if (index >= newWords.length) {
-        setIndex(0);
-      }
+      if (index >= newWords.length) setIndex(0);
     }
   };
 
   const handleRate = async (rating: number) => {
     if (!currentWord) return;
-
     try {
       const token = localStorage.getItem("token");
       const res = await fetch("/api/trainer/rate", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          word_id: currentWord.id,
-          rating: rating
-        })
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ word_id: currentWord.id, rating: rating })
       });
-
-      if (res.ok) {
-        handleNext();
-      }
+      if (res.ok) handleNext();
     } catch (err) {
-      console.error("Ошибка сохранения прогресса:", err);
+      console.error(err);
     }
   };
 
-  const playAudio = (text: string) => {
+  const playAudio = (e: React.MouseEvent, text: string) => {
+    e.stopPropagation(); // Чтобы карточка не переворачивалась при клике на звук
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = "de-DE";
     window.speechSynthesis.speak(utterance);
@@ -194,19 +154,20 @@ export default function TrainerPage() {
   const currentWord = words[index];
 
   return (
-    <div className={styles.pageWrapper}>
+    <div className={`${styles.pageWrapper} bg-slate-50 min-h-screen font-sans`}>
       <Header />
 
-      <main className="flex-1 flex flex-col items-center px-4 py-6 w-full">
+      <main className="flex-1 flex flex-col items-center px-4 w-full pt-8 pb-12">
 
-        <div className="flex flex-wrap gap-2 mb-8 justify-center">
+        {/* Стильный переключатель уровней */}
+        <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200 mb-10 w-full max-w-md overflow-x-auto">
           {["A1", "A2", "B1", "B2", "C1"].map((lvl) => (
             <button
               key={lvl}
               onClick={() => setLevel(lvl)}
-              className={`px-4 py-2 rounded-lg font-bold transition-all ${level === lvl
-                ? "bg-blue-600 text-white shadow-md transform scale-105"
-                : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
+              className={`flex-1 min-w-[60px] py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ${level === lvl
+                  ? "bg-blue-600 text-white shadow-md shadow-blue-500/30 transform scale-105"
+                  : "bg-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-800"
                 }`}
             >
               {lvl}
@@ -214,94 +175,126 @@ export default function TrainerPage() {
           ))}
         </div>
 
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col relative min-h-[500px]">
+        {/* Контейнер карточки */}
+        <div className="w-full max-w-md h-[460px] relative perspective-1000">
           {loading ? (
-            <div className="flex-1 flex items-center justify-center flex-col gap-4">
-              <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-gray-500">Подготовка сессии...</p>
+            <div className="w-full h-full bg-white rounded-3xl shadow-xl flex flex-col items-center justify-center border border-slate-100">
+              <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-4" />
+              <p className="text-slate-500 font-medium animate-pulse">Загружаем слова...</p>
             </div>
           ) : !currentWord ? (
-            <div className="flex-1 flex items-center justify-center p-8 text-center text-gray-500">
-              Пока нет слов для повторения на уровне {level}. <br />Попробуйте другой уровень или зайдите позже!
+            <div className="w-full h-full bg-white rounded-3xl shadow-xl flex flex-col items-center justify-center p-8 text-center border border-slate-100">
+              <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-6">
+                <span className="text-4xl">🎉</span>
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 mb-2">На сегодня всё!</h3>
+              <p className="text-slate-500">
+                Нет слов для повторения на уровне <span className="font-bold text-blue-600">{level}</span>.
+                <br />Отдохните или выберите другой уровень.
+              </p>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col p-6">
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-xs font-bold text-blue-500 uppercase tracking-wider">{currentWord.level}</span>
-                {/* @ts-ignore */}
-                {currentWord.next_review && (
-                  <span className="text-[10px] text-gray-400 bg-gray-50 px-2 py-1 rounded">Повторение</span>
-                )}
-              </div>
+            <>
+              {/* Сама 3D-Карточка */}
+              <div
+                onClick={() => !showAnswer && setShowAnswer(true)}
+                className={`relative w-full h-[380px] rounded-3xl shadow-xl border border-slate-100 bg-white transition-all duration-500 transform-gpu cursor-pointer flex flex-col ${showAnswer ? "shadow-blue-900/10" : "hover:-translate-y-1 hover:shadow-2xl"}`}
+              >
 
-              <div className="flex flex-col items-center text-center mb-6 mt-4">
-                <h2 className="text-4xl font-bold text-gray-800 mb-4">
+                {/* Бейджи в шапке карточки */}
+                <div className="flex justify-between items-center w-full p-5 absolute top-0 left-0">
+                  <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-bold tracking-wide">
+                    {currentWord.level}
+                  </span>
                   {/* @ts-ignore */}
-                  {currentWord.article && !currentWord.de.toLowerCase().startsWith(currentWord.article.toLowerCase() + " ") && (
-                    <span className="text-blue-500 text-2xl mr-2">{currentWord.article}</span>
+                  {currentWord.next_review && (
+                    <span className="flex items-center gap-1 bg-amber-50 text-amber-600 px-3 py-1 rounded-full text-xs font-semibold">
+                      <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></span>
+                      Повторение
+                    </span>
                   )}
-                  {currentWord.de}
-                </h2>
-                <button onClick={() => playAudio(currentWord.de)} className="p-3 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition"><Volume2 size={28} /></button>
-              </div>
+                </div>
 
-              <div className={`transition-all duration-300 overflow-hidden ${showAnswer ? "max-h-60 opacity-100 mb-6" : "max-h-0 opacity-0"}`}>
-                <div className="bg-gray-50 p-4 rounded-xl text-center border border-gray-100">
-                  <p className="text-xl text-green-700 font-medium mb-1">{currentWord.ru}</p>
-                  {currentWord.example_de && (
-                    <div className="text-sm text-gray-500 mt-2 pt-2 border-t border-gray-200 italic">
-                      {currentWord.example_de}
+                {/* Центр карточки (Слово) */}
+                <div className="flex-1 flex flex-col items-center justify-center p-6 mt-6">
+                  <h2 className="text-[2.75rem] font-extrabold text-slate-800 text-center leading-tight mb-6">
+                    {/* @ts-ignore */}
+                    {currentWord.article && !currentWord.de.toLowerCase().startsWith(currentWord.article.toLowerCase() + " ") && (
+                      <span className="text-blue-500 font-bold mr-2 opacity-90">{currentWord.article}</span>
+                    )}
+                    {currentWord.de}
+                  </h2>
+                  <button
+                    onClick={(e) => playAudio(e, currentWord.de)}
+                    className="w-14 h-14 bg-slate-50 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded-full flex items-center justify-center transition-colors shadow-sm border border-slate-100"
+                  >
+                    <Volume2 size={26} strokeWidth={2.5} />
+                  </button>
+                </div>
+
+                {/* Низ карточки (Подсказка или Перевод) */}
+                <div className="w-full">
+                  {!showAnswer ? (
+                    <div className="w-full py-5 bg-slate-50 rounded-b-3xl border-t border-slate-100 text-center text-slate-400 font-medium flex items-center justify-center gap-2">
+                      <Eye size={18} /> Нажмите, чтобы увидеть перевод
+                    </div>
+                  ) : (
+                    <div className="w-full bg-blue-50 rounded-b-3xl p-5 border-t border-blue-100 animate-fade-in-up">
+                      <p className="text-2xl text-blue-800 font-bold text-center mb-3">
+                        {currentWord.ru}
+                      </p>
+                      {currentWord.example_de && (
+                        <div className="text-sm text-blue-600/80 text-center italic bg-white/60 py-2 px-4 rounded-xl">
+                          "{currentWord.example_de}"
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               </div>
 
-              <div className="mt-auto">
-                {!showAnswer ? (
-                  <button onClick={() => setShowAnswer(true)} className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:bg-blue-700 transition flex items-center justify-center gap-2">
-                    <Eye size={20} /> Показать перевод
-                  </button>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    <button
-                      onClick={() => handleRate(0)}
-                      className="flex flex-col items-center gap-1 py-3 bg-gray-100 text-gray-500 rounded-xl hover:bg-gray-200 transition border border-gray-200"
-                    >
-                      <span className="font-bold text-sm">Знаю</span>
-                      <span className="text-[10px] opacity-70">Убрать</span>
-                    </button>
-                    <button
-                      onClick={() => handleRate(1)}
-                      className="flex flex-col items-center gap-1 py-3 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition border border-red-100"
-                    >
-                      <span className="font-bold text-sm">Сложно</span>
-                      <span className="text-[10px] opacity-70">Завтра</span>
-                    </button>
-                    <button
-                      onClick={() => handleRate(3)}
-                      className="flex flex-col items-center gap-1 py-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition border border-blue-100"
-                    >
-                      <span className="font-bold text-sm">Норма</span>
-                      <span className="text-[10px] opacity-70">3-4 дня</span>
-                    </button>
-                    <button
-                      onClick={() => handleRate(5)}
-                      className="flex flex-col items-center gap-1 py-3 bg-green-50 text-green-600 rounded-xl hover:bg-green-100 transition border border-green-100"
-                    >
-                      <span className="font-bold text-sm">Легко</span>
-                      <span className="text-[10px] opacity-70">Неделя+</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex justify-center mt-6 pt-4 border-t border-gray-100">
-                <button onClick={isRecording ? stopRecording : startRecording} className={`p-4 rounded-full transition-all shadow-md ${isRecording ? "bg-red-500 text-white animate-pulse scale-110" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
-                  {isRecording ? <Square size={24} fill="currentColor" /> : <Mic size={24} />}
+              {/* Блок кнопок оценок (появляется только после переворота) */}
+              <div className={`mt-6 grid grid-cols-4 gap-3 transition-all duration-300 ${showAnswer ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"}`}>
+                <button onClick={() => handleRate(1)} className="flex flex-col items-center justify-center py-3 bg-white border-2 border-red-100 rounded-2xl hover:bg-red-50 hover:border-red-300 transition-colors shadow-sm group">
+                  <span className="text-red-500 font-bold mb-1 group-hover:scale-110 transition-transform">Сложно</span>
+                  <span className="text-[10px] text-slate-400 font-medium uppercase">Завтра</span>
+                </button>
+                <button onClick={() => handleRate(3)} className="flex flex-col items-center justify-center py-3 bg-white border-2 border-amber-100 rounded-2xl hover:bg-amber-50 hover:border-amber-300 transition-colors shadow-sm group">
+                  <span className="text-amber-500 font-bold mb-1 group-hover:scale-110 transition-transform">Норма</span>
+                  <span className="text-[10px] text-slate-400 font-medium uppercase">3-4 Дня</span>
+                </button>
+                <button onClick={() => handleRate(5)} className="flex flex-col items-center justify-center py-3 bg-white border-2 border-emerald-100 rounded-2xl hover:bg-emerald-50 hover:border-emerald-300 transition-colors shadow-sm group">
+                  <span className="text-emerald-500 font-bold mb-1 group-hover:scale-110 transition-transform">Легко</span>
+                  <span className="text-[10px] text-slate-400 font-medium uppercase">Неделя+</span>
+                </button>
+                <button onClick={() => handleRate(0)} className="flex flex-col items-center justify-center py-3 bg-slate-800 border-2 border-slate-800 rounded-2xl hover:bg-slate-900 transition-colors shadow-sm group">
+                  <span className="text-white font-bold mb-1 group-hover:scale-110 transition-transform">Знаю</span>
+                  <span className="text-[10px] text-slate-300 font-medium uppercase">Убрать</span>
                 </button>
               </div>
-              {audioStatus && <p className="text-center text-xs text-gray-400 mt-2 h-4">{audioStatus}</p>}
-            </div>
+
+              {/* Блок микрофона сбоку или внизу */}
+              <div className={`absolute -right-16 top-1/2 -translate-y-1/2 transition-opacity duration-300 ${!showAnswer ? "opacity-100" : "opacity-0 pointer-events-none"} hidden md:flex flex-col items-center`}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); isRecording ? stopRecording() : startRecording() }}
+                  className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all ${isRecording ? "bg-red-500 text-white animate-pulse scale-110 ring-4 ring-red-200" : "bg-white text-slate-400 hover:text-blue-500 hover:scale-105"}`}
+                >
+                  {isRecording ? <Square size={20} fill="currentColor" /> : <Mic size={20} />}
+                </button>
+              </div>
+
+              {/* Мобильный микрофон */}
+              <div className={`mt-4 flex justify-center md:hidden transition-opacity duration-300 ${!showAnswer ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); isRecording ? stopRecording() : startRecording() }}
+                  className={`px-6 py-2.5 rounded-full flex items-center gap-2 shadow-sm font-semibold text-sm transition-all ${isRecording ? "bg-red-500 text-white animate-pulse ring-4 ring-red-100" : "bg-white border border-slate-200 text-slate-500"}`}
+                >
+                  {isRecording ? <><Square size={16} fill="currentColor" /> Идёт запись</> : <><Mic size={16} /> Проверить произношение</>}
+                </button>
+              </div>
+
+              {audioStatus && <p className="text-center text-xs font-medium text-slate-500 mt-3 absolute -bottom-8 w-full">{audioStatus}</p>}
+            </>
           )}
         </div>
       </main>
