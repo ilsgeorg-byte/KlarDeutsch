@@ -13,13 +13,19 @@ interface Word {
     ru: string;
     article?: string;
     verb_forms?: string;
+    plural?: string;
     level: string;
     topic: string;
     example_de?: string;
     example_ru?: string;
+    examples?: { de: string; ru: string }[];
+    synonyms?: string;
+    antonyms?: string;
+    collocations?: string;
     audio_url?: string;
     is_favorite?: boolean;
 }
+
 
 export default function DictionaryPage() {
     const [query, setQuery] = useState("");
