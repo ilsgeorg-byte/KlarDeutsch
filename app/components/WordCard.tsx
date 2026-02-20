@@ -66,7 +66,7 @@ export default function WordCard({ word, onPlayAudio, onToggleFavorite }: WordCa
                 zIndex: 5
             }}>
                 <span style={{
-                    fontSize: '0.75rem',
+                    fontSize: '0.76rem',
                     padding: '3px 10px',
                     borderRadius: '12px',
                     background: '#e0f2fe',
