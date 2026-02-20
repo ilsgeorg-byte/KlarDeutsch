@@ -2,26 +2,15 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Mic, Square, Volume2, Eye, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import styles from "../styles/Shared.module.css";
 import Header from "../components/Header";
-
-interface Word {
-  id: number;
-  de: string;
-  ru: string;
-  example_de?: string;
-  example_ru?: string;
-  level: string;
-  article?: string;
-  next_review?: string;
-}
+import WordCard, { Word } from "../components/WordCard";
 
 export default function TrainerPage() {
   const [words, setWords] = useState<Word[]>([]);
   const [level, setLevel] = useState("A1");
   const [index, setIndex] = useState(0);
-  const [showAnswer, setShowAnswer] = useState(false);
   const [loading, setLoading] = useState(false);
   const [audioStatus, setAudioStatus] = useState<string | null>(null);
   const router = useRouter();
@@ -105,7 +94,6 @@ export default function TrainerPage() {
       } else {
         setWords(data);
         setIndex(0);
-        setShowAnswer(false);
       }
     } catch (e) {
       setAudioStatus("Ошибка загрузки слов");
@@ -117,7 +105,6 @@ export default function TrainerPage() {
   useEffect(() => { loadWords(); }, [level]);
 
   const handleNext = () => {
-    setShowAnswer(false);
     setAudioStatus(null);
     const newWords = [...words];
     newWords.splice(index, 1);
@@ -142,13 +129,6 @@ export default function TrainerPage() {
     } catch (err) {
       console.error(err);
     }
-  };
-
-  const playAudio = (e: React.MouseEvent, text: string) => {
-    e.stopPropagation(); // Чтобы карточка не переворачивалась при клике на звук
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "de-DE";
-    window.speechSynthesis.speak(utterance);
   };
 
   const currentWord = words[index];
@@ -195,120 +175,14 @@ export default function TrainerPage() {
             </div>
           ) : (
             <>
-              {/* Сама Карточка */}
-              <div
-                onClick={() => !showAnswer && setShowAnswer(true)}
-                className={`relative w-full rounded-3xl shadow-xl border border-slate-100 bg-white transition-all duration-500 transform-gpu flex flex-col overflow-hidden ${!showAnswer ? "hover:-translate-y-1 hover:shadow-2xl cursor-pointer" : "shadow-blue-900/10 cursor-default"} min-h-[380px]`}
-              >
-
-                {/* Бейджи в шапке карточки */}
-                <div className="flex justify-between items-center w-full p-5 absolute top-0 left-0">
-                  <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-bold tracking-wide border border-blue-100">
-                    {currentWord.level}
-                  </span>
-                  {/* @ts-ignore */}
-                  {currentWord.next_review && (
-                    <span className="flex items-center gap-1.5 bg-amber-50 text-amber-600 px-3 py-1 rounded-full text-xs font-semibold border border-amber-100">
-                      <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></span>
-                      Повторение
-                    </span>
-                  )}
-                </div>
-
-                {/* Центр карточки (Слово + Звук + Микрофон) */}
-                <div className="flex-1 flex flex-col items-center justify-center p-6 mt-12 mb-6">
-
-                  {/* Немецкое слово */}
-                  <h2 className="text-[2.5rem] font-extrabold text-slate-800 text-center leading-tight mb-6">
-                    {/* @ts-ignore */}
-                    {currentWord.article && !currentWord.de.toLowerCase().startsWith(currentWord.article.toLowerCase() + " ") && (
-                      <span className="text-blue-500 font-bold mr-2 opacity-90">{currentWord.article}</span>
-                    )}
-                    {currentWord.de}
-                  </h2>
-
-                  {/* Кнопки аудио (Озвучка + Запись) */}
-                  <div className="flex items-center gap-6">
-                    {/* Диктор */}
-                    <div className="flex flex-col items-center gap-2">
-                      <button
-                        onClick={(e) => playAudio(e, currentWord.de)}
-                        className="w-14 h-14 bg-slate-50 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded-full flex items-center justify-center transition-colors shadow-sm border border-slate-100"
-                      >
-                        <Volume2 size={26} strokeWidth={2.5} />
-                      </button>
-                      <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Послушать</span>
-                    </div>
-
-                    {/* Разделитель */}
-                    <div className="h-8 w-px bg-slate-200"></div>
-
-                    {/* Микрофон */}
-                    <div className="flex flex-col items-center gap-2">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); isRecording ? stopRecording() : startRecording() }}
-                        className={`w-14 h-14 rounded-full flex items-center justify-center shadow-sm transition-all border ${isRecording
-                          ? "bg-red-500 text-white animate-pulse scale-110 border-red-500 shadow-red-500/40"
-                          : "bg-slate-50 text-slate-400 hover:text-blue-500 hover:bg-blue-50 border-slate-100"
-                          }`}
-                      >
-                        {isRecording ? <Square size={24} fill="currentColor" /> : <Mic size={24} strokeWidth={2.5} />}
-                      </button>
-                      <span className={`text-[10px] uppercase font-bold tracking-wider ${isRecording ? "text-red-500" : "text-slate-400"}`}>
-                        {isRecording ? "Идёт запись..." : "Проверить"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Статус записи (если есть) */}
-                  {audioStatus && (
-                    <div className="mt-4 px-4 py-1.5 bg-slate-50 rounded-lg border border-slate-100 text-xs font-medium text-slate-600">
-                      {audioStatus}
-                    </div>
-                  )}
-                </div>
-
-                {/* Низ карточки (Подсказка или Перевод) */}
-                <div className="w-full mt-auto">
-                  {!showAnswer ? (
-                    <div className="w-full py-5 bg-slate-50 border-t border-slate-100 text-center text-slate-400 font-medium flex items-center justify-center gap-2 transition-colors hover:bg-blue-50 hover:text-blue-500">
-                      <Eye size={18} /> Нажмите, чтобы увидеть перевод
-                    </div>
-                  ) : (
-                    <div className="w-full bg-blue-50 p-6 border-t border-blue-100 animate-fade-in-up flex flex-col items-center justify-center min-h-[120px]">
-                      <p className="text-2xl text-blue-800 font-bold text-center mb-3">
-                        {currentWord.ru}
-                      </p>
-                      {currentWord.example_de && (
-                        <div className="text-sm text-blue-700/80 text-center italic bg-white/60 py-2 px-4 rounded-xl border border-blue-100/50">
-                          "{currentWord.example_de}"
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Блок кнопок оценок (появляется только после переворота) */}
-              <div className={`mt-5 grid grid-cols-4 gap-3 transition-all duration-300 ${showAnswer ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none absolute w-full"}`}>
-                <button onClick={() => handleRate(1)} className="flex flex-col items-center justify-center py-3.5 bg-white border-2 border-red-100 rounded-2xl hover:bg-red-50 hover:border-red-300 transition-colors shadow-sm group">
-                  <span className="text-red-500 font-bold mb-1 group-hover:scale-110 transition-transform">Сложно</span>
-                  <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Завтра</span>
-                </button>
-                <button onClick={() => handleRate(3)} className="flex flex-col items-center justify-center py-3.5 bg-white border-2 border-amber-100 rounded-2xl hover:bg-amber-50 hover:border-amber-300 transition-colors shadow-sm group">
-                  <span className="text-amber-500 font-bold mb-1 group-hover:scale-110 transition-transform">Норма</span>
-                  <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">3-4 Дня</span>
-                </button>
-                <button onClick={() => handleRate(5)} className="flex flex-col items-center justify-center py-3.5 bg-white border-2 border-emerald-100 rounded-2xl hover:bg-emerald-50 hover:border-emerald-300 transition-colors shadow-sm group">
-                  <span className="text-emerald-500 font-bold mb-1 group-hover:scale-110 transition-transform">Легко</span>
-                  <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Неделя+</span>
-                </button>
-                <button onClick={() => handleRate(0)} className="flex flex-col items-center justify-center py-3.5 bg-slate-800 border-2 border-slate-800 rounded-2xl hover:bg-slate-900 transition-colors shadow-sm group">
-                  <span className="text-white font-bold mb-1 group-hover:scale-110 transition-transform">Знаю</span>
-                  <span className="text-[10px] text-slate-300 font-medium uppercase tracking-wide">Убрать</span>
-                </button>
-              </div>
-
+              <WordCard
+                key={currentWord.id}
+                word={currentWord}
+                isRecording={isRecording}
+                onToggleRecording={(e) => { e.stopPropagation(); isRecording ? stopRecording() : startRecording() }}
+                audioStatus={audioStatus}
+                onRate={handleRate}
+              />
             </>
           )}
         </div>
