@@ -26,7 +26,6 @@ interface Word {
     is_favorite?: boolean;
 }
 
-
 export default function DictionaryPage() {
     const [query, setQuery] = useState("");
     const [words, setWords] = useState<Word[]>([]);
