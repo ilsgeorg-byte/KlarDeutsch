@@ -21,7 +21,7 @@ def get_gemini_answer(de: str, ru: str) -> dict:
         raise RuntimeError("GEMINI_API_KEY не задан в окружении")
 
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-1.5-flash")
 
     prompt = f"""Ты — эксперт по немецкому языку. Проанализируй слово и верни JSON.
 
