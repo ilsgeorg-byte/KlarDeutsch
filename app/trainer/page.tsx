@@ -10,12 +10,21 @@ interface Word {
   id: number;
   de: string;
   ru: string;
+  article?: string;
+  verb_forms?: string;
+  plural?: string;
+  level: string;
+  topic: string;
   example_de?: string;
   example_ru?: string;
-  level: string;
-  article?: string;
-  next_review?: string;
+  examples?: { de: string; ru: string }[];
+  synonyms?: string;
+  antonyms?: string;
+  collocations?: string;
+  audio_url?: string;
+  is_favorite?: boolean;
 }
+
 
 export default function TrainerPage() {
   const [words, setWords] = useState<Word[]>([]);
