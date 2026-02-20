@@ -1,230 +1,309 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
-import styles from "./Trainer.module.css";
+import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Mic, Square, Volume2, ArrowRight, Eye, EyeOff, Home, Loader2 } from "lucide-react";
+import styles from "../styles/Shared.module.css";
 
-type Word = {
+interface Word {
   id: number;
-  level: string;
-  topic: string;
   de: string;
   ru: string;
-  article: string | null;
-  example_de: string;
-  example_ru: string;
-  audio_url: string | null;
-};
+  example_de?: string;
+  example_ru?: string;
+  level: string;
+  article?: string;
+  next_review?: string;
+}
+
+import Header from "../components/Header";
 
 export default function TrainerPage() {
   const [words, setWords] = useState<Word[]>([]);
+  const [level, setLevel] = useState("A1");
   const [index, setIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [audioStatus, setAudioStatus] = useState<string | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const [isRecording, setIsRecording] = useState(false);
+  const router = useRouter();
 
-  // Новые состояния для уровней
-  const [currentLevel, setCurrentLevel] = useState("A1");
-  const levels = ["A1", "A2", "B1", "B2", "C1"];
-
+  // Проверка авторизации
   useEffect(() => {
-    const loadWords = async () => {
-      setLoading(true);
-      try {
-        // Делаем запрос к Flask API с явным указанием URL, если локально
-        // Если ты запускаешь npm run dev (Next.js на 3000), он должен проксировать на 5000
-        const res = await fetch(`/api?action=words&level=${currentLevel}`);
+    const token = localStorage.getItem("token");
+    if (!token) {
+      router.push("/login");
+    }
+  }, []);
 
-        if (!res.ok) throw new Error("Failed to fetch");
-        const data = await res.json();
-
-        if (Array.isArray(data)) {
-          setWords(data);
-        } else {
-          console.error("API returned non-array data:", data);
-          setWords([]);
-        }
-
-        setIndex(0);
-        setShowAnswer(false);
-      } catch (e) {
-        console.error("Fetch error:", e);
-        setWords([]);
-        setAudioStatus("Ошибка загрузки слов");
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadWords();
-  }, [currentLevel]);
-
-  const nextCard = () => {
-    if (words.length === 0) return;
-    setShowAnswer(false);
-    setAudioStatus(null);
-    setIndex((prev) => (prev + 1) % words.length);
-  };
-
-  const prevCard = () => {
-    if (words.length === 0) return;
-    setShowAnswer(false);
-    setAudioStatus(null);
-    setIndex((prev) => (prev - 1 + words.length) % words.length);
-  };
+  // --- ЛОГИКА ЗАПИСИ ---
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<BlobPart[]>([]);
 
   const startRecording = async () => {
+    setAudioStatus(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream);
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
-      mr.ondataavailable = (e) => { chunksRef.current.push(e.data); };
-      mr.onstop = async () => {
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-        const fd = new FormData();
-        fd.append("file", blob, "recording.webm");
-        setLoading(true);
-        setAudioStatus(null);
-        try {
-          const res = await fetch("/api?action=audio", { method: "POST", body: fd });
-          const data = await res.json();
-          if (res.ok) { setAudioStatus("✅ Аудио сохранено!"); }
-          else { setAudioStatus("❌ Ошибка: " + (data.error || "неизвестно")); }
-        } catch (e) {
-          console.error(e);
-          setAudioStatus("❌ Ошибка отправки");
-        } finally {
-          setLoading(false);
-        }
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
       };
-      mr.start();
-      mediaRecorderRef.current = mr;
+
+      mediaRecorder.onstop = async () => {
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        await uploadAudio(blob);
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      mediaRecorder.start();
       setIsRecording(true);
-    } catch (e) {
-      console.error(e);
-      setAudioStatus("Не удалось получить доступ к микрофону");
+    } catch (err) {
+      console.error(err);
+      setAudioStatus("Ошибка доступа к микрофону");
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+    if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
     }
   };
 
+  const uploadAudio = async (blob: Blob) => {
+    setAudioStatus("Отправка...");
+    console.log("Размер блоба:", blob.size, "байт");
+
+    const formData = new FormData();
+    formData.append("file", blob, "recording.webm");
+
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/audio", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        },
+        body: formData,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        console.log("Загрузка успешна:", data);
+        setAudioStatus("Записано! ✅");
+      } else {
+        const error = await res.json();
+        console.error("Ошибка сервера:", error);
+        setAudioStatus("Ошибка загрузки ❌");
+      }
+    } catch (e) {
+      console.error("Ошибка сети:", e);
+      setAudioStatus("Ошибка сети");
+    }
+  };
+  // ---------------------
+
+  const loadWords = async (isManual = false) => {
+    if (!isManual) setLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`/api/trainer/words?level=${level}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (res.status === 401) {
+        router.push("/login");
+        return;
+      }
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+
+      if (isManual) {
+        setWords((prev) => [...prev, ...data]);
+      } else {
+        setWords(data);
+        setIndex(0);
+        setShowAnswer(false);
+      }
+    } catch (e) {
+      console.error("Ошибка при загрузке слов:", e);
+      setAudioStatus("Ошибка загрузки слов");
+    } finally {
+      if (!isManual) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadWords();
+  }, [level]);
+
+  const handleNext = () => {
+    setShowAnswer(false);
+    setAudioStatus(null);
+
+    // Удаляем текущее слово из списка
+    const newWords = [...words];
+    newWords.splice(index, 1);
+
+    if (newWords.length === 0) {
+      // Если слова кончились, подгружаем новые
+      setWords([]);
+      loadWords();
+    } else {
+      setWords(newWords);
+      // Если мы удалили последний элемент, сдвигаем индекс назад
+      if (index >= newWords.length) {
+        setIndex(0);
+      }
+    }
+  };
+
+  const handleRate = async (rating: number) => {
+    if (!currentWord) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/trainer/rate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          word_id: currentWord.id,
+          rating: rating
+        })
+      });
+
+      if (res.ok) {
+        handleNext();
+      }
+    } catch (err) {
+      console.error("Ошибка сохранения прогресса:", err);
+    }
+  };
+
+  const playAudio = (text: string) => {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "de-DE";
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const currentWord = words[index];
+
   return (
-    <div className={styles.container}>
-      {/* Шапка */}
-      <header className={styles.header}>
-        <div className={styles.headerContent}>
-          <Link href="/" className={styles.logo}>
-            🇩🇪 KlarDeutsch
-          </Link>
-          <nav className={styles.nav}>
-            <Link href="/" className={styles.navLink}>Главная</Link>
-            <Link href="/dictionary" className={styles.navLink}>Словарь</Link>
-            <Link href="/trainer" className={`${styles.navLink} ${styles.activeLink}`}>Тренажер</Link>
-            <Link href="/audio" className={styles.navLink}>Записи</Link>
-            <Link href="/profile" className={styles.navLink}>Дневник</Link>
-          </nav>
-        </div>
-      </header>
+    <div className={styles.pageWrapper}>
+      <Header />
 
-      <main className={styles.main}>
-        <h1 style={{ textAlign: 'center', marginBottom: '20px', color: '#1e293b' }}>Тренажер карточек</h1>
+      <main className="flex-1 flex flex-col items-center px-4 py-6 w-full">
 
-        {/* Кнопки переключения уровней */}
-        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '30px', flexWrap: 'wrap' }}>
-          {levels.map((level) => (
+        <div className="flex flex-wrap gap-2 mb-8 justify-center">
+          {["A1", "A2", "B1", "B2", "C1"].map((lvl) => (
             <button
-              key={level}
-              onClick={() => setCurrentLevel(level)}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: 'none',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                backgroundColor: currentLevel === level ? '#3b82f6' : '#e5e7eb',
-                color: currentLevel === level ? '#fff' : '#374151',
-                transition: '0.2s',
-                boxShadow: currentLevel === level ? '0 4px 6px rgba(59, 130, 246, 0.3)' : 'none'
-              }}
+              key={lvl}
+              onClick={() => setLevel(lvl)}
+              className={`px-4 py-2 rounded-lg font-bold transition-all ${level === lvl
+                ? "bg-blue-600 text-white shadow-md transform scale-105"
+                : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
+                }`}
             >
-              {level}
+              {lvl}
             </button>
           ))}
         </div>
 
-        {/* Основной контент */}
-        {loading ? (
-          <div className={styles.card}>
-            <h2 className={styles.wordDe}>Загрузка...</h2>
-          </div>
-        ) : words.length === 0 ? (
-          <div className={styles.card}>
-            <h2 className={styles.wordDe} style={{ fontSize: '24px' }}>Слов для уровня {currentLevel} пока нет 😔</h2>
-            <p style={{ color: '#64748b', marginTop: '10px' }}>Проверьте консоль браузера (F12) на наличие ошибок API</p>
-          </div>
-        ) : (
-          <>
-            <div
-              className={`${styles.card} ${showAnswer ? styles.flipped : ""}`}
-              onClick={() => setShowAnswer(!showAnswer)}
-            >
-              <div className={styles.cardFront}>
-                <span className={styles.levelBadge}>Deutsch • {currentLevel}</span>
-                <h2 className={styles.wordDe}>
-                  {words[index]?.article && <span className={styles.article}>{words[index].article} </span>}
-                  {words[index]?.de}
-                </h2>
-                <div className={styles.hint}>Нажми, чтобы показать перевод</div>
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col relative min-h-[500px]">
+          {loading ? (
+            <div className="flex-1 flex items-center justify-center flex-col gap-4">
+              <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-gray-500">Подготовка сессии...</p>
+            </div>
+          ) : !currentWord ? (
+            <div className="flex-1 flex items-center justify-center p-8 text-center text-gray-500">
+              Пока нет слов для повторения на уровне {level}. <br />Попробуйте другой уровень или зайдите позже!
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col p-6">
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-xs font-bold text-blue-500 uppercase tracking-wider">{currentWord.level}</span>
+                {/* @ts-ignore */}
+                {currentWord.next_review && (
+                  <span className="text-[10px] text-gray-400 bg-gray-50 px-2 py-1 rounded">Повторение</span>
+                )}
               </div>
 
-              <div className={styles.cardBack}>
-                <span className={styles.levelBadge}>Русский • {currentLevel}</span>
-                <h3 className={styles.wordRu}>{words[index]?.ru}</h3>
-                {words[index]?.example_de && (
-                  <div className={styles.exampleBox}>
-                    <p className={styles.exampleDe}>{words[index].example_de}</p>
-                    <p className={styles.exampleRu}>{words[index].example_ru}</p>
+              <div className="flex flex-col items-center text-center mb-6 mt-4">
+                <h2 className="text-4xl font-bold text-gray-800 mb-4">
+                  {/* @ts-ignore */}
+                  {currentWord.article && !currentWord.de.toLowerCase().startsWith(currentWord.article.toLowerCase() + " ") && (
+                    <span className="text-blue-500 text-2xl mr-2">{currentWord.article}</span>
+                  )}
+                  {currentWord.de}
+                </h2>
+                <button onClick={() => playAudio(currentWord.de)} className="p-3 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition"><Volume2 size={28} /></button>
+              </div>
+
+              <div className={`transition-all duration-300 overflow-hidden ${showAnswer ? "max-h-60 opacity-100 mb-6" : "max-h-0 opacity-0"}`}>
+                <div className="bg-gray-50 p-4 rounded-xl text-center border border-gray-100">
+                  <p className="text-xl text-green-700 font-medium mb-1">{currentWord.ru}</p>
+                  {currentWord.example_de && (
+                    <div className="text-sm text-gray-500 mt-2 pt-2 border-t border-gray-200 italic">
+                      {currentWord.example_de}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-auto">
+                {!showAnswer ? (
+                  <button onClick={() => setShowAnswer(true)} className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:bg-blue-700 transition flex items-center justify-center gap-2">
+                    <Eye size={20} /> Показать перевод
+                  </button>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <button
+                      onClick={() => handleRate(0)}
+                      className="flex flex-col items-center gap-1 py-3 bg-gray-100 text-gray-500 rounded-xl hover:bg-gray-200 transition border border-gray-200"
+                    >
+                      <span className="font-bold text-sm">Знаю</span>
+                      <span className="text-[10px] opacity-70">Убрать</span>
+                    </button>
+                    <button
+                      onClick={() => handleRate(1)}
+                      className="flex flex-col items-center gap-1 py-3 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition border border-red-100"
+                    >
+                      <span className="font-bold text-sm">Сложно</span>
+                      <span className="text-[10px] opacity-70">Завтра</span>
+                    </button>
+                    <button
+                      onClick={() => handleRate(3)}
+                      className="flex flex-col items-center gap-1 py-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition border border-blue-100"
+                    >
+                      <span className="font-bold text-sm">Норма</span>
+                      <span className="text-[10px] opacity-70">3-4 дня</span>
+                    </button>
+                    <button
+                      onClick={() => handleRate(5)}
+                      className="flex flex-col items-center gap-1 py-3 bg-green-50 text-green-600 rounded-xl hover:bg-green-100 transition border border-green-100"
+                    >
+                      <span className="font-bold text-sm">Легко</span>
+                      <span className="text-[10px] opacity-70">Неделя+</span>
+                    </button>
                   </div>
                 )}
               </div>
+
+              <div className="flex justify-center mt-6 pt-4 border-t border-gray-100">
+                <button onClick={isRecording ? stopRecording : startRecording} className={`p-4 rounded-full transition-all shadow-md ${isRecording ? "bg-red-500 text-white animate-pulse scale-110" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+                  {isRecording ? <Square size={24} fill="currentColor" /> : <Mic size={24} />}
+                </button>
+              </div>
+              {audioStatus && <p className="text-center text-xs text-gray-400 mt-2 h-4">{audioStatus}</p>}
             </div>
-
-            <div className={styles.controls}>
-              <button className={styles.btnSecondary} onClick={(e) => { e.stopPropagation(); prevCard(); }}>
-                ← Назад
-              </button>
-              <span style={{ color: '#64748b', fontWeight: 'bold' }}>
-                {index + 1} / {words.length}
-              </span>
-              <button className={styles.btnPrimary} onClick={(e) => { e.stopPropagation(); nextCard(); }}>
-                Дальше →
-              </button>
-            </div>
-
-            <div className={styles.audioSection}>
-              <h3 className={styles.audioTitle}>Произношение</h3>
-              <p className={styles.audioDesc}>Запиши себя и послушай</p>
-
-              <button
-                className={`${styles.recordBtn} ${isRecording ? styles.recording : ""}`}
-                onClick={isRecording ? stopRecording : startRecording}
-              >
-                {!isRecording ? "● Записать" : "■ Стоп"}
-              </button>
-
-              {audioStatus && (
-                <div className={styles.audioStatus}>{audioStatus}</div>
-              )}
-            </div>
-          </>
-        )}
+          )}
+        </div>
       </main>
     </div>
   );
