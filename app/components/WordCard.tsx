@@ -2,8 +2,7 @@
 
 import React from "react";
 import styles from "../styles/Shared.module.css";
-import { Volume2, BookOpen, Tag, Star } from "lucide-react";
-
+import { Volume2, BookOpen, Tag, Star, ArrowRightLeft, Layers } from "lucide-react";
 import Link from "next/link";
 
 interface WordCardProps {
@@ -13,10 +12,15 @@ interface WordCardProps {
         ru: string;
         article?: string;
         verb_forms?: string;
+        plural?: string;
         level: string;
         topic: string;
         example_de?: string;
         example_ru?: string;
+        examples?: { de: string; ru: string }[];
+        synonyms?: string;
+        antonyms?: string;
+        collocations?: string;
         audio_url?: string;
         is_favorite?: boolean;
     };
@@ -25,6 +29,16 @@ interface WordCardProps {
 }
 
 export default function WordCard({ word, onPlayAudio, onToggleFavorite }: WordCardProps) {
+    // Функция для определения цвета артикля
+    const getArticleColor = (article: string | undefined) => {
+        if (!article) return '#3b82f6'; // по умолчанию синий
+        const lower = article.toLowerCase().trim();
+        if (lower === 'der') return '#2563eb'; // синий
+        if (lower === 'die') return '#ef4444'; // красный
+        if (lower === 'das') return '#10b981'; // зеленый
+        return '#3b82f6';
+    };
+
     return (
         <div className={styles.card} style={{
             width: '100%',
@@ -35,23 +49,30 @@ export default function WordCard({ word, onPlayAudio, onToggleFavorite }: WordCa
             minHeight: 'auto',
             padding: 0,
             overflow: 'hidden',
-            border: '1px solid #e2e8f0'
-        }}>
+            border: '1px solid #e2e8f0',
+            borderRadius: '16px',
+            background: '#ffffff',
+            transition: 'box-shadow 0.2s',
+        }}
+            onMouseOver={(e) => e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01)'}
+            onMouseOut={(e) => e.currentTarget.style.boxShadow = 'none'}
+        >
             <div style={{
                 position: 'absolute',
-                top: '12px',
-                right: '48px',
+                top: '16px',
+                right: '52px',
                 display: 'flex',
                 gap: '8px',
                 zIndex: 5
             }}>
                 <span style={{
                     fontSize: '0.75rem',
-                    padding: '2px 8px',
+                    padding: '3px 10px',
                     borderRadius: '12px',
                     background: '#e0f2fe',
                     color: '#0369a1',
-                    fontWeight: 'bold'
+                    fontWeight: 'bold',
+                    border: '1px solid #bae6fd'
                 }}>
                     {word.level}
                 </span>
@@ -66,17 +87,18 @@ export default function WordCard({ word, onPlayAudio, onToggleFavorite }: WordCa
                 }}
                 style={{
                     position: 'absolute',
-                    top: '8px',
-                    right: '8px',
+                    top: '10px',
+                    right: '10px',
                     background: 'none',
                     border: 'none',
                     cursor: 'pointer',
-                    color: word.is_favorite ? '#f59e0b' : '#94a3b8',
+                    color: word.is_favorite ? '#f59e0b' : '#cbd5e1',
                     padding: '8px',
                     zIndex: 10,
-                    transition: 'transform 0.2s'
+                    transition: 'all 0.2s transform cubic-bezier(0.175, 0.885, 0.32, 1.275)'
                 }}
-                className="fav-btn"
+                onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.15)'}
+                onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
             >
                 <Star size={24} fill={word.is_favorite ? '#f59e0b' : 'none'} />
             </button>
@@ -93,30 +115,63 @@ export default function WordCard({ word, onPlayAudio, onToggleFavorite }: WordCa
             >
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '8px', width: '100%' }}>
                     <div style={{ flex: 1 }}>
-                        <h3 style={{ margin: 0, fontSize: '1.5rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                            {word.article && <span style={{ color: '#3b82f6', fontSize: '1.1rem', fontWeight: 'bold' }}>{word.article}</span>}
+                        <h3 style={{ margin: 0, fontSize: '1.75rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', fontWeight: '800' }}>
+                            {word.article && <span style={{ color: getArticleColor(word.article), fontSize: '1.4rem' }}>{word.article}</span>}
                             <span>{word.de}</span>
                         </h3>
                     </div>
                 </div>
 
-                {word.verb_forms && (
-                    <p style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: '#64748b', fontStyle: 'italic' }}>
-                        ({word.verb_forms})
-                    </p>
+                {/* Лингвистические данные: Множественное число или Формы глагола */}
+                {(word.plural || word.verb_forms) && (
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                        {word.plural && (
+                            <span style={{ fontSize: '0.85rem', color: '#64748b', background: '#f1f5f9', padding: '2px 8px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                                Pl: <span style={{ fontWeight: '600', color: '#475569' }}>{word.plural}</span>
+                            </span>
+                        )}
+                        {word.verb_forms && (
+                            <span style={{ fontSize: '0.85rem', color: '#64748b', background: '#f1f5f9', padding: '2px 8px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                                {word.verb_forms}
+                            </span>
+                        )}
+                    </div>
                 )}
 
-                <p style={{ fontSize: '1.2rem', color: '#1e293b', marginBottom: '16px', fontWeight: '500' }}>
+                <p style={{ fontSize: '1.25rem', color: '#334155', marginBottom: '20px', fontWeight: '500' }}>
                     {word.ru}
                 </p>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#94a3b8', fontSize: '0.85rem' }}>
-                        <Tag size={14} />
+                {/* Блок Синонимов, Антонимов и Словосочетаний */}
+                {(word.synonyms || word.antonyms || word.collocations) && (
+                    <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '10px', marginBottom: '20px', border: '1px solid #f1f5f9', fontSize: '0.9rem' }}>
+                        {word.synonyms && (
+                            <div style={{ display: 'flex', marginBottom: '6px' }}>
+                                <span style={{ width: '90px', color: '#94a3b8', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>Синонимы:</span>
+                                <span style={{ color: '#475569', flex: 1 }}>{word.synonyms}</span>
+                            </div>
+                        )}
+                        {word.antonyms && (
+                            <div style={{ display: 'flex', marginBottom: '6px' }}>
+                                <span style={{ width: '90px', color: '#94a3b8', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}><ArrowRightLeft size={12} /> Антонимы:</span>
+                                <span style={{ color: '#475569', flex: 1 }}>{word.antonyms}</span>
+                            </div>
+                        )}
+                        {word.collocations && (
+                            <div style={{ display: 'flex' }}>
+                                <span style={{ width: '90px', color: '#94a3b8', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}><Layers size={12} /> Связки:</span>
+                                <span style={{ color: '#0369a1', fontWeight: '500', flex: 1 }}>{word.collocations}</span>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '500' }}>
+                        <Tag size={16} color="#cbd5e1" />
                         <span>{word.topic}</span>
                     </div>
 
-                    {/* Prominent Audio Button inside the card but not blocking navigation */}
                     {word.audio_url && (
                         <button
                             onClick={(e) => {
@@ -125,26 +180,29 @@ export default function WordCard({ word, onPlayAudio, onToggleFavorite }: WordCa
                                 onPlayAudio?.(word.audio_url!);
                             }}
                             style={{
-                                background: '#f1f5f9',
-                                border: 'none',
+                                background: '#f0f9ff',
+                                border: '1px solid #bae6fd',
                                 cursor: 'pointer',
-                                color: '#3498db',
+                                color: '#0284c7',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '8px',
                                 padding: '8px 16px',
-                                borderRadius: '20px',
+                                borderRadius: '24px',
                                 transition: 'all 0.2s',
                                 fontWeight: '600',
-                                fontSize: '0.9rem'
+                                fontSize: '0.9rem',
+                                boxShadow: '0 2px 4px rgba(2, 132, 199, 0.05)'
                             }}
                             onMouseOver={(e) => {
-                                e.currentTarget.style.background = '#e2e8f0';
-                                e.currentTarget.style.transform = 'scale(1.05)';
+                                e.currentTarget.style.background = '#e0f2fe';
+                                e.currentTarget.style.transform = 'translateY(-1px)';
+                                e.currentTarget.style.boxShadow = '0 4px 6px rgba(2, 132, 199, 0.1)';
                             }}
                             onMouseOut={(e) => {
-                                e.currentTarget.style.background = '#f1f5f9';
-                                e.currentTarget.style.transform = 'scale(1)';
+                                e.currentTarget.style.background = '#f0f9ff';
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = '0 2px 4px rgba(2, 132, 199, 0.05)';
                             }}
                         >
                             <Volume2 size={20} />
@@ -153,20 +211,48 @@ export default function WordCard({ word, onPlayAudio, onToggleFavorite }: WordCa
                     )}
                 </div>
 
-                {(word.example_de || word.example_ru) && (
-                    <div style={{
-                        background: '#f8fafc',
-                        padding: '16px',
-                        borderRadius: '12px',
-                        borderLeft: '4px solid #3498db',
-                        width: '100%'
-                    }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
-                            <BookOpen size={18} style={{ marginTop: '2px', color: '#64748b' }} />
-                            <p style={{ margin: 0, fontStyle: 'italic', color: '#334155', fontSize: '1rem', lineHeight: '1.4' }}>{word.example_de}</p>
-                        </div>
-                        {word.example_ru && (
-                            <p style={{ margin: '6px 0 0 26px', color: '#64748b', fontSize: '0.9rem' }}>{word.example_ru}</p>
+                {/* Примеры (поддержка массива из 3 штук или старого одиночного формата) */}
+                {((word.examples && word.examples.length > 0) || word.example_de) && (
+                    <div style={{ display: 'flex', flexDirection: 'col' as any, gap: '8px', width: '100%' }}>
+
+                        {(word.examples && word.examples.length > 0) ? (
+                            // Рендер массива примеров
+                            word.examples.map((ex, idx) => (
+                                <div key={idx} style={{
+                                    background: '#f8fafc',
+                                    padding: '12px 16px',
+                                    borderRadius: '12px',
+                                    borderLeft: '4px solid #3b82f6',
+                                    width: '100%'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '4px' }}>
+                                        <BookOpen size={16} style={{ marginTop: '2px', color: '#94a3b8', minWidth: '16px' }} />
+                                        <p style={{ margin: 0, fontStyle: 'italic', color: '#1e293b', fontSize: '0.95rem', lineHeight: '1.4', fontWeight: '500' }}>
+                                            {ex.de}
+                                        </p>
+                                    </div>
+                                    <p style={{ margin: '4px 0 0 24px', color: '#64748b', fontSize: '0.85rem' }}>{ex.ru}</p>
+                                </div>
+                            ))
+                        ) : (
+                            // Рендер старого одиночного примера
+                            <div style={{
+                                background: '#f8fafc',
+                                padding: '12px 16px',
+                                borderRadius: '12px',
+                                borderLeft: '4px solid #3b82f6',
+                                width: '100%'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '4px' }}>
+                                    <BookOpen size={16} style={{ marginTop: '2px', color: '#94a3b8', minWidth: '16px' }} />
+                                    <p style={{ margin: 0, fontStyle: 'italic', color: '#1e293b', fontSize: '0.95rem', lineHeight: '1.4', fontWeight: '500' }}>
+                                        {word.example_de}
+                                    </p>
+                                </div>
+                                {word.example_ru && (
+                                    <p style={{ margin: '4px 0 0 24px', color: '#64748b', fontSize: '0.85rem' }}>{word.example_ru}</p>
+                                )}
+                            </div>
                         )}
                     </div>
                 )}
