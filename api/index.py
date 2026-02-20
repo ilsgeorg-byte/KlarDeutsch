@@ -41,6 +41,7 @@ try:
     from routes.diary import diary_bp
     from routes.trainer import trainer_bp
     from routes.auth import auth_bp
+    from routes.ai_enrich import ai_enrich_bp
     from db import init_db
 except ImportError:
     from .routes.words import words_bp
@@ -48,6 +49,7 @@ except ImportError:
     from .routes.diary import diary_bp
     from .routes.trainer import trainer_bp
     from .routes.auth import auth_bp
+    from .routes.ai_enrich import ai_enrich_bp
     from .db import init_db
 
 # Инициализируем базу данных (создаем таблицы если их нет)
@@ -58,6 +60,7 @@ app.register_blueprint(audio_bp)
 app.register_blueprint(diary_bp)
 app.register_blueprint(trainer_bp)
 app.register_blueprint(auth_bp)
+app.register_blueprint(ai_enrich_bp)
 
 # Health check endpoint
 @app.route('/health', methods=['GET'])
