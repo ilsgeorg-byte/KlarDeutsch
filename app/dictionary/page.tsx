@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import styles from "../styles/Shared.module.css";
-import Header from "../components/Header";
 import WordCard from "../components/WordCard";
 import { Search, Loader2, Plus, BookOpen } from "lucide-react";
 import AddWordModal from "../components/AddWordModal";
@@ -104,7 +103,6 @@ export default function DictionaryPage() {
 
     return (
         <div className={styles.pageWrapper}>
-            <Header />
 
             <main className={styles.container} style={{ maxWidth: '800px', justifyContent: 'flex-start' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '10px' }}>

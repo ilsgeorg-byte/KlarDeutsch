@@ -3,9 +3,7 @@
 import React, { useState, useEffect } from "react";
 import styles from "./Diary.module.css";
 import { Sparkles, CheckCircle2, AlertCircle, Loader2, Trash2, Calendar } from "lucide-react";
-
 import { useRouter } from "next/navigation";
-import Header from "../components/Header";
 
 export default function DiaryPage() {
   const [text, setText] = useState("");
@@ -181,7 +179,6 @@ export default function DiaryPage() {
 
   return (
     <div className={styles.pageWrapper}>
-      <Header />
 
       <main className={styles.container}>
         <h1 className={styles.title}>Мой дневник</h1>

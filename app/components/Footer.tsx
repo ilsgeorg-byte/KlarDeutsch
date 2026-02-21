@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpen, Github, Mail, Heart } from "lucide-react";
+import { BookOpen, Mail, Heart } from "lucide-react";
 
 export default function Footer() {
     const currentYear = new Date().getFullYear();
@@ -37,7 +37,7 @@ export default function Footer() {
                         <Link href="/dictionary" className="text-slate-500 hover:text-blue-600 text-sm transition-colors w-fit">
                             Словарь
                         </Link>
-                        <Link href="/train" className="text-slate-500 hover:text-blue-600 text-sm transition-colors w-fit">
+                        <Link href="/trainer" className="text-slate-500 hover:text-blue-600 text-sm transition-colors w-fit">
                             Тренажер
                         </Link>
                     </div>
@@ -51,15 +51,6 @@ export default function Footer() {
                         >
                             <Mail size={16} />
                             hello@klardeutsch.app
-                        </a>
-                        <a
-                            href="https://github.com/georgils"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-2 text-slate-500 hover:text-blue-600 text-sm transition-colors w-fit"
-                        >
-                            <Github size={16} />
-                            GitHub
                         </a>
                     </div>
                 </div>

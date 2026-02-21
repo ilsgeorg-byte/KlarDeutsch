@@ -2,14 +2,12 @@
 
 import React from "react";
 import styles from "./styles/Shared.module.css";
-import Header from "./components/Header";
-import Footer from "./components/Footer"; // <-- Импортируем наш новый Footer
+
 
 export default function HomePage() {
   return (
     // Добавляем min-h-screen и flex flex-col, чтобы растянуть страницу на весь экран
     <div className={`${styles.pageWrapper} min-h-screen flex flex-col`}>
-      <Header />
 
       {/* Контент главной. Добавляем flex-1, чтобы этот блок отталкивал Footer вниз */}
       <main
@@ -74,7 +72,7 @@ export default function HomePage() {
         </div>
       </main>
 
-      <Footer /> {/* <-- Подвал будет аккуратно прижат к низу */}
+
     </div>
   );
 }

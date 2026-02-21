@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "../styles/Auth.module.css";
-import Header from "../components/Header";
+
 import { AlertCircle, Loader2 } from "lucide-react";
 
 export default function RegisterPage() {
@@ -69,7 +69,6 @@ export default function RegisterPage() {
 
     return (
         <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh' }}>
-            <Header />
             <div className={styles.container}>
                 <h1 className={styles.title}>Создать аккаунт</h1>
                 <p className={styles.subtitle}>Начните свое путешествие в немецкий язык</p>

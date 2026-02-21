@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Header from "../components/Header";
 import { BookOpen, CheckCircle, TrendingUp, Award, Layers, Star } from "lucide-react";
 import styles from "../styles/Shared.module.css";
 
@@ -87,7 +86,6 @@ export default function ProfilePage() {
 
     return (
         <div className={styles.pageWrapper}>
-            <Header />
 
             <main className="max-w-5xl mx-auto px-6 py-12 w-full">
                 <header className="mb-12">
