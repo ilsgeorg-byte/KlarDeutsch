@@ -78,15 +78,20 @@ export default function Header() {
 
                 {/* Десктопный профиль */}
                 <div className="hidden md:flex items-center gap-4">
-                    <button className="flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-blue-600 transition-colors">
+                    <Link
+                        href="/profile"
+                        className="flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-blue-600 transition-colors"
+                    >
                         <User size={18} />
                         Профиль
-                    </button>
+                    </Link>
+
                     <button className="flex items-center gap-2 text-sm font-semibold text-red-500 hover:text-red-600 transition-colors bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg">
                         <LogOut size={16} />
                         Выйти
                     </button>
                 </div>
+
 
                 {/* Мобильная кнопка меню */}
 
