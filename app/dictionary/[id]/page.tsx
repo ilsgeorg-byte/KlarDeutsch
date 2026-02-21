@@ -209,7 +209,7 @@ export default function WordDetailPage() {
                                     </div>
                                 )}
                                 {word.collocations && (
-                                    <div className="flex flex-col sm:flex-row sm:items-baseline">
+                                    <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-2">
                                         <span className="w-32 text-slate-500 font-medium">Словосочетания: </span>
                                         <span className="text-blue-700 font-medium flex-1">{word.collocations}</span>
                                     </div>
