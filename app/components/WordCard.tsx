@@ -143,28 +143,30 @@ export default function WordCard({ word, onPlayAudio, onToggleFavorite }: WordCa
                 </p>
 
                 {/* Блок Синонимов, Антонимов и Словосочетаний */}
+                {/* Блок Синонимов, Антонимов и Словосочетаний */}
                 {(word.synonyms || word.antonyms || word.collocations) && (
                     <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '10px', marginBottom: '20px', border: '1px solid #f1f5f9', fontSize: '0.9rem' }}>
                         {word.synonyms && (
-                            <div style={{ display: 'flex', marginBottom: '6px' }}>
-                                <span style={{ width: '90px', color: '#94a3b8', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>Синонимы: </span>
+                            <div style={{ display: 'flex', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
+                                <span style={{ color: '#94a3b8', fontWeight: '600', display: 'flex', alignItems: 'center', minWidth: '95px' }}>Синонимы:</span>
                                 <span style={{ color: '#475569', flex: 1 }}>{word.synonyms}</span>
                             </div>
                         )}
                         {word.antonyms && (
-                            <div style={{ display: 'flex', marginBottom: '6px' }}>
-                                <span style={{ width: '90px', color: '#94a3b8', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}><ArrowRightLeft size={12} /> Антонимы: </span>
+                            <div style={{ display: 'flex', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
+                                <span style={{ color: '#94a3b8', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px', minWidth: '95px' }}><ArrowRightLeft size={12} /> Антонимы:</span>
                                 <span style={{ color: '#475569', flex: 1 }}>{word.antonyms}</span>
                             </div>
                         )}
                         {word.collocations && (
-                            <div style={{ display: 'flex' }}>
-                                <span style={{ width: '90px', color: '#94a3b8', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}><Layers size={12} /> Связки: </span>
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                <span style={{ color: '#94a3b8', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px', minWidth: '95px' }}><Layers size={12} /> Связки:</span>
                                 <span style={{ color: '#0369a1', fontWeight: '500', flex: 1 }}>{word.collocations}</span>
                             </div>
                         )}
                     </div>
                 )}
+
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '500' }}>
