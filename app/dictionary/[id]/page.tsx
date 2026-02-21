@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, Volume2, BookOpen, Tag, Star, ArrowRightLeft, Layers } from "lucide-react";
 import styles from "../../styles/Shared.module.css";
-import Header from "../../components/Header";
+
 
 interface Word {
     id: number;
@@ -91,7 +91,7 @@ export default function WordDetailPage() {
     if (loading) {
         return (
             <div className={styles.pageWrapper}>
-                <Header />
+
                 <div className="flex-1 flex flex-col items-center justify-center p-8">
                     <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-4" />
                     <p className="text-slate-500 font-medium">Загружаем слово...</p>
@@ -103,7 +103,7 @@ export default function WordDetailPage() {
     if (error || !word) {
         return (
             <div className={styles.pageWrapper}>
-                <Header />
+
                 <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
                     <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-red-500 mb-4">
                         <span className="text-2xl">😕</span>
@@ -120,7 +120,7 @@ export default function WordDetailPage() {
 
     return (
         <div className={`${styles.pageWrapper} bg-slate-50 min-h-screen font-sans flex flex-col`}>
-            <Header />
+
 
             <main className="flex-1 flex flex-col items-center px-4 w-full pt-8 pb-12 max-w-3xl mx-auto">
 

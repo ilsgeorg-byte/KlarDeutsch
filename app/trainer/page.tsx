@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Mic, Square, Volume2, Eye, Loader2 } from "lucide-react";
 import styles from "../styles/Shared.module.css";
-import Header from "../components/Header";
+
 
 interface Word {
   id: number;
@@ -164,7 +164,7 @@ export default function TrainerPage() {
 
   return (
     <div className={`${styles.pageWrapper} bg-slate-50 min-h-screen font-sans flex flex-col`}>
-      <Header />
+
 
       <main className="flex-1 flex flex-col items-center px-4 w-full pt-8 pb-12">
 

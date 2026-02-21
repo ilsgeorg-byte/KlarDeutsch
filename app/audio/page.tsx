@@ -3,9 +3,6 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "../styles/Shared.module.css";
-
-import Header from "../components/Header";
-
 export default function AudioPage() {
   const [files, setFiles] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -66,7 +63,6 @@ export default function AudioPage() {
 
   return (
     <div className={styles.pageWrapper}>
-      <Header />
 
       <main className={styles.container}>
         <h1 className={styles.pageTitle}>Мои записи</h1>
