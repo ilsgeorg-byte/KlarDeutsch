@@ -198,7 +198,7 @@ export default function WordDetailPage() {
                             <div className="space-y-3">
                                 {word.synonyms && (
                                     <div className="flex flex-col sm:flex-row sm:items-baseline border-b border-slate-200/50 pb-3">
-                                        <span className="w-32 text-slate-500 font-medium">Синонимы:</span>
+                                        <span className="w-32 text-slate-500 font-medium">Синонимы: </span>
                                         <span className="text-slate-800 flex-1">{word.synonyms}</span>
                                     </div>
                                 )}
@@ -210,7 +210,7 @@ export default function WordDetailPage() {
                                 )}
                                 {word.collocations && (
                                     <div className="flex flex-col sm:flex-row sm:items-baseline">
-                                        <span className="w-32 text-slate-500 font-medium">Словосочетания:</span>
+                                        <span className="w-32 text-slate-500 font-medium">Словосочетания: </span>
                                         <span className="text-blue-700 font-medium flex-1">{word.collocations}</span>
                                     </div>
                                 )}
