@@ -147,19 +147,19 @@ export default function WordCard({ word, onPlayAudio, onToggleFavorite }: WordCa
                     <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '10px', marginBottom: '20px', border: '1px solid #f1f5f9', fontSize: '0.9rem' }}>
                         {word.synonyms && (
                             <div style={{ display: 'flex', marginBottom: '6px' }}>
-                                <span style={{ width: '90px', color: '#94a3b8', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>Синонимы:</span>
+                                <span style={{ width: '90px', color: '#94a3b8', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>Синонимы: </span>
                                 <span style={{ color: '#475569', flex: 1 }}>{word.synonyms}</span>
                             </div>
                         )}
                         {word.antonyms && (
                             <div style={{ display: 'flex', marginBottom: '6px' }}>
-                                <span style={{ width: '90px', color: '#94a3b8', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}><ArrowRightLeft size={12} /> Антонимы:</span>
+                                <span style={{ width: '90px', color: '#94a3b8', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}><ArrowRightLeft size={12} /> Антонимы: </span>
                                 <span style={{ color: '#475569', flex: 1 }}>{word.antonyms}</span>
                             </div>
                         )}
                         {word.collocations && (
                             <div style={{ display: 'flex' }}>
-                                <span style={{ width: '90px', color: '#94a3b8', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}><Layers size={12} /> Связки:</span>
+                                <span style={{ width: '90px', color: '#94a3b8', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}><Layers size={12} /> Связки: </span>
                                 <span style={{ color: '#0369a1', fontWeight: '500', flex: 1 }}>{word.collocations}</span>
                             </div>
                         )}
