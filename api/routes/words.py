@@ -51,11 +51,12 @@ def get_words():
         cur.execute("SELECT COUNT(*) FROM words WHERE level = %s", (level,))
         total = cur.fetchone()[0]
 
-        # Получаем слова с пагинацией
+        # Получаем слова с пагинацией И НОВЫМИ КОЛОНКАМИ
         user_id = get_current_user_id()
         if user_id:
             cur.execute("""
                 SELECT w.id, w.level, w.topic, w.de, w.ru, w.article, w.verb_forms, w.example_de, w.example_ru, w.audio_url,
+                       w.plural, w.examples, w.synonyms, w.antonyms, w.collocations,
                        (f.word_id IS NOT NULL) as is_favorite
                 FROM words w
                 LEFT JOIN user_favorites f ON w.id = f.word_id AND f.user_id = %s
@@ -66,6 +67,7 @@ def get_words():
         else:
             cur.execute("""
                 SELECT id, level, topic, de, ru, article, verb_forms, example_de, example_ru, audio_url,
+                       plural, examples, synonyms, antonyms, collocations,
                        false as is_favorite
                 FROM words 
                 WHERE level = %s AND user_id IS NULL
@@ -104,6 +106,7 @@ def get_word(word_id: int):
         if user_id:
             cur.execute("""
                 SELECT w.id, w.level, w.topic, w.de, w.ru, w.article, w.verb_forms, w.example_de, w.example_ru, w.audio_url,
+                       w.plural, w.examples, w.synonyms, w.antonyms, w.collocations,
                        (f.word_id IS NOT NULL) as is_favorite
                 FROM words w
                 LEFT JOIN user_favorites f ON w.id = f.word_id AND f.user_id = %s
@@ -112,6 +115,7 @@ def get_word(word_id: int):
         else:
             cur.execute("""
                 SELECT id, level, topic, de, ru, article, verb_forms, example_de, example_ru, audio_url,
+                       plural, examples, synonyms, antonyms, collocations,
                        false as is_favorite
                 FROM words 
                 WHERE id = %s AND user_id IS NULL
@@ -150,7 +154,8 @@ def get_words_by_topic(topic: str):
             return jsonify({"error": "Тема не найдена"}), 404
         
         cur.execute("""
-            SELECT id, level, topic, de, ru, article, verb_forms, example_de, example_ru, audio_url
+            SELECT id, level, topic, de, ru, article, verb_forms, example_de, example_ru, audio_url,
+                   plural, examples, synonyms, antonyms, collocations
             FROM words 
             WHERE topic = %s
             ORDER BY id
@@ -234,7 +239,6 @@ def search_words():
         if len(query) < 2:
             return jsonify({"data": [], "message": "Запрос слишком короткий (мин. 2 символа)"}), 200
             
-
         user_id = get_current_user_id()
         
         conn = get_db_connection()
@@ -243,6 +247,7 @@ def search_words():
         if user_id:
             cur.execute("""
                 SELECT w.id, w.level, w.topic, w.de, w.ru, w.article, w.verb_forms, w.example_de, w.example_ru, w.audio_url,
+                       w.plural, w.examples, w.synonyms, w.antonyms, w.collocations,
                        (f.word_id IS NOT NULL) as is_favorite
                 FROM words w
                 LEFT JOIN user_favorites f ON w.id = f.word_id AND f.user_id = %s
@@ -259,6 +264,7 @@ def search_words():
         else:
             cur.execute("""
                 SELECT id, level, topic, de, ru, article, verb_forms, example_de, example_ru, audio_url,
+                       plural, examples, synonyms, antonyms, collocations,
                        false as is_favorite
                 FROM words 
                 WHERE (de ILIKE %s OR ru ILIKE %s) AND user_id IS NULL
@@ -295,6 +301,7 @@ def get_favorites():
         
         cur.execute("""
             SELECT w.id, w.level, w.topic, w.de, w.ru, w.article, w.verb_forms, w.example_de, w.example_ru, w.audio_url,
+                   w.plural, w.examples, w.synonyms, w.antonyms, w.collocations,
                    true as is_favorite
             FROM words w
             JOIN user_favorites f ON w.id = f.word_id
