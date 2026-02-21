@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import { Mic, Square, Volume2, Eye, Loader2, Star } from "lucide-react";
 import styles from "../styles/Shared.module.css";
 
-
-
 interface Word {
   id: number;
   de: string;
@@ -26,9 +24,13 @@ interface Word {
   is_favorite?: boolean;
 }
 
+// @ts-ignore — если backend добавляет это поле
+interface TrainerWord extends Word {
+  next_review?: string;
+}
 
 export default function TrainerPage() {
-  const [words, setWords] = useState<Word[]>([]);
+  const [words, setWords] = useState<TrainerWord[]>([]);
   const [level, setLevel] = useState("A1");
   const [index, setIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
@@ -36,37 +38,11 @@ export default function TrainerPage() {
   const [audioStatus, setAudioStatus] = useState<string | null>(null);
   const router = useRouter();
 
-  const toggleFavorite = async (wordId: number) => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        alert("Пожалуйста, войдите в систему, чтобы добавлять слова в избранное");
-        return;
-      }
-
-      const response = await fetch(`/api/words/${wordId}/favorite`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (response.ok) {
-        setWords(prev =>
-          prev.map(w =>
-            w.id === wordId ? { ...w, is_favorite: !w.is_favorite } : w
-          )
-        );
-      }
-    } catch (err) {
-      console.error("Favorite error:", err);
-    }
-  };
-
-
   // Проверка авторизации
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) router.push("/login");
-  }, []);
+  }, [router]);
 
   // --- ЛОГИКА ЗАПИСИ ---
   const [isRecording, setIsRecording] = useState(false);
@@ -115,7 +91,7 @@ export default function TrainerPage() {
       const token = localStorage.getItem("token");
       const res = await fetch("/api/audio", {
         method: "POST",
-        headers: { "Authorization": `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
       if (res.ok) setAudioStatus("Записано! ✅");
@@ -130,7 +106,7 @@ export default function TrainerPage() {
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`/api/trainer/words?level=${level}`, {
-        headers: { "Authorization": `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.status === 401) return router.push("/login");
       if (!res.ok) throw new Error("Failed");
@@ -150,7 +126,10 @@ export default function TrainerPage() {
     }
   };
 
-  useEffect(() => { loadWords(); }, [level]);
+  useEffect(() => {
+    loadWords();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [level]);
 
   const handleNext = () => {
     setShowAnswer(false);
@@ -171,8 +150,11 @@ export default function TrainerPage() {
       const token = localStorage.getItem("token");
       const res = await fetch("/api/trainer/rate", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({ word_id: currentWord.id, rating: rating })
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ word_id: currentWord.id, rating }),
       });
       if (res.ok) handleNext();
     } catch (err) {
@@ -181,20 +163,46 @@ export default function TrainerPage() {
   };
 
   const playAudio = (e: React.MouseEvent, text: string) => {
-    e.stopPropagation(); // Чтобы карточка не переворачивалась при клике на звук
+    e.stopPropagation();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = "de-DE";
     window.speechSynthesis.speak(utterance);
   };
 
+  const toggleFavorite = async (wordId: number) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        alert("Пожалуйста, войдите в систему, чтобы добавлять слова в избранное");
+        return;
+      }
+
+      await fetch(`/api/words/${wordId}/favorite`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      // Если backend уже возвращает is_favorite в тренажёре,
+      // и хочешь обновлять визуально прямо здесь, можно потом
+      // раскомментировать и подстроить к формату ответа:
+      //
+      // setWords(prev =>
+      //   prev.map(w =>
+      //     w.id === wordId ? { ...w, is_favorite: !w.is_favorite } : w
+      //   )
+      // );
+    } catch (err) {
+      console.error("Favorite error:", err);
+    }
+  };
+
   const currentWord = words[index];
 
   return (
-    <div className={`${styles.pageWrapper} bg-slate-50 min-h-screen font-sans flex flex-col`}>
-
-
+    <div
+      className={`${styles.pageWrapper} bg-slate-50 min-h-screen font-sans flex flex-col`}
+    >
       <main className="flex-1 flex flex-col items-center px-4 w-full pt-8 pb-12">
-
         {/* Стильный переключатель уровней */}
         <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200 mb-8 w-full max-w-md overflow-x-auto">
           {["A1", "A2", "B1", "B2", "C1"].map((lvl) => (
@@ -202,8 +210,8 @@ export default function TrainerPage() {
               key={lvl}
               onClick={() => setLevel(lvl)}
               className={`flex-1 min-w-[60px] py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ${level === lvl
-                ? "bg-blue-600 text-white shadow-md shadow-blue-500/30 transform scale-105"
-                : "bg-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                  ? "bg-blue-600 text-white shadow-md shadow-blue-500/30 transform scale-105"
+                  : "bg-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-800"
                 }`}
             >
               {lvl}
@@ -216,17 +224,23 @@ export default function TrainerPage() {
           {loading ? (
             <div className="w-full h-[400px] bg-white rounded-3xl shadow-xl flex flex-col items-center justify-center border border-slate-100">
               <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-4" />
-              <p className="text-slate-500 font-medium animate-pulse">Загружаем слова...</p>
+              <p className="text-slate-500 font-medium animate-pulse">
+                Загружаем слова...
+              </p>
             </div>
           ) : !currentWord ? (
             <div className="w-full h-[400px] bg-white rounded-3xl shadow-xl flex flex-col items-center justify-center p-8 text-center border border-slate-100">
               <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-6">
                 <span className="text-4xl">🎉</span>
               </div>
-              <h3 className="text-xl font-bold text-slate-800 mb-2">На сегодня всё!</h3>
+              <h3 className="text-xl font-bold text-slate-800 mb-2">
+                На сегодня всё!
+              </h3>
               <p className="text-slate-500">
-                Нет слов для повторения на уровне <span className="font-bold text-blue-600">{level}</span>.
-                <br />Отдохните или выберите другой уровень.
+                Нет слов для повторения на уровне{" "}
+                <span className="font-bold text-blue-600">{level}</span>.
+                <br />
+                Отдохните или выберите другой уровень.
               </p>
             </div>
           ) : (
@@ -234,9 +248,11 @@ export default function TrainerPage() {
               {/* Сама Карточка */}
               <div
                 onClick={() => !showAnswer && setShowAnswer(true)}
-                className={`relative w-full rounded-3xl shadow-xl border border-slate-100 bg-white transition-all duration-500 transform-gpu flex flex-col overflow-hidden ${!showAnswer ? "hover:-translate-y-1 hover:shadow-2xl cursor-pointer" : "shadow-blue-900/10 cursor-default"} min-h-[380px]`}
+                className={`relative w-full rounded-3xl shadow-xl border border-slate-100 bg-white transition-all duration-500 transform-gpu flex flex-col overflow-hidden ${!showAnswer
+                    ? "hover:-translate-y-1 hover:shadow-2xl cursor-pointer"
+                    : "shadow-blue-900/10 cursor-default"
+                  } min-h-[380px]`}
               >
-
                 {/* Бейджи + избранное в шапке карточки */}
                 <div className="flex justify-between items-center w-full p-5 absolute top-0 left-0">
                   <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-bold tracking-wide border border-blue-100">
@@ -261,127 +277,164 @@ export default function TrainerPage() {
                     >
                       <Star
                         size={22}
-                        className={currentWord.is_favorite ? "fill-yellow-400" : "fill-none"}
+                        className={
+                          currentWord.is_favorite
+                            ? "fill-yellow-400"
+                            : "fill-none"
+                        }
                       />
                     </button>
                   </div>
                 </div>
 
+                {/* Центр карточки (Слово + Звук + Микрофон) */}
+                <div className="flex-1 flex flex-col items-center justify-center p-6 mt-12 mb-6">
+                  {/* Немецкое слово */}
+                  <h2 className="text-[2.5rem] font-extrabold text-slate-800 text-center leading-tight mb-6">
+                    {/* @ts-ignore */}
+                    {currentWord.article &&
+                      !currentWord.de
+                        .toLowerCase()
+                        .startsWith(
+                          currentWord.article.toLowerCase() + " "
+                        ) && (
+                        <span className="text-blue-500 font-bold mr-2 opacity-90">
+                          {currentWord.article}
+                        </span>
+                      )}
+                    {currentWord.de}
+                  </h2>
 
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleFavorite(currentWord.id);
-                  }}
-                  className="p-1.5 text-yellow-400 hover:scale-110 transition-transform"
-                >
-                  <Star
-                    size={22}
-                    className={currentWord.is_favorite ? "fill-yellow-400" : "fill-none"}
-                  />
-                </button>
-              </div>
+                  {/* Кнопки аудио (Озвучка + Запись) */}
+                  <div className="flex items-center gap-6">
+                    {/* Диктор */}
+                    <div className="flex flex-col items-center gap-2">
+                      <button
+                        onClick={(e) => playAudio(e, currentWord.de)}
+                        className="w-14 h-14 bg-slate-50 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded-full flex items-center justify-center transition-colors shadow-sm border border-slate-100"
+                      >
+                        <Volume2 size={26} strokeWidth={2.5} />
+                      </button>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                        Послушать
+                      </span>
+                    </div>
 
+                    {/* Разделитель */}
+                    <div className="h-8 w-px bg-slate-200"></div>
 
+                    {/* Микрофон */}
+                    <div className="flex flex-col items-center gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          isRecording ? stopRecording() : startRecording();
+                        }}
+                        className={`w-14 h-14 rounded-full flex items-center justify-center shadow-sm transition-all border ${isRecording
+                            ? "bg-red-500 text-white animate-pulse scale-110 border-red-500 shadow-red-500/40"
+                            : "bg-slate-50 text-slate-400 hover:text-blue-500 hover:bg-blue-50 border-slate-100"
+                          }`}
+                      >
+                        {isRecording ? (
+                          <Square size={24} fill="currentColor" />
+                        ) : (
+                          <Mic size={24} strokeWidth={2.5} />
+                        )}
+                      </button>
+                      <span
+                        className={`text-[10px] uppercase font-bold tracking-wider ${isRecording ? "text-red-500" : "text-slate-400"
+                          }`}
+                      >
+                        {isRecording ? "Идёт запись..." : "Проверить"}
+                      </span>
+                    </div>
+                  </div>
 
-              {/* Центр карточки (Слово + Звук + Микрофон) */}
-              <div className="flex-1 flex flex-col items-center justify-center p-6 mt-12 mb-6">
-
-                {/* Немецкое слово */}
-                <h2 className="text-[2.5rem] font-extrabold text-slate-800 text-center leading-tight mb-6">
-                  {/* @ts-ignore */}
-                  {currentWord.article && !currentWord.de.toLowerCase().startsWith(currentWord.article.toLowerCase() + " ") && (
-                    <span className="text-blue-500 font-bold mr-2 opacity-90">{currentWord.article}</span>
+                  {/* Статус записи (если есть) */}
+                  {audioStatus && (
+                    <div className="mt-4 px-4 py-1.5 bg-slate-50 rounded-lg border border-slate-100 text-xs font-medium text-slate-600">
+                      {audioStatus}
+                    </div>
                   )}
-                  {currentWord.de}
-                </h2>
-
-                {/* Кнопки аудио (Озвучка + Запись) */}
-                <div className="flex items-center gap-6">
-                  {/* Диктор */}
-                  <div className="flex flex-col items-center gap-2">
-                    <button
-                      onClick={(e) => playAudio(e, currentWord.de)}
-                      className="w-14 h-14 bg-slate-50 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded-full flex items-center justify-center transition-colors shadow-sm border border-slate-100"
-                    >
-                      <Volume2 size={26} strokeWidth={2.5} />
-                    </button>
-                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Послушать</span>
-                  </div>
-
-                  {/* Разделитель */}
-                  <div className="h-8 w-px bg-slate-200"></div>
-
-                  {/* Микрофон */}
-                  <div className="flex flex-col items-center gap-2">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); isRecording ? stopRecording() : startRecording() }}
-                      className={`w-14 h-14 rounded-full flex items-center justify-center shadow-sm transition-all border ${isRecording
-                        ? "bg-red-500 text-white animate-pulse scale-110 border-red-500 shadow-red-500/40"
-                        : "bg-slate-50 text-slate-400 hover:text-blue-500 hover:bg-blue-50 border-slate-100"
-                        }`}
-                    >
-                      {isRecording ? <Square size={24} fill="currentColor" /> : <Mic size={24} strokeWidth={2.5} />}
-                    </button>
-                    <span className={`text-[10px] uppercase font-bold tracking-wider ${isRecording ? "text-red-500" : "text-slate-400"}`}>
-                      {isRecording ? "Идёт запись..." : "Проверить"}
-                    </span>
-                  </div>
                 </div>
 
-                {/* Статус записи (если есть) */}
-                {audioStatus && (
-                  <div className="mt-4 px-4 py-1.5 bg-slate-50 rounded-lg border border-slate-100 text-xs font-medium text-slate-600">
-                    {audioStatus}
-                  </div>
-                )}
+                {/* Низ карточки (Подсказка или Перевод) */}
+                <div className="w-full mt-auto">
+                  {!showAnswer ? (
+                    <div className="w-full py-5 bg-slate-50 border-t border-slate-100 text-center text-slate-400 font-medium flex items-center justify-center gap-2 transition-colors hover:bg-blue-50 hover:text-blue-500">
+                      <Eye size={18} /> Нажмите, чтобы увидеть перевод
+                    </div>
+                  ) : (
+                    <div className="w-full bg-blue-50 p-6 border-t border-blue-100 animate-fade-in-up flex flex-col items-center justify-center min-h-[120px]">
+                      <p className="text-2xl text-blue-800 font-bold text-center mb-3">
+                        {currentWord.ru}
+                      </p>
+                      {currentWord.example_de && (
+                        <div className="text-sm text-blue-700/80 text-center italic bg-white/60 py-2 px-4 rounded-xl border border-blue-100/50">
+                          "{currentWord.example_de}"
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-
-              {/* Низ карточки (Подсказка или Перевод) */}
-              <div className="w-full mt-auto">
-                {!showAnswer ? (
-                  <div className="w-full py-5 bg-slate-50 border-t border-slate-100 text-center text-slate-400 font-medium flex items-center justify-center gap-2 transition-colors hover:bg-blue-50 hover:text-blue-500">
-                    <Eye size={18} /> Нажмите, чтобы увидеть перевод
-                  </div>
-                ) : (
-                  <div className="w-full bg-blue-50 p-6 border-t border-blue-100 animate-fade-in-up flex flex-col items-center justify-center min-h-[120px]">
-                    <p className="text-2xl text-blue-800 font-bold text-center mb-3">
-                      {currentWord.ru}
-                    </p>
-                    {currentWord.example_de && (
-                      <div className="text-sm text-blue-700/80 text-center italic bg-white/60 py-2 px-4 rounded-xl border border-blue-100/50">
-                        "{currentWord.example_de}"
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
 
               {/* Блок кнопок оценок (появляется только после переворота) */}
-              <div className={`mt-5 grid grid-cols-4 gap-3 transition-all duration-300 ${showAnswer ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none absolute w-full"}`}>
-                <button onClick={() => handleRate(1)} className="flex flex-col items-center justify-center py-3.5 bg-white border-2 border-red-100 rounded-2xl hover:bg-red-50 hover:border-red-300 transition-colors shadow-sm group">
-                  <span className="text-red-500 font-bold mb-1 group-hover:scale-110 transition-transform">Сложно</span>
-                  <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Завтра</span>
+              <div
+                className={`mt-5 grid grid-cols-4 gap-3 transition-all duration-300 ${showAnswer
+                    ? "opacity-100 translate-y-0"
+                    : "opacity-0 translate-y-4 pointer-events-none absolute w-full"
+                  }`}
+              >
+                <button
+                  onClick={() => handleRate(1)}
+                  className="flex flex-col items-center justify-center py-3.5 bg-white border-2 border-red-100 rounded-2xl hover:bg-red-50 hover:border-red-300 transition-colors shadow-sm group"
+                >
+                  <span className="text-red-500 font-bold mb-1 group-hover:scale-110 transition-transform">
+                    Сложно
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">
+                    Завтра
+                  </span>
                 </button>
-                <button onClick={() => handleRate(3)} className="flex flex-col items-center justify-center py-3.5 bg-white border-2 border-amber-100 rounded-2xl hover:bg-amber-50 hover:border-amber-300 transition-colors shadow-sm group">
-                  <span className="text-amber-500 font-bold mb-1 group-hover:scale-110 transition-transform">Норма</span>
-                  <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">3-4 Дня</span>
+                <button
+                  onClick={() => handleRate(3)}
+                  className="flex flex-col items-center justify-center py-3.5 bg-white border-2 border-amber-100 rounded-2xl hover:bg-amber-50 hover:border-amber-300 transition-colors shadow-sm group"
+                >
+                  <span className="text-amber-500 font-bold mb-1 group-hover:scale-110 transition-transform">
+                    Норма
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">
+                    3-4 Дня
+                  </span>
                 </button>
-                <button onClick={() => handleRate(5)} className="flex flex-col items-center justify-center py-3.5 bg-white border-2 border-emerald-100 rounded-2xl hover:bg-emerald-50 hover:border-emerald-300 transition-colors shadow-sm group">
-                  <span className="text-emerald-500 font-bold mb-1 group-hover:scale-110 transition-transform">Легко</span>
-                  <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Неделя+</span>
+                <button
+                  onClick={() => handleRate(5)}
+                  className="flex flex-col items-center justify-center py-3.5 bg-white border-2 border-emerald-100 rounded-2xl hover:bg-emerald-50 hover:border-emerald-300 transition-colors shadow-sm group"
+                >
+                  <span className="text-emerald-500 font-bold mb-1 group-hover:scale-110 transition-transform">
+                    Легко
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">
+                    Неделя+
+                  </span>
                 </button>
-                <button onClick={() => handleRate(0)} className="flex flex-col items-center justify-center py-3.5 bg-slate-800 border-2 border-slate-800 rounded-2xl hover:bg-slate-900 transition-colors shadow-sm group">
-                  <span className="text-white font-bold mb-1 group-hover:scale-110 transition-transform">Знаю</span>
-                  <span className="text-[10px] text-slate-300 font-medium uppercase tracking-wide">Убрать</span>
+                <button
+                  onClick={() => handleRate(0)}
+                  className="flex flex-col items-center justify-center py-3.5 bg-slate-800 border-2 border-slate-800 rounded-2xl hover:bg-slate-900 transition-colors shadow-sm group"
+                >
+                  <span className="text-white font-bold mb-1 group-hover:scale-110 transition-transform">
+                    Знаю
+                  </span>
+                  <span className="text-[10px] text-slate-300 font-medium uppercase tracking-wide">
+                    Убрать
+                  </span>
                 </button>
               </div>
-
             </>
           )}
         </div>
-      </main >
-    </div >
+      </main>
+    </div>
   );
 }
