@@ -177,24 +177,24 @@ export default function TrainerPage() {
         return;
       }
 
-      await fetch(`/api/words/${wordId}/favorite`, {
+      const res = await fetch(`/api/words/${wordId}/favorite`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      // Если backend уже возвращает is_favorite в тренажёре,
-      // и хочешь обновлять визуально прямо здесь, можно потом
-      // раскомментировать и подстроить к формату ответа:
-      //
-      // setWords(prev =>
-      //   prev.map(w =>
-      //     w.id === wordId ? { ...w, is_favorite: !w.is_favorite } : w
-      //   )
-      // );
+      if (!res.ok) return;
+
+      // Локально переворачиваем флаг, чтобы звезда перекрасилась
+      setWords(prev =>
+        prev.map(w =>
+          w.id === wordId ? { ...w, is_favorite: !w.is_favorite } : w
+        )
+      );
     } catch (err) {
       console.error("Favorite error:", err);
     }
   };
+
 
   const currentWord = words[index];
 
@@ -210,8 +210,8 @@ export default function TrainerPage() {
               key={lvl}
               onClick={() => setLevel(lvl)}
               className={`flex-1 min-w-[60px] py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ${level === lvl
-                  ? "bg-blue-600 text-white shadow-md shadow-blue-500/30 transform scale-105"
-                  : "bg-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                ? "bg-blue-600 text-white shadow-md shadow-blue-500/30 transform scale-105"
+                : "bg-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-800"
                 }`}
             >
               {lvl}
@@ -249,8 +249,8 @@ export default function TrainerPage() {
               <div
                 onClick={() => !showAnswer && setShowAnswer(true)}
                 className={`relative w-full rounded-3xl shadow-xl border border-slate-100 bg-white transition-all duration-500 transform-gpu flex flex-col overflow-hidden ${!showAnswer
-                    ? "hover:-translate-y-1 hover:shadow-2xl cursor-pointer"
-                    : "shadow-blue-900/10 cursor-default"
+                  ? "hover:-translate-y-1 hover:shadow-2xl cursor-pointer"
+                  : "shadow-blue-900/10 cursor-default"
                   } min-h-[380px]`}
               >
                 {/* Бейджи + избранное в шапке карточки */}
@@ -331,8 +331,8 @@ export default function TrainerPage() {
                           isRecording ? stopRecording() : startRecording();
                         }}
                         className={`w-14 h-14 rounded-full flex items-center justify-center shadow-sm transition-all border ${isRecording
-                            ? "bg-red-500 text-white animate-pulse scale-110 border-red-500 shadow-red-500/40"
-                            : "bg-slate-50 text-slate-400 hover:text-blue-500 hover:bg-blue-50 border-slate-100"
+                          ? "bg-red-500 text-white animate-pulse scale-110 border-red-500 shadow-red-500/40"
+                          : "bg-slate-50 text-slate-400 hover:text-blue-500 hover:bg-blue-50 border-slate-100"
                           }`}
                       >
                         {isRecording ? (
@@ -382,8 +382,8 @@ export default function TrainerPage() {
               {/* Блок кнопок оценок (появляется только после переворота) */}
               <div
                 className={`mt-5 grid grid-cols-4 gap-3 transition-all duration-300 ${showAnswer
-                    ? "opacity-100 translate-y-0"
-                    : "opacity-0 translate-y-4 pointer-events-none absolute w-full"
+                  ? "opacity-100 translate-y-0"
+                  : "opacity-0 translate-y-4 pointer-events-none absolute w-full"
                   }`}
               >
                 <button
