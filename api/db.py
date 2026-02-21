@@ -90,13 +90,9 @@ def init_db():
         # Убеждаемся, что первичный ключ правильный (составной)
         cur.execute("SELECT conname FROM pg_constraint WHERE conrelid = 'user_words'::regclass AND contype = 'p'")
         pk_name = cur.fetchone()
-        if pk_name:
-            # Если PK есть, проверяем, из каких он колонок (упрощенно: если это не составной или старого имени)
-            # В данном случае проще пересоздать, если мы не уверены
-            pass
-        else:
+        if not pk_name:
             cur.execute("ALTER TABLE user_words ADD PRIMARY KEY (user_id, word_id)")
-        cur.execute("ALTER TABLE user_words ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);")
+            
         cur.execute("ALTER TABLE words ADD COLUMN IF NOT EXISTS verb_forms TEXT;")
         cur.execute("ALTER TABLE words ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);")
         
@@ -104,16 +100,13 @@ def init_db():
         try:
             cur.execute("ALTER TABLE words DROP CONSTRAINT IF EXISTS words_de_ru_key;")
             # Уникальность по de, ru и user_id (где user_id может быть NULL)
-            # В PostgreSQL NULL в уникальном индексе считается уникальным, 
-            # но мы хотим чтобы один "общий" вариант (user_id is NULL) был уникален по de, ru.
             cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_words_de_ru_public ON words (de, ru) WHERE user_id IS NULL;")
             cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_words_de_ru_private ON words (de, ru, user_id) WHERE user_id IS NOT NULL;")
         except Exception as e:
             print(f"Warning during words index update: {e}")
             conn.rollback() 
-            # Если не вышло, продолжаем (в проде лучше быть осторожнее)
 
-        # Таблица аудиозаписей - теперь привязана к пользователю
+        # Таблица аудиозаписей
         cur.execute("""
             CREATE TABLE IF NOT EXISTS recordings (
                 id SERIAL PRIMARY KEY,
@@ -148,14 +141,20 @@ def init_db():
             );
         """)
 
-        # Миграции для новых колонок в words
+        # МИГРАЦИИ: Добавляем новые колонки в таблицу words (если их еще нет)
         cur.execute("ALTER TABLE words ADD COLUMN IF NOT EXISTS examples JSONB;")
         cur.execute("ALTER TABLE words ADD COLUMN IF NOT EXISTS plural TEXT;")
+        
+        # --- НОВЫЕ ЛИНГВИСТИЧЕСКИЕ КОЛОНКИ ---
+        cur.execute("ALTER TABLE words ADD COLUMN IF NOT EXISTS synonyms TEXT;")
+        cur.execute("ALTER TABLE words ADD COLUMN IF NOT EXISTS antonyms TEXT;")
+        cur.execute("ALTER TABLE words ADD COLUMN IF NOT EXISTS collocations TEXT;")
+        # -----------------------------------
         
         conn.commit()
         cur.close()
         conn.close()
-        print("Database initialized!")
+        print("Database initialized successfully with new linguistic columns!")
     except Exception as e:
         print(f"Error initializing DB: {e}")
 
