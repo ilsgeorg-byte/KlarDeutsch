@@ -69,7 +69,7 @@ export default function HomePage() {
               e.currentTarget.style.borderColor = '#e2e8f0';
             }}
           >
-            Писать дневник ✍️
+            Заметки ✍️
           </a>
         </div>
       </main>
