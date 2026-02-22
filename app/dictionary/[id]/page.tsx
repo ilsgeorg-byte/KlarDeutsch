@@ -198,7 +198,7 @@ export default function WordDetailPage() {
                                     {word.article}
                                 </span>
                             )}
-                            {renderWordWithArticle(word.de)}
+                            {renderWordWithArticle(word)}
                         </h1>
 
                         {/* Множественное число / Формы глагола */}
