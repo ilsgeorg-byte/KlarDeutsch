@@ -195,10 +195,10 @@ export default function WordDetailPage() {
                         <h1 className="text-4xl md:text-5xl font-extrabold text-slate-800 mb-4 flex flex-wrap items-center gap-3">
                             {word.article && (
                                 <span style={{ color: getArticleColor(word.article) }} className="mr-2 opacity-95">
-                                    {word.article}
+                                    {renderWordWithArticle(word)}
                                 </span>
                             )}
-                            {renderWordWithArticle(word)}
+                            
                         </h1>
 
                         {/* Множественное число / Формы глагола */}
