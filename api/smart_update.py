@@ -30,22 +30,23 @@ def needs_fixing(row):
     # Распаковываем все нужные поля из SELECT
     word_id, de, examples_raw, ru, synonyms, antonyms, collocations, plural, verb_forms = row
     
+    # 1. Проверка перевода
     if not ru or ru.strip() == "перевод в процессе" or ru.strip() == "":
         return True
         
+    # 2. Проверка на кириллицу в немецких полях
     if has_cyrillic(synonyms) or has_cyrillic(antonyms) or has_cyrillic(collocations):
         return True
 
-    # Проверка форм
-    # 1. Если существительное (начинается с большой буквы, но не Satzanfang - в словаре все сущ с большой)
-    #    и нет plural, то надо фиксить. (упрощенно: если есть артикль в de или de c большой)
-    if de[0].isupper() and not plural and not verb_forms: 
-        return True # Скорее всего существительное без plural
-    
-    # 2. Если глагол (с маленькой буквы) и нет verb_forms
-    if de[0].islower() and not verb_forms and not plural:
-        return True
+    # 3. УМНАЯ ПРОВЕРКА ФОРМ (ИСПРАВЛЕНО)
+    # Если в базе None (NULL), значит ИИ еще ни разу не заполнял эти колонки для этого слова.
+    # Если там пустая строка "", значит ИИ уже проверил слово и решил, что форм у него НЕТ (например, "Guten Tag").
+    if plural is None and verb_forms is None:
+        # Отправляем на проверку только те слова, у которых гипотетически могут быть формы
+        if de[0].isupper() or de.endswith("en"): 
+            return True 
 
+    # 4. Проверка примеров
     if not examples_raw:
         return True
     try:
@@ -61,6 +62,7 @@ def needs_fixing(row):
         return True
         
     return False
+
 
 def validate_and_fix_with_ai(de_word, current_data):
     prompt = f"""
@@ -181,7 +183,7 @@ def process_batch(limit=100):
         else:
             print("❌")
             
-        time.sleep(2)
+        time.sleep(0.5)
 
     cur.close()
     conn.close()

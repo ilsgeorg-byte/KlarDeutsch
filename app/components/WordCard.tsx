@@ -38,20 +38,38 @@ export default function WordCard({ word, onPlayAudio, onToggleFavorite }: WordCa
         return '#3b82f6';
     };
 
-const renderWordWithArticle = (word: string) => {
+    // УМНАЯ ФУНКЦИЯ ПОКРАСКИ (Использует и базу, и старые данные)
+    const renderWordWithArticle = (wordObj: any) => {
+        // 1. Если ИИ заполнил колонку article в базе:
+        if (wordObj.article) {
+            const articleLower = wordObj.article.toLowerCase().trim();
+            let colorClass = "";
+            if (articleLower === "der") colorClass = "text-blue-500 font-bold";
+            else if (articleLower === "die") colorClass = "text-red-500 font-bold";
+            else if (articleLower === "das") colorClass = "text-green-500 font-bold";
 
-    if (word.startsWith("der ")) {
-        return <><span className="text-blue-500 font-bold">der</span> {word.slice(4)}</>;
-    }
-    if (word.startsWith("die ")) {
-        return <><span className="text-red-500 font-bold">die</span> {word.slice(4)}</>;
-    }
-    if (word.startsWith("das ")) {
-        return <><span className="text-green-500 font-bold">das</span> {word.slice(4)}</>;
-    }
-    return <span className="font-bold">{word}</span>;
-};
+            if (colorClass) {
+                // Если артикль всё еще прилип к началу слова - отрезаем его
+                const cleanDe = wordObj.de.replace(/^(der|die|das)\s/i, "");
+                return <><span className={colorClass}>{wordObj.article}</span> {cleanDe}</>;
+            }
+        }
 
+        // 2. Если колонки article нет (старые слова), ищем внутри слова de
+        const text = wordObj.de || "";
+        if (text.toLowerCase().startsWith("der ")) {
+            return <><span className="text-blue-500 font-bold">der</span> {text.slice(4)}</>;
+        }
+        if (text.toLowerCase().startsWith("die ")) {
+            return <><span className="text-red-500 font-bold">die</span> {text.slice(4)}</>;
+        }
+        if (text.toLowerCase().startsWith("das ")) {
+            return <><span className="text-green-500 font-bold">das</span> {text.slice(4)}</>;
+        }
+
+        // 3. Если артикля нет (глаголы и тд)
+        return <span className="font-bold">{text}</span>;
+    };
 
     return (
         <div className={styles.card} style={{
@@ -104,8 +122,8 @@ const renderWordWithArticle = (word: string) => {
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '8px', width: '100%' }}>
                     <div style={{ flex: 1 }}>
                         <h3 style={{ margin: 0, fontSize: '1.75rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', fontWeight: '800' }}>
-                            {word.article && <span style={{ color: getArticleColor(word.article), fontSize: '1.4rem' }}>{word.article}</span>}
-                            <span>{renderWordWithArticle(word.de)}</span>
+                            {/* Здесь мы вызываем умную функцию, передавая весь объект word */}
+                            <span>{renderWordWithArticle(word)}</span>
                         </h3>
                     </div>
                 </div>
@@ -129,7 +147,7 @@ const renderWordWithArticle = (word: string) => {
                     {word.ru}
                 </p>
 
-                {/* ИСПРАВЛЕННЫЙ БЛОК ЛИНГВИСТИКИ */}
+                {/* БЛОК ЛИНГВИСТИКИ */}
                 {(word.synonyms || word.antonyms || word.collocations) && (
                     <div style={{
                         background: '#f8fafc', padding: '12px 16px', borderRadius: '10px',
