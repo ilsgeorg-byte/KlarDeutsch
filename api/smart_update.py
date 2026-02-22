@@ -98,7 +98,7 @@ def validate_and_fix_with_ai(de_word, current_data):
 """
     try:
         completion = groq_client.chat.completions.create(
-            model="qwen/qwen3-32b",
+            model="allam-2-7b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.4,
             max_tokens=1500,
