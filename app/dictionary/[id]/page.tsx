@@ -85,9 +85,9 @@ export default function WordDetailPage() {
     const articleLower = wordObj.article.toLowerCase().trim();
     let colorClass = "";
 
-    if (articleLower === "der") colorClass = "text-blue-500 font-bold";
-    else if (articleLower === "die") colorClass = "text-red-500 font-bold";
-    else if (articleLower === "das") colorClass = "text-green-500 font-bold";
+    if (articleLower === "der") colorClass = "text-blue-500";
+    else if (articleLower === "die") colorClass = "text-red-500";
+    else if (articleLower === "das") colorClass = "text-green-500";
 
     if (colorClass) {
       if (text.toLowerCase().startsWith(articleLower + " ")) {
@@ -95,8 +95,8 @@ export default function WordDetailPage() {
       }
       return (
         <>
-          <span className={colorClass}>{wordObj.article}</span>{" "}
-          <span>{text}</span>
+          <span className={`${colorClass} font-extrabold`}>{wordObj.article}</span>{" "}
+          <span className="text-slate-800 font-extrabold">{text}</span>
         </>
       );
     }
@@ -105,30 +105,29 @@ export default function WordDetailPage() {
   if (text.toLowerCase().startsWith("der ")) {
     return (
       <>
-        <span className="text-blue-500 font-bold">der</span>{" "}
-        <span>{text.slice(4)}</span>
+        <span className="text-blue-500 font-extrabold">der</span>{" "}
+        <span className="text-slate-800 font-extrabold">{text.slice(4)}</span>
       </>
     );
   }
   if (text.toLowerCase().startsWith("die ")) {
     return (
       <>
-        <span className="text-red-500 font-bold">die</span>{" "}
-        <span>{text.slice(4)}</span>
+        <span className="text-red-500 font-extrabold">die</span>{" "}
+        <span className="text-slate-800 font-extrabold">{text.slice(4)}</span>
       </>
     );
   }
   if (text.toLowerCase().startsWith("das ")) {
     return (
       <>
-        <span className="text-green-500 font-bold">das</span>{" "}
-        <span>{text.slice(4)}</span>
+        <span className="text-green-500 font-extrabold">das</span>{" "}
+        <span className="text-slate-800 font-extrabold">{text.slice(4)}</span>
       </>
     );
   }
 
-  // без артикля — просто слово, без доп. цвета
-  return <span>{text}</span>;
+  return <span className="text-slate-800 font-extrabold">{text}</span>;
 };
 
 
@@ -214,9 +213,9 @@ export default function WordDetailPage() {
                     {/* Слово и перевод */}
                     <div className="mb-10">
                        <div className="mb-10">
-  <h1 className="text-4xl md:text-5xl mb-4 flex flex-wrap items-center gap-3">
-    {renderWordWithArticle(word)}
-  </h1>
+ <h1 className="text-4xl md:text-5xl mb-4 flex flex-wrap items-center gap-3">
+  {renderWordWithArticle(word)}
+</h1>
 
   {(word.plural || word.verb_forms) && (
     <div className="flex gap-3 mb-6 flex-wrap">
