@@ -1,14 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { BookOpen, Menu, X, LogOut, User } from "lucide-react";
 import { useState, useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
+
 
 export default function Header() {
     const pathname = usePathname();
+    const router = useRouter(); // <-- Добавляем роутер
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isMounted, setIsMounted] = useState(false);
+   
+
+    // Функция выхода
+    const handleLogout = () => {
+        localStorage.removeItem("token"); // Удаляем токен
+        setIsMenuOpen(false); // Закрываем мобильное меню (на всякий случай)
+        router.push("/login"); // Перекидываем на страницу логина
+    };
+  
 
     useEffect(() => {
         setIsMounted(true);
@@ -86,7 +97,10 @@ export default function Header() {
                         Профиль
                     </Link>
 
-                    <button className="flex items-center gap-2 text-sm font-semibold text-red-500 hover:text-red-600 transition-colors bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg">
+                     <button 
+                        onClick={handleLogout} 
+                        className="flex items-center gap-2 text-sm font-semibold text-red-500 hover:text-red-600 transition-colors bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg"
+                    >
                         <LogOut size={16} />
                         Выйти
                     </button>
@@ -125,11 +139,19 @@ export default function Header() {
                     </nav>
 
                     <div className="mt-auto px-6 py-8 flex flex-col gap-4 bg-slate-50 border-t border-slate-200">
-                        <button className="flex items-center justify-center gap-2 w-full py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-semibold shadow-sm">
+                        <Link 
+                            href="/profile"
+                            onClick={() => setIsMenuOpen(false)}
+                            className="flex items-center justify-center gap-2 w-full py-3 bg-white border border-slate-200 text-slate-700 hover:text-blue-600 hover:border-blue-200 rounded-xl font-semibold shadow-sm transition-colors"
+                        >
                             <User size={18} />
                             Профиль
-                        </button>
-                        <button className="flex items-center justify-center gap-2 w-full py-3 bg-red-50 text-red-600 rounded-xl font-semibold">
+                        </Link>
+
+                        <button 
+                            onClick={handleLogout}
+                            className="flex items-center justify-center gap-2 w-full py-3 bg-red-50 hover:bg-red-100 transition-colors text-red-600 rounded-xl font-semibold"
+                    >
                             <LogOut size={18} />
                             Выйти
                         </button>
