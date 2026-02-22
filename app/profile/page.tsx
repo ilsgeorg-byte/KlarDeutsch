@@ -84,6 +84,39 @@ export default function ProfilePage() {
     const knownWords = stats?.user_progress["known"] || 0;
     const learningWords = stats?.user_progress["learning"] || 0;
 
+        const renderWordWithArticle = (wordObj: any) => {
+        let text = wordObj.de || "";
+        
+        if (wordObj.article) {
+            const articleLower = wordObj.article.toLowerCase().trim();
+            let colorClass = "";
+            
+            if (articleLower === "der") colorClass = "text-blue-500 font-bold";
+            else if (articleLower === "die") colorClass = "text-red-500 font-bold";
+            else if (articleLower === "das") colorClass = "text-green-500 font-bold";
+
+            if (colorClass) {
+                if (text.toLowerCase().startsWith(articleLower + " ")) {
+                    text = text.slice(articleLower.length + 1).trim();
+                }
+                return <><span className={colorClass}>{wordObj.article}</span> {text}</>;
+            }
+        }
+
+        if (text.toLowerCase().startsWith("der ")) {
+            return <><span className="text-blue-500 font-bold">der</span> {text.slice(4)}</>;
+        }
+        if (text.toLowerCase().startsWith("die ")) {
+            return <><span className="text-red-500 font-bold">die</span> {text.slice(4)}</>;
+        }
+        if (text.toLowerCase().startsWith("das ")) {
+            return <><span className="text-green-500 font-bold">das</span> {text.slice(4)}</>;
+        }
+
+        return <span className="font-bold">{text}</span>;
+    };
+
+
     return (
         <div className={styles.pageWrapper}>
 
@@ -152,7 +185,7 @@ export default function ProfilePage() {
                                         >
                                             <div className="flex items-center gap-2">
                                                 {word.article && <span className="text-xs font-bold text-blue-600 uppercase">{word.article}</span>}
-                                                <span className="font-bold text-gray-900">{word.de}</span>
+                                                <span className="font-bold text-gray-900">{renderWordWithArticle(word)}</span>
                                             </div>
                                             <span className="text-sm text-gray-500">{word.ru}</span>
                                             <div className="mt-2 flex items-center gap-2">

@@ -44,6 +44,38 @@ export default function TrainerPage() {
     if (!token) router.push("/login");
   }, [router]);
 
+  const renderWordWithArticle = (wordObj: any) => {
+    let text = wordObj.de || "";
+    
+    if (wordObj.article) {
+        const articleLower = wordObj.article.toLowerCase().trim();
+        let colorClass = "";
+        
+        if (articleLower === "der") colorClass = "text-blue-500 font-bold";
+        else if (articleLower === "die") colorClass = "text-red-500 font-bold";
+        else if (articleLower === "das") colorClass = "text-green-500 font-bold";
+
+        if (colorClass) {
+            if (text.toLowerCase().startsWith(articleLower + " ")) {
+                text = text.slice(articleLower.length + 1).trim();
+            }
+            return <><span className={colorClass}>{wordObj.article}</span> {text}</>;
+        }
+    }
+
+    if (text.toLowerCase().startsWith("der ")) {
+        return <><span className="text-blue-500 font-bold">der</span> {text.slice(4)}</>;
+    }
+    if (text.toLowerCase().startsWith("die ")) {
+        return <><span className="text-red-500 font-bold">die</span> {text.slice(4)}</>;
+    }
+    if (text.toLowerCase().startsWith("das ")) {
+        return <><span className="text-green-500 font-bold">das</span> {text.slice(4)}</>;
+    }
+
+    return <span className="font-bold">{text}</span>;
+  };
+
   // --- ЛОГИКА ЗАПИСИ ---
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -195,7 +227,6 @@ export default function TrainerPage() {
     }
   };
 
-
   const currentWord = words[index];
 
   return (
@@ -289,20 +320,9 @@ export default function TrainerPage() {
 
                 {/* Центр карточки (Слово + Звук + Микрофон) */}
                 <div className="flex-1 flex flex-col items-center justify-center p-6 mt-12 mb-6">
-                  {/* Немецкое слово */}
+                  {/* ИСПРАВЛЕННОЕ НЕМЕЦКОЕ СЛОВО (ВЫЗОВ ФУНКЦИИ) */}
                   <h2 className="text-[2.5rem] font-extrabold text-slate-800 text-center leading-tight mb-6">
-                    {/* @ts-ignore */}
-                    {currentWord.article &&
-                      !currentWord.de
-                        .toLowerCase()
-                        .startsWith(
-                          currentWord.article.toLowerCase() + " "
-                        ) && (
-                        <span className="text-blue-500 font-bold mr-2 opacity-90">
-                          {currentWord.article}
-                        </span>
-                      )}
-                    {currentWord.de}
+                    {renderWordWithArticle(currentWord)}
                   </h2>
 
                   {/* Кнопки аудио (Озвучка + Запись) */}
