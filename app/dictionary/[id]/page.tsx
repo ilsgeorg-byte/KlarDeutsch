@@ -79,36 +79,57 @@ export default function WordDetailPage() {
     };
 
         const renderWordWithArticle = (wordObj: any) => {
-        let text = wordObj.de || "";
-        
-        if (wordObj.article) {
-            const articleLower = wordObj.article.toLowerCase().trim();
-            let colorClass = "";
-            
-            if (articleLower === "der") colorClass = "text-blue-500 font-bold";
-            else if (articleLower === "die") colorClass = "text-red-500 font-bold";
-            else if (articleLower === "das") colorClass = "text-green-500 font-bold";
+  let text = wordObj.de || "";
 
-            if (colorClass) {
-                if (text.toLowerCase().startsWith(articleLower + " ")) {
-                    text = text.slice(articleLower.length + 1).trim();
-                }
-                return <><span className={colorClass}>{wordObj.article}</span> {text}</>;
-            }
-        }
+  if (wordObj.article) {
+    const articleLower = wordObj.article.toLowerCase().trim();
+    let colorClass = "";
 
-        if (text.toLowerCase().startsWith("der ")) {
-            return <><span className="text-blue-500 font-bold">der</span> {text.slice(4)}</>;
-        }
-        if (text.toLowerCase().startsWith("die ")) {
-            return <><span className="text-red-500 font-bold">die</span> {text.slice(4)}</>;
-        }
-        if (text.toLowerCase().startsWith("das ")) {
-            return <><span className="text-green-500 font-bold">das</span> {text.slice(4)}</>;
-        }
+    if (articleLower === "der") colorClass = "text-blue-500 font-bold";
+    else if (articleLower === "die") colorClass = "text-red-500 font-bold";
+    else if (articleLower === "das") colorClass = "text-green-500 font-bold";
 
-        return <span className="font-bold">{text}</span>;
-    };
+    if (colorClass) {
+      if (text.toLowerCase().startsWith(articleLower + " ")) {
+        text = text.slice(articleLower.length + 1).trim();
+      }
+      return (
+        <>
+          <span className={colorClass}>{wordObj.article}</span>{" "}
+          <span>{text}</span>
+        </>
+      );
+    }
+  }
+
+  if (text.toLowerCase().startsWith("der ")) {
+    return (
+      <>
+        <span className="text-blue-500 font-bold">der</span>{" "}
+        <span>{text.slice(4)}</span>
+      </>
+    );
+  }
+  if (text.toLowerCase().startsWith("die ")) {
+    return (
+      <>
+        <span className="text-red-500 font-bold">die</span>{" "}
+        <span>{text.slice(4)}</span>
+      </>
+    );
+  }
+  if (text.toLowerCase().startsWith("das ")) {
+    return (
+      <>
+        <span className="text-green-500 font-bold">das</span>{" "}
+        <span>{text.slice(4)}</span>
+      </>
+    );
+  }
+
+  // без артикля — просто слово, без доп. цвета
+  return <span>{text}</span>;
+};
 
 
     // Определение цвета артикля
