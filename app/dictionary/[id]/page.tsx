@@ -213,14 +213,31 @@ export default function WordDetailPage() {
 
                     {/* Слово и перевод */}
                     <div className="mb-10">
-                        <h1 className="text-4xl md:text-5xl font-extrabold text-slate-800 mb-4 flex flex-wrap items-center gap-3">
-                            {word.article && (
-                                <span style={{ color: getArticleColor(word.article) }} className="mr-2 opacity-95">
-                                    {renderWordWithArticle(word)}
-                                </span>
-                            )}
-                            
-                        </h1>
+                       <div className="mb-10">
+  <h1 className="text-4xl md:text-5xl mb-4 flex flex-wrap items-center gap-3">
+    {renderWordWithArticle(word)}
+  </h1>
+
+  {(word.plural || word.verb_forms) && (
+    <div className="flex gap-3 mb-6 flex-wrap">
+      {word.plural && (
+        <span className="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200">
+          Pl: <span className="text-slate-800 font-bold">{word.plural}</span>
+        </span>
+      )}
+      {word.verb_forms && (
+        <span className="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200">
+          {word.verb_forms}
+        </span>
+      )}
+    </div>
+  )}
+
+  <p className="text-2xl md:text-3xl font-medium text-slate-600 pb-8 border-b border-slate-100">
+    {word.ru}
+  </p>
+</div>
+
 
                         {/* Множественное число / Формы глагола */}
                         {(word.plural || word.verb_forms) && (
