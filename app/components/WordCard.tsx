@@ -39,24 +39,28 @@ export default function WordCard({ word, onPlayAudio, onToggleFavorite }: WordCa
     };
 
     // УМНАЯ ФУНКЦИЯ ПОКРАСКИ (Использует и базу, и старые данные)
-    const renderWordWithArticle = (wordObj: any) => {
-        // 1. Если ИИ заполнил колонку article в базе:
+       const renderWordWithArticle = (wordObj: any) => {
+        let text = wordObj.de || "";
+        
+        // Если ИИ заполнил колонку article в базе
         if (wordObj.article) {
             const articleLower = wordObj.article.toLowerCase().trim();
             let colorClass = "";
+            
             if (articleLower === "der") colorClass = "text-blue-500 font-bold";
             else if (articleLower === "die") colorClass = "text-red-500 font-bold";
             else if (articleLower === "das") colorClass = "text-green-500 font-bold";
 
             if (colorClass) {
-                // Если артикль всё еще прилип к началу слова - отрезаем его
-                const cleanDe = wordObj.de.replace(/^(der|die|das)\s/i, "");
-                return <><span className={colorClass}>{wordObj.article}</span> {cleanDe}</>;
+                // Если в колонке de тоже есть этот артикль в начале, отрезаем его, чтобы не было "der der Baum"
+                if (text.toLowerCase().startsWith(articleLower + " ")) {
+                    text = text.slice(articleLower.length + 1).trim();
+                }
+                return <><span className={colorClass}>{wordObj.article}</span> {text}</>;
             }
         }
 
-        // 2. Если колонки article нет (старые слова), ищем внутри слова de
-        const text = wordObj.de || "";
+        // Если колонки article нет (старые слова), ищем артикль прямо внутри слова de
         if (text.toLowerCase().startsWith("der ")) {
             return <><span className="text-blue-500 font-bold">der</span> {text.slice(4)}</>;
         }
@@ -67,9 +71,10 @@ export default function WordCard({ word, onPlayAudio, onToggleFavorite }: WordCa
             return <><span className="text-green-500 font-bold">das</span> {text.slice(4)}</>;
         }
 
-        // 3. Если артикля нет (глаголы и тд)
+        // Если артикля вообще нет (глаголы, прилагательные, или не заполнен)
         return <span className="font-bold">{text}</span>;
     };
+
 
     return (
         <div className={styles.card} style={{
