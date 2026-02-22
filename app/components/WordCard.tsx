@@ -38,6 +38,21 @@ export default function WordCard({ word, onPlayAudio, onToggleFavorite }: WordCa
         return '#3b82f6';
     };
 
+const renderWordWithArticle = (word: string) => {
+
+    if (word.startsWith("der ")) {
+        return <><span className="text-blue-500 font-bold">der</span> {word.slice(4)}</>;
+    }
+    if (word.startsWith("die ")) {
+        return <><span className="text-red-500 font-bold">die</span> {word.slice(4)}</>;
+    }
+    if (word.startsWith("das ")) {
+        return <><span className="text-green-500 font-bold">das</span> {word.slice(4)}</>;
+    }
+    return <span className="font-bold">{word}</span>;
+};
+
+
     return (
         <div className={styles.card} style={{
             width: '100%',
@@ -90,7 +105,7 @@ export default function WordCard({ word, onPlayAudio, onToggleFavorite }: WordCa
                     <div style={{ flex: 1 }}>
                         <h3 style={{ margin: 0, fontSize: '1.75rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', fontWeight: '800' }}>
                             {word.article && <span style={{ color: getArticleColor(word.article), fontSize: '1.4rem' }}>{word.article}</span>}
-                            <span>{word.de}</span>
+                            <span>{renderWordWithArticle(word.de)}</span>
                         </h3>
                     </div>
                 </div>
