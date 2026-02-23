@@ -143,27 +143,22 @@ export default function TrainerPage() {
     }
   };
 
-   const loadWords = async (isManual = false) => {
-    if (!isManual) setLoading(true);
-    try {
-      const token = localStorage.getItem("token");
-      // ДОБАВЛЕН cache: 'no-store' чтобы отключить агрессивный кэш Next.js
-      const res = await fetch(`/api/trainer/words?level=${level}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: 'no-store'
-      });
-      
+      const loadWords = async (isManual = false) => {
+        if (!isManual) setLoading(true);
+        try {
+          const token = localStorage.getItem("token");
+          const res = await fetch(`/api/trainer/words?level=${level}`, {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: 'no-store'
+        });
       if (res.status === 401) return router.push("/login");
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
-      
-      // Перемешиваем
-      const randomizedData = shuffleArray<TrainerWord>(data);
 
       if (isManual) {
-        setWords((prev) => [...prev, ...randomizedData]);
+        setWords((prev) => [...prev, ...data]);
       } else {
-        setWords(randomizedData);
+        setWords(data);
         setIndex(0);
         setShowAnswer(false);
       }
@@ -175,10 +170,29 @@ export default function TrainerPage() {
   };
 
 
+
+
   useEffect(() => {
     loadWords();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [level]);
+
+    // Гарантированное перемешивание после загрузки массива
+  const hasShuffled = useRef(false);
+
+  useEffect(() => {
+    // Если массив не пустой и мы его ещё не перемешивали для текущего уровня
+    if (words.length > 1 && !hasShuffled.current) {
+      setWords((prev) => shuffleArray<TrainerWord>([...prev]));
+      hasShuffled.current = true;
+    }
+  }, [words]);
+
+  // Сбрасываем флаг перемешивания при смене уровня
+  useEffect(() => {
+    hasShuffled.current = false;
+  }, [level]);
+
 
   const handleNext = () => {
     setShowAnswer(false);
@@ -257,10 +271,11 @@ export default function TrainerPage() {
     <button
       key={lvl}
       onClick={() => {
-        setWords([]); // Сбрасываем старые слова
+        setWords([]); // Важно! Очищаем старые слова
         setIndex(0);
         setLevel(lvl);
-      }}
+    }}
+
 
               className={`flex-1 min-w-[60px] py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ${level === lvl
                 ? "bg-blue-600 text-white shadow-md shadow-blue-500/30 transform scale-105"
