@@ -56,7 +56,7 @@ def get_training_words():
                 SELECT id, level, topic, de, ru, article, example_de, example_ru
                 FROM words
                 WHERE level IN %s AND id NOT IN (SELECT word_id FROM user_words WHERE user_id = %s)
-                ORDER BY id
+                ORDER BY RANDOM()
                 LIMIT %s
             """, (tuple(target_levels), request.user_id, remaining))
             
