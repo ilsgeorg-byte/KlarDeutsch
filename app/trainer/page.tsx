@@ -143,7 +143,7 @@ export default function TrainerPage() {
     }
   };
 
-  const loadWords = async (isManual = false) => {
+ const loadWords = async (isManual = false) => {
     if (!isManual) setLoading(true);
     try {
       const token = localStorage.getItem("token");
@@ -152,17 +152,14 @@ export default function TrainerPage() {
       });
       if (res.status === 401) return router.push("/login");
       if (!res.ok) throw new Error("Failed");
-            const data = await res.json();
-      
-      // ПЕРЕМЕШИВАЕМ СЛОВА ПЕРЕД СОХРАНЕНИЕМ В STATE
-      // Явно указываем TS, что мы передаем массив TrainerWord
-      const randomizedData = shuffleArray<TrainerWord>(data);
-
+      const data = await res.json();
 
       if (isManual) {
-        setWords((prev) => [...prev, ...randomizedData]);
+        // Добавляем новые и сразу перемешиваем ВЕСЬ массив
+        setWords((prev) => shuffleArray<TrainerWord>([...prev, ...data]));
       } else {
-        setWords(randomizedData);
+        // Перемешиваем при первичной загрузке
+        setWords(shuffleArray<TrainerWord>([...data]));
         setIndex(0);
         setShowAnswer(false);
       }
