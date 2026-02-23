@@ -6,6 +6,7 @@ import psycopg2
 from dotenv import load_dotenv
 from groq import Groq
 
+
 dotenv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env.local')
 load_dotenv(dotenv_path)
 
@@ -18,22 +19,37 @@ if not url or not api_key:
 
 groq_client = Groq(api_key=api_key)
 
+
 def get_db_connection():
     return psycopg2.connect(url)
+
 
 def has_cyrillic(text):
     if not text:
         return False
     return bool(re.search(r'[а-яёА-ЯЁ]', str(text)))
 
+
+def is_verb_like(de: str) -> bool:
+    """
+    Простая эвристика: считаем словом-подобным глаголу
+    то, которое начинается с маленькой буквы и оканчивается на 'en'.
+    Типа: gehen, baden, meinen.
+    """
+    if not de:
+        return False
+    de = de.strip()
+    return de[0].islower() and de.endswith("en")
+
+
 def needs_fixing(row):
     # Распаковываем все нужные поля из SELECT
     word_id, de, examples_raw, ru, synonyms, antonyms, collocations, plural, verb_forms = row
-    
+
     # 1. Проверка перевода
     if not ru or ru.strip() == "перевод в процессе" or ru.strip() == "":
         return True
-        
+
     # 2. Проверка на кириллицу в немецких полях
     if has_cyrillic(synonyms) or has_cyrillic(antonyms) or has_cyrillic(collocations):
         return True
@@ -43,8 +59,8 @@ def needs_fixing(row):
     # Если там пустая строка "", значит ИИ уже проверил слово и решил, что форм у него НЕТ (например, "Guten Tag").
     if plural is None and verb_forms is None:
         # Отправляем на проверку только те слова, у которых гипотетически могут быть формы
-        if de[0].isupper() or de.endswith("en"): 
-            return True 
+        if de[0].isupper() or de.endswith("en"):
+            return True
 
     # 4. Проверка примеров
     if not examples_raw:
@@ -60,7 +76,7 @@ def needs_fixing(row):
                 return True
     except Exception:
         return True
-        
+
     return False
 
 
@@ -98,7 +114,7 @@ def validate_and_fix_with_ai(de_word, current_data):
 """
     try:
         completion = groq_client.chat.completions.create(
-            model="allam-2-7b",
+            model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.4,
             max_tokens=1500,
@@ -114,16 +130,21 @@ def validate_and_fix_with_ai(de_word, current_data):
         print(f"  ⚠️ Ошибка AI: {e}")
         return None
 
+
 def process_batch(limit=100):
     print("\n🚀 Скрипт запущен! Подключаюсь к базе...")
     conn = get_db_connection()
     cur = conn.cursor()
 
     print("🔍 Скачиваю слова...")
-    # Запрашиваем правильные колонки
-    cur.execute("SELECT id, de, examples, ru, synonyms, antonyms, collocations, plural, verb_forms FROM words ORDER BY id ASC;")
+    # Запрашиваем колонки
+    cur.execute("""
+        SELECT id, de, examples, ru, synonyms, antonyms, collocations, plural, verb_forms
+        FROM words
+        ORDER BY id ASC;
+    """)
     all_words = cur.fetchall()
-    
+
     words_to_fix = []
     for row in all_words:
         if needs_fixing(row):
@@ -141,7 +162,7 @@ def process_batch(limit=100):
         if examples_raw:
             try:
                 current_examples = examples_raw if isinstance(examples_raw, list) else json.loads(examples_raw)
-            except:
+            except Exception:
                 pass
 
         current_data = {
@@ -161,11 +182,21 @@ def process_batch(limit=100):
             break
 
         if new_data and isinstance(new_data, dict) and "examples" in new_data:
-            # Обновляем все поля
+            # Жёсткая правка: если слово похоже на глагол — чистим article и plural
+            if is_verb_like(de):
+                new_data["article"] = ""
+                new_data["plural"] = ""
+
             cur.execute("""
                 UPDATE words 
-                SET ru = %s, synonyms = %s, antonyms = %s, collocations = %s, 
-                    plural = %s, verb_forms = %s, article = %s, examples = %s::jsonb 
+                SET ru = %s,
+                    synonyms = %s,
+                    antonyms = %s,
+                    collocations = %s,
+                    plural = %s,
+                    verb_forms = %s,
+                    article = %s,
+                    examples = %s::jsonb 
                 WHERE id = %s
             """, (
                 new_data.get("ru_translation", ""),
@@ -182,12 +213,13 @@ def process_batch(limit=100):
             print("✅")
         else:
             print("❌")
-            
+
         time.sleep(0.5)
 
     cur.close()
     conn.close()
     print("\n🎉 Готово!")
+
 
 if __name__ == "__main__":
     process_batch(100)

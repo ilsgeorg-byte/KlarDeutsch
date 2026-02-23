@@ -29,6 +29,16 @@ interface TrainerWord extends Word {
   next_review?: string;
 }
 
+// Функция для надежного перемешивания массива (алгоритм Фишера-Йетса)
+const shuffleArray = <T,>(array: T[]): T[] => {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+};
+
 export default function TrainerPage() {
   const [words, setWords] = useState<TrainerWord[]>([]);
   const [level, setLevel] = useState("A1");
@@ -142,12 +152,17 @@ export default function TrainerPage() {
       });
       if (res.status === 401) return router.push("/login");
       if (!res.ok) throw new Error("Failed");
-      const data = await res.json();
+            const data = await res.json();
+      
+      // ПЕРЕМЕШИВАЕМ СЛОВА ПЕРЕД СОХРАНЕНИЕМ В STATE
+      // Явно указываем TS, что мы передаем массив TrainerWord
+      const randomizedData = shuffleArray<TrainerWord>(data);
+
 
       if (isManual) {
-        setWords((prev) => [...prev, ...data]);
+        setWords((prev) => [...prev, ...randomizedData]);
       } else {
-        setWords(data);
+        setWords(randomizedData);
         setIndex(0);
         setShowAnswer(false);
       }
