@@ -143,23 +143,27 @@ export default function TrainerPage() {
     }
   };
 
- const loadWords = async (isManual = false) => {
+   const loadWords = async (isManual = false) => {
     if (!isManual) setLoading(true);
     try {
       const token = localStorage.getItem("token");
+      // ДОБАВЛЕН cache: 'no-store' чтобы отключить агрессивный кэш Next.js
       const res = await fetch(`/api/trainer/words?level=${level}`, {
         headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store'
       });
+      
       if (res.status === 401) return router.push("/login");
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
+      
+      // Перемешиваем
+      const randomizedData = shuffleArray<TrainerWord>(data);
 
       if (isManual) {
-        // Добавляем новые и сразу перемешиваем ВЕСЬ массив
-        setWords((prev) => shuffleArray<TrainerWord>([...prev, ...data]));
+        setWords((prev) => [...prev, ...randomizedData]);
       } else {
-        // Перемешиваем при первичной загрузке
-        setWords(shuffleArray<TrainerWord>([...data]));
+        setWords(randomizedData);
         setIndex(0);
         setShowAnswer(false);
       }
@@ -169,6 +173,7 @@ export default function TrainerPage() {
       if (!isManual) setLoading(false);
     }
   };
+
 
   useEffect(() => {
     loadWords();
@@ -248,10 +253,15 @@ export default function TrainerPage() {
       <main className="flex-1 flex flex-col items-center px-4 w-full pt-8 pb-12">
         {/* Стильный переключатель уровней */}
         <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200 mb-8 w-full max-w-md overflow-x-auto">
-          {["A1", "A2", "B1", "B2", "C1"].map((lvl) => (
-            <button
-              key={lvl}
-              onClick={() => setLevel(lvl)}
+  {["A1", "A2", "B1", "B2", "C1"].map((lvl) => (
+    <button
+      key={lvl}
+      onClick={() => {
+        setWords([]); // Сбрасываем старые слова
+        setIndex(0);
+        setLevel(lvl);
+      }}
+
               className={`flex-1 min-w-[60px] py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ${level === lvl
                 ? "bg-blue-600 text-white shadow-md shadow-blue-500/30 transform scale-105"
                 : "bg-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-800"
