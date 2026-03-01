@@ -53,12 +53,13 @@ def get_training_words():
         remaining = limit - len(cards_to_review)
         if remaining > 0:
             cur.execute("""
-                SELECT id, level, topic, de, ru, article, example_de, example_ru
-                FROM words
-                WHERE level IN %s AND id NOT IN (SELECT word_id FROM user_words WHERE user_id = %s)
+                SELECT w.id, w.level, w.topic, w.de, w.ru, w.article, w.example_de, w.example_ru
+                FROM words w
+                LEFT JOIN user_words uw ON w.id = uw.word_id AND uw.user_id = %s
+                WHERE w.level IN %s AND uw.word_id IS NULL
                 ORDER BY RANDOM()
                 LIMIT %s
-            """, (tuple(target_levels), request.user_id, remaining))
+            """, (request.user_id, tuple(target_levels), remaining))
             
             columns = [desc[0] for desc in cur.description]
             new_words = [dict(zip(columns, row)) for row in cur.fetchall()]
