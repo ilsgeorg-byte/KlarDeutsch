@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 import sys
 import os
+import logging
 
 # Добавляем родительскую директорию в path
 api_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -9,21 +10,30 @@ if api_dir not in sys.path:
 
 from db import get_db_connection
 from .auth import token_required, SECRET_KEY
-import jwt
+from utils.token_utils import get_current_user_id_optional
 
 words_bp = Blueprint('words', __name__, url_prefix='/api')
 
+# Логгер
+logger = logging.getLogger(__name__)
+
 def get_current_user_id():
-    """Безопасно получаем user_id из заголовка (опционально)"""
-    auth_header = request.headers.get('Authorization')
-    if auth_header and auth_header.startswith('Bearer '):
-        token = auth_header.split(" ")[1]
-        try:
-            data = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-            return data['user_id']
-        except:
-            pass
-    return None
+    """
+    Безопасно получаем user_id из заголовка (опционально)
+    
+    Используется для персонализации ответов (избранные слова и т.п.)
+    При ошибке токена возвращает None и логирует событие.
+    
+    Returns:
+        user_id если токен валиден, иначе None
+    """
+    user_id = get_current_user_id_optional()
+    if user_id is None:
+        # Проверяем, есть ли вообще заголовок Authorization
+        auth_header = request.headers.get('Authorization')
+        if auth_header:
+            logger.debug("Запрос с авторизацией, но токен не валиден (возможно, истёк или не принадлежит пользователю)")
+    return user_id
 
 @words_bp.route('/words', methods=['GET'])
 def get_words():

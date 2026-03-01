@@ -3,37 +3,56 @@ import re
 import jwt
 import datetime
 import bcrypt
+import logging
 from flask import Blueprint, request, jsonify, current_app
 from functools import wraps
 from db import get_db_connection
+from utils.token_utils import (
+    decode_token, 
+    TokenError, 
+    TokenExpiredError, 
+    TokenInvalidError,
+    TokenMissingError,
+    get_token_from_header
+)
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
 # Секретный ключ (в продакшене должен быть в .env.local)
-SECRET_KEY = os.environ.get("JWT_SECRET", "klardeutsch-super-secret-key")
+# Минимальная длина для HS256: 32 байта (256 бит)
+SECRET_KEY = os.environ.get("JWT_SECRET", "klardeutsch-super-secret-key-change-in-production!")
+
+# Логгер
+logger = logging.getLogger(__name__)
 
 def is_valid_email(email):
     """Простая проверка формата email"""
     return re.match(r"[^@]+@[^@]+\.[^@]+", email) is not None
 
 def token_required(f):
+    """
+    Декоратор для обязательной авторизации
+    """
     @wraps(f)
     def decorated(*args, **kwargs):
-        token = None
-        if 'Authorization' in request.headers:
-            auth_header = request.headers['Authorization']
-            if auth_header.startswith('Bearer '):
-                token = auth_header.split(" ")[1]
-
+        token = get_token_from_header()
+        
         if not token:
+            logger.warning("Запрос без токена авторизации")
             return jsonify({'error': 'Токен отсутствует'}), 401
 
         try:
-            data = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            data = decode_token(token)
             # Прикрепляем user_id к запросу
             request.user_id = data['user_id']
-        except Exception as e:
+        except TokenExpiredError:
+            logger.warning("Истёкший токен авторизации")
+            return jsonify({'error': 'Токен истёк'}), 401
+        except TokenInvalidError as e:
+            logger.warning(f"Недействительный токен: {e}")
             return jsonify({'error': 'Неверный токен'}), 401
+        except TokenMissingError:
+            return jsonify({'error': 'Токен отсутствует'}), 401
 
         return f(*args, **kwargs)
 
