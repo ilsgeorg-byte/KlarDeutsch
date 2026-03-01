@@ -38,6 +38,7 @@ export default function ProfilePage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [favorites, setFavorites] = useState<Word[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -49,29 +50,44 @@ export default function ProfilePage() {
       }
 
       try {
+        setError(null);
+        
         // Fetch Stats
         const statsRes = await fetch("/api/trainer/stats", {
           headers: { Authorization: `Bearer ${token}` },
         });
+        
         if (statsRes.status === 401) {
+          localStorage.removeItem("token");
           router.push("/login");
           return;
         }
-        if (statsRes.ok) {
-          const data = await statsRes.json();
-          setStats(data);
+        
+        if (!statsRes.ok) {
+          const errorData = await statsRes.json().catch(() => ({}));
+          throw new Error(errorData.error || `HTTP ${statsRes.status}`);
         }
+        
+        const statsData = await statsRes.json();
+        console.log("Stats loaded:", statsData);
+        setStats(statsData);
 
         // Fetch Favorites
         const favsRes = await fetch("/api/favorites", {
           headers: { Authorization: `Bearer ${token}` },
         });
+        
         if (favsRes.ok) {
-          const data = await favsRes.json();
-          setFavorites(Array.isArray(data) ? data : data.words || []);
+          const favsData = await favsRes.json();
+          console.log("Favorites loaded:", favsData);
+          setFavorites(Array.isArray(favsData) ? favsData : (favsData.words || []));
+        } else {
+          console.warn("Failed to load favorites:", favsRes.status);
+          setFavorites([]);
         }
       } catch (err) {
-        console.error("Failed to fetch data:", err);
+        console.error("Failed to fetch profile data:", err);
+        setError(err instanceof Error ? err.message : "Неизвестная ошибка");
       } finally {
         setLoading(false);
       }
@@ -146,6 +162,33 @@ export default function ProfilePage() {
         {loading ? (
           <div className="flex justify-center items-center h-64">
             <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        ) : error ? (
+          <div className="bg-white p-12 rounded-3xl shadow-sm text-center">
+            <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Ошибка загрузки данных</h3>
+            <p className="text-gray-500 mb-6">{error}</p>
+            <div className="flex gap-4 justify-center">
+              <button
+                onClick={() => window.location.reload()}
+                className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors"
+              >
+                Обновить страницу
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.removeItem("token");
+                  router.push("/login");
+                }}
+                className="px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors"
+              >
+                Войти снова
+              </button>
+            </div>
           </div>
         ) : !stats ? (
           <div className="bg-white p-12 rounded-3xl shadow-sm text-center">
