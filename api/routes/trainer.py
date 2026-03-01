@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from datetime import datetime, timedelta
 import os
 import sys
+import logging
 
 # Добавляем родительскую директорию в path
 api_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -10,8 +11,13 @@ if api_dir not in sys.path:
 
 from .auth import token_required
 from db import get_db_connection
+from schemas import TrainingQuery, RateWordRequest, VALID_LEVELS
 
 trainer_bp = Blueprint('trainer', __name__, url_prefix='/api/trainer')
+
+# Логгер
+logger = logging.getLogger(__name__)
+
 
 @trainer_bp.route('/words', methods=['GET'])
 @token_required
@@ -22,15 +28,18 @@ def get_training_words():
     2. Новые слова из выбранного уровня (которых еще нет в user_words)
     """
     try:
-        level = request.args.get("level", "A1").upper()
-        limit = int(request.args.get("limit", 10))
-        
+        # Валидация через Pydantic
+        query = TrainingQuery(
+            level=request.args.get("level", "A1").upper(),
+            limit=int(request.args.get("limit", 10))
+        )
+
         # Определяем список уровней для выборки (кумулятивно)
         all_levels = ["A1", "A2", "B1", "B2", "C1"]
-        if level in all_levels:
-            target_levels = all_levels[:all_levels.index(level) + 1]
+        if query.level in all_levels:
+            target_levels = all_levels[:all_levels.index(query.level) + 1]
         else:
-            target_levels = [level]
+            target_levels = [query.level]
             
         conn = get_db_connection()
         cur = conn.cursor()
@@ -80,13 +89,15 @@ def rate_word():
     Rating: 0 (Знаю - пропускать), 1 (Сложно), 3 (Хорошо), 5 (Легко)
     """
     try:
-        data = request.json
-        word_id = data.get('word_id')
-        rating = int(data.get('rating', -1))
+        # Валидация через Pydantic
+        try:
+            rate_data = RateWordRequest.model_validate(request.json or {})
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
         
-        if not word_id or rating not in [0, 1, 3, 5]:
-            return jsonify({"error": "Неверные данные"}), 400
-            
+        word_id = rate_data.word_id
+        rating = rate_data.rating
+
         conn = get_db_connection()
         cur = conn.cursor()
         

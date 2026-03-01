@@ -2,6 +2,11 @@ import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
+from contextlib import contextmanager
+import logging
+
+# Настраиваем логирование
+logger = logging.getLogger(__name__)
 
 # Загружаем переменные окружения из .env.local (который лежит в корне проекта)
 # Указываем путь к корню, так как db.py лежит в api/
@@ -13,19 +18,53 @@ def get_db_connection():
     if not url:
         # Если переменной нет, попробуем найти другую (Prisma иногда дает другое имя)
         url = os.environ.get("DATABASE_URL")
-    
+
     if not url:
-        print("Ошибка: POSTGRES_URL не найдена!")
-        print(f"Доступные переменные окружения: {list(os.environ.keys())[:10]}")
+        logger.error("POSTGRES_URL не найдена в переменных окружения")
         raise Exception("POSTGRES_URL не найдена в переменных окружения")
 
     try:
         conn = psycopg2.connect(url)
-        print("Successfully connected to DB")
+        logger.debug("Successfully connected to DB")
         return conn
     except Exception as e:
-        print(f"Error connecting to DB: {str(e)}")
+        logger.error(f"Error connecting to DB: {str(e)}")
         raise
+
+
+@contextmanager
+def get_db_cursor():
+    """
+    Контекстный менеджер для работы с БД.
+    
+    Автоматически закрывает соединение и курсор, даже если произошло исключение.
+    Коммит выполняется только если не было исключений.
+    
+    Использование:
+        with get_db_cursor() as cur:
+            cur.execute("SELECT * FROM words")
+            results = cur.fetchall()
+    
+    Yields:
+        Cursor для выполнения запросов
+    """
+    conn = None
+    cur = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        yield cur
+        conn.commit()
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        logger.error(f"Database error: {str(e)}")
+        raise
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
 
 def init_db():
     try:

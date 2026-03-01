@@ -1,17 +1,18 @@
 from flask import Blueprint, request, jsonify
 import os
 import sys
+import logging
 import google.generativeai as genai
 from openai import OpenAI
-from dotenv import load_dotenv
 from .auth import token_required
 from db import get_db_connection
 
 diary_bp = Blueprint('diary', __name__, url_prefix='/api/diary')
 
-# Загружаем переменные окружения
-env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.env.local')
-load_dotenv(env_path)
+# Логгер
+logger = logging.getLogger(__name__)
+
+# Переменные окружения уже загружены в index.py
 
 def correct_with_gemini(text):
     api_key = os.getenv("GEMINI_API_KEY")
