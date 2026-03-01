@@ -88,6 +88,7 @@ export default function TrainerPage() {
 
   // --- ЛОГИКА ЗАПИСИ ---
   const [isRecording, setIsRecording] = useState(false);
+  const [ratingInProgress, setRatingInProgress] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
 
@@ -208,7 +209,9 @@ export default function TrainerPage() {
   };
 
   const handleRate = async (rating: number) => {
-    if (!currentWord) return;
+    if (!currentWord || ratingInProgress) return;
+    
+    setRatingInProgress(true);
     try {
       const token = localStorage.getItem("token");
       const res = await fetch("/api/trainer/rate", {
@@ -219,9 +222,20 @@ export default function TrainerPage() {
         },
         body: JSON.stringify({ word_id: currentWord.id, rating }),
       });
-      if (res.ok) handleNext();
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        console.error(`API error: ${res.status}`, errorData);
+        setAudioStatus(`Ошибка: ${errorData.error || 'Не удалось сохранить прогресс'}`);
+        return;
+      }
+      
+      handleNext();
     } catch (err) {
-      console.error(err);
+      console.error("Rate error:", err);
+      setAudioStatus("Ошибка сети. Проверьте подключение к серверу.");
+    } finally {
+      setRatingInProgress(false);
     }
   };
 
@@ -315,7 +329,7 @@ export default function TrainerPage() {
             <>
               {/* Сама Карточка */}
               <div
-                onClick={() => !showAnswer && setShowAnswer(true)}
+                onClick={() => !showAnswer && !ratingInProgress && setShowAnswer(true)}
                 className={`relative w-full rounded-3xl shadow-xl border border-slate-100 bg-white transition-all duration-500 transform-gpu flex flex-col overflow-hidden ${!showAnswer
                   ? "hover:-translate-y-1 hover:shadow-2xl cursor-pointer"
                   : "shadow-blue-900/10 cursor-default"
@@ -445,44 +459,80 @@ export default function TrainerPage() {
               >
                 <button
                   onClick={() => handleRate(1)}
-                  className="flex flex-col items-center justify-center py-3.5 bg-white border-2 border-red-100 rounded-2xl hover:bg-red-50 hover:border-red-300 transition-colors shadow-sm group"
+                  disabled={ratingInProgress}
+                  className={`flex flex-col items-center justify-center py-3.5 bg-white border-2 border-red-100 rounded-2xl transition-all shadow-sm group ${
+                    ratingInProgress 
+                      ? 'opacity-50 cursor-not-allowed' 
+                      : 'hover:bg-red-50 hover:border-red-300 hover:shadow-md'
+                  }`}
                 >
-                  <span className="text-red-500 font-bold mb-1 group-hover:scale-110 transition-transform">
-                    Сложно
-                  </span>
+                  {ratingInProgress ? (
+                    <Loader2 size={20} className="animate-spin text-red-500 mb-1" />
+                  ) : (
+                    <span className="text-red-500 font-bold mb-1 group-hover:scale-110 transition-transform">
+                      Сложно
+                    </span>
+                  )}
                   <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">
                     Завтра
                   </span>
                 </button>
                 <button
                   onClick={() => handleRate(3)}
-                  className="flex flex-col items-center justify-center py-3.5 bg-white border-2 border-amber-100 rounded-2xl hover:bg-amber-50 hover:border-amber-300 transition-colors shadow-sm group"
+                  disabled={ratingInProgress}
+                  className={`flex flex-col items-center justify-center py-3.5 bg-white border-2 border-amber-100 rounded-2xl transition-all shadow-sm group ${
+                    ratingInProgress 
+                      ? 'opacity-50 cursor-not-allowed' 
+                      : 'hover:bg-amber-50 hover:border-amber-300 hover:shadow-md'
+                  }`}
                 >
-                  <span className="text-amber-500 font-bold mb-1 group-hover:scale-110 transition-transform">
-                    Норма
-                  </span>
+                  {ratingInProgress ? (
+                    <Loader2 size={20} className="animate-spin text-amber-500 mb-1" />
+                  ) : (
+                    <span className="text-amber-500 font-bold mb-1 group-hover:scale-110 transition-transform">
+                      Норма
+                    </span>
+                  )}
                   <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">
                     3-4 Дня
                   </span>
                 </button>
                 <button
                   onClick={() => handleRate(5)}
-                  className="flex flex-col items-center justify-center py-3.5 bg-white border-2 border-emerald-100 rounded-2xl hover:bg-emerald-50 hover:border-emerald-300 transition-colors shadow-sm group"
+                  disabled={ratingInProgress}
+                  className={`flex flex-col items-center justify-center py-3.5 bg-white border-2 border-emerald-100 rounded-2xl transition-all shadow-sm group ${
+                    ratingInProgress 
+                      ? 'opacity-50 cursor-not-allowed' 
+                      : 'hover:bg-emerald-50 hover:border-emerald-300 hover:shadow-md'
+                  }`}
                 >
-                  <span className="text-emerald-500 font-bold mb-1 group-hover:scale-110 transition-transform">
-                    Легко
-                  </span>
+                  {ratingInProgress ? (
+                    <Loader2 size={20} className="animate-spin text-emerald-500 mb-1" />
+                  ) : (
+                    <span className="text-emerald-500 font-bold mb-1 group-hover:scale-110 transition-transform">
+                      Легко
+                    </span>
+                  )}
                   <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">
                     Неделя+
                   </span>
                 </button>
                 <button
                   onClick={() => handleRate(0)}
-                  className="flex flex-col items-center justify-center py-3.5 bg-slate-800 border-2 border-slate-800 rounded-2xl hover:bg-slate-900 transition-colors shadow-sm group"
+                  disabled={ratingInProgress}
+                  className={`flex flex-col items-center justify-center py-3.5 bg-slate-800 border-2 border-slate-800 rounded-2xl transition-all shadow-sm group ${
+                    ratingInProgress 
+                      ? 'opacity-50 cursor-not-allowed' 
+                      : 'hover:bg-slate-900 hover:shadow-lg'
+                  }`}
                 >
-                  <span className="text-white font-bold mb-1 group-hover:scale-110 transition-transform">
-                    Знаю
-                  </span>
+                  {ratingInProgress ? (
+                    <Loader2 size={20} className="animate-spin text-white mb-1" />
+                  ) : (
+                    <span className="text-white font-bold mb-1 group-hover:scale-110 transition-transform">
+                      Знаю
+                    </span>
+                  )}
                   <span className="text-[10px] text-slate-300 font-medium uppercase tracking-wide">
                     Убрать
                   </span>
