@@ -34,33 +34,38 @@ def get_training_words():
             limit=int(request.args.get("limit", 10))
         )
 
+        logger.info(f"Запрос слов для пользователя {request.user_id}, уровень: {query.level}, лимит: {query.limit}")
+
         # Определяем список уровней для выборки (кумулятивно)
         all_levels = ["A1", "A2", "B1", "B2", "C1"]
         if query.level in all_levels:
             target_levels = all_levels[:all_levels.index(query.level) + 1]
         else:
             target_levels = [query.level]
-            
+
         conn = get_db_connection()
         cur = conn.cursor()
-        
+
         # 1. Получаем слова, которые пора повторить
+        logger.info(f"Выполняем запрос на повторение: user_id={request.user_id}, levels={target_levels}")
         cur.execute("""
-            SELECT w.id, w.level, w.topic, w.de, w.ru, w.article, w.example_de, w.example_ru, 
+            SELECT w.id, w.level, w.topic, w.de, w.ru, w.article, w.example_de, w.example_ru,
                    uw.interval, uw.ease_factor, uw.reps, uw.next_review
             FROM words w
             JOIN user_words uw ON w.id = uw.word_id
             WHERE w.level IN %s AND uw.user_id = %s AND uw.next_review <= CURRENT_TIMESTAMP AND uw.status = 'learning'
             ORDER BY uw.next_review ASC
             LIMIT %s
-        """, (tuple(target_levels), request.user_id, limit))
-        
+        """, (tuple(target_levels), request.user_id, query.limit))
+
         columns = [desc[0] for desc in cur.description]
         cards_to_review = [dict(zip(columns, row)) for row in cur.fetchall()]
+        logger.info(f"Найдено слов на повторение: {len(cards_to_review)}")
         
         # 2. Если слов меньше лимита, добавляем новые
-        remaining = limit - len(cards_to_review)
+        remaining = query.limit - len(cards_to_review)
         if remaining > 0:
+            logger.info(f"Добавляем {remaining} новых слов")
             cur.execute("""
                 SELECT w.id, w.level, w.topic, w.de, w.ru, w.article, w.example_de, w.example_ru
                 FROM words w
@@ -69,14 +74,18 @@ def get_training_words():
                 ORDER BY RANDOM()
                 LIMIT %s
             """, (request.user_id, tuple(target_levels), remaining))
-            
+
             columns = [desc[0] for desc in cur.description]
             new_words = [dict(zip(columns, row)) for row in cur.fetchall()]
+            logger.info(f"Найдено новых слов: {len(new_words)}")
             cards_to_review.extend(new_words)
-            
+        else:
+            logger.info(f"Новые слова не требуются (уже есть {len(cards_to_review)})")
+
         cur.close()
         conn.close()
-        
+
+        logger.info(f"Возвращаем {len(cards_to_review)} слов")
         return jsonify(cards_to_review), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
