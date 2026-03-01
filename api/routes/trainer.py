@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import os
 import sys
 import logging
+import random
 
 # Добавляем родительскую директорию в path
 api_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -17,6 +18,16 @@ trainer_bp = Blueprint('trainer', __name__, url_prefix='/api/trainer')
 
 # Логгер
 logger = logging.getLogger(__name__)
+
+# === Настройки алгоритма SM-2 ===
+# Fuzzing - случайный разброс интервала (в процентах)
+FUZZING_FACTOR = 0.1  # ±10% от интервала
+
+# Минимальный интервал для "Сложно" (в минутах)
+MIN_INTERVAL_MINUTES = 10
+
+# Множитель снижения ease_factor для "Сложно"
+EASE_PENALTY_HARD = 0.3  # Агрессивнее стандартного 0.2
 
 
 @trainer_bp.route('/words', methods=['GET'])
@@ -94,8 +105,18 @@ def get_training_words():
 @token_required
 def rate_word():
     """
-    Обновить прогресс слова по алгоритму SM-2
-    Rating: 0 (Знаю - пропускать), 1 (Сложно), 3 (Хорошо), 5 (Легко)
+    Обновить прогресс слова по улучшенному алгоритму SM-2
+    
+    Rating:
+    - 0: Знаю (убрать из колоды)
+    - 1: Сложно (повтор через 10 минут)
+    - 3: Хорошо (стандартный интервал)
+    - 5: Легко (увеличенный интервал)
+    
+    Улучшения:
+    - Fuzzing: случайный разброс интервала для предотвращения "куч"
+    - Агрессивное снижение ease_factor для "Сложно"
+    - Минимальный интервал 10 минут для внутридневных сессий
     """
     try:
         # Валидация через Pydantic
@@ -109,9 +130,10 @@ def rate_word():
 
         conn = get_db_connection()
         cur = conn.cursor()
-        
+
         if rating == 0:
             # Пометить как "известное" навсегда
+            logger.info(f"Слово {word_id} помечено как 'known'")
             cur.execute("""
                 INSERT INTO user_words (user_id, word_id, status, next_review)
                 VALUES (%s, %s, 'known', '2099-01-01')
@@ -121,31 +143,55 @@ def rate_word():
             # Получаем текущий прогресс
             cur.execute("SELECT interval, ease_factor, reps FROM user_words WHERE word_id = %s AND user_id = %s", (word_id, request.user_id))
             row = cur.fetchone()
-            
+
             if not row:
                 interval, ease_factor, reps = 0, 2.5, 0
             else:
                 interval, ease_factor, reps = row
+
+            # === Улучшенный алгоритм SM-2 ===
+            
+            if rating == 1:
+                # "Сложно" - агрессивное снижение
+                reps = 0
+                interval = 0  # 0 дней = повтор через 10 минут
+                ease_factor = max(1.3, ease_factor - EASE_PENALTY_HARD)
+                logger.info(f"Слово {word_id}: сложно, interval=0 (10 мин), ease_factor={ease_factor:.2f}")
                 
-            # Алгоритм SM-2
-            if rating >= 3:
+            elif rating >= 3:
+                # "Хорошо" (3) или "Легко" (5)
                 if reps == 0:
-                    interval = 1
+                    interval = 1  # Первый повтор - 1 день
                 elif reps == 1:
-                    interval = 6
+                    interval = 6  # Второй повтор - 6 дней
                 else:
                     interval = round(interval * ease_factor)
                 
                 reps += 1
-                ease_factor = ease_factor + (0.1 - (5 - rating) * (0.08 + (5 - rating) * 0.02))
-            else:
-                reps = 0
-                interval = 1
-                ease_factor = max(1.3, ease_factor - 0.2)
                 
-            ease_factor = max(1.3, ease_factor)
-            next_review = datetime.now() + timedelta(days=interval)
+                # Модификатор для "Легко" - бонус к ease_factor
+                rating_bonus = 0.1 if rating == 5 else 0
+                ease_factor = ease_factor + (0.1 - (5 - rating) * (0.08 + (5 - rating) * 0.02)) + rating_bonus
+                
+                # Применяем fuzzing (случайный разброс)
+                if interval > 1:  # Не применяем к интервалам в 1 день
+                    fuzz_range = interval * FUZZING_FACTOR
+                    fuzz = random.uniform(-fuzz_range, fuzz_range)
+                    interval = max(1, round(interval + fuzz))
+                
+                logger.info(f"Слово {word_id}: rating={rating}, interval={interval} дней, ease_factor={ease_factor:.2f}")
             
+            # Ограничиваем ease_factor минимумом
+            ease_factor = max(1.3, ease_factor)
+            
+            # Вычисляем дату следующего повторения
+            if interval == 0:
+                # "Сложно" - повтор через 10 минут (внутри той же сессии)
+                next_review = datetime.now() + timedelta(minutes=MIN_INTERVAL_MINUTES)
+            else:
+                # Стандартный интервал в днях
+                next_review = datetime.now() + timedelta(days=interval)
+
             cur.execute("""
                 INSERT INTO user_words (user_id, word_id, interval, ease_factor, reps, next_review, status)
                 VALUES (%s, %s, %s, %s, %s, %s, 'learning')
