@@ -39,6 +39,9 @@ export default function ProfilePage() {
   const [favorites, setFavorites] = useState<Word[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedLevel, setSelectedLevel] = useState<string | null>(null);
+  const [levelWords, setLevelWords] = useState<Word[]>([]);
+  const [loadingLevel, setLoadingLevel] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -94,6 +97,27 @@ export default function ProfilePage() {
     };
     fetchData();
   }, [router]);
+
+  // Загрузка слов для уровня
+  const loadLevelWords = async (level: string) => {
+    setLoadingLevel(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`/api/words?level=${level}&limit=100`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setLevelWords(data.data || []);
+        setSelectedLevel(level);
+      }
+    } catch (err) {
+      console.error("Failed to load level words:", err);
+    } finally {
+      setLoadingLevel(false);
+    }
+  };
 
   const totalWordsInDb = stats ? Object.values(stats.total_words).reduce((a, b) => a + b, 0) : 0;
   const knownWords = stats?.user_progress["known"] || 0;
@@ -284,7 +308,8 @@ export default function ProfilePage() {
                   return (
                     <div
                       key={lvl}
-                      className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100"
+                      onClick={() => loadLevelWords(lvl)}
+                      className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-lg hover:border-blue-300 transition-all"
                     >
                       <div className="flex justify-between items-center mb-4">
                         <span className="px-3 py-1 bg-gray-900 text-white text-xs font-bold rounded-lg">
@@ -311,6 +336,9 @@ export default function ProfilePage() {
                           <span className="text-gray-500">Тренируется</span>
                           <span className="font-semibold text-orange-600">{learning}</span>
                         </div>
+                        <div className="text-xs text-blue-600 mt-2 text-center">
+                          👆 Нажми чтобы увидеть слова
+                        </div>
                       </div>
                     </div>
                   );
@@ -333,6 +361,85 @@ export default function ProfilePage() {
                 <span className="text-xs uppercase tracking-widest font-bold text-blue-200">
                   Дней подряд
                 </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Модальное окно со словами уровня */}
+        {selectedLevel && (
+          <div 
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setSelectedLevel(null)}
+          >
+            <div 
+              className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Заголовок */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <div className="flex items-center gap-3">
+                  <BookOpen className="text-blue-600" size={28} />
+                  <h3 className="text-2xl font-bold text-gray-900">
+                    Слова уровня {selectedLevel}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setSelectedLevel(null)}
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Контент */}
+              <div className="overflow-y-auto max-h-[60vh] p-6">
+                {loadingLevel ? (
+                  <div className="flex justify-center items-center h-40">
+                    <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                ) : levelWords.length === 0 ? (
+                  <p className="text-center text-gray-500 py-8">
+                    Нет слов этого уровня
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {levelWords.map((word) => (
+                      <button
+                        key={word.id}
+                        onClick={() => {
+                          setSelectedLevel(null);
+                          router.push(`/dictionary/${word.id}`);
+                        }}
+                        className="p-4 border border-gray-200 rounded-2xl hover:border-blue-300 hover:bg-blue-50 transition-all text-left"
+                      >
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="font-bold text-gray-900">
+                            {renderWordWithArticle(word)}
+                          </span>
+                        </div>
+                        <span className="text-sm text-gray-600">{word.ru}</span>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold uppercase">
+                            {word.level}
+                          </span>
+                          {word.topic && (
+                            <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                              {word.topic}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Подвал */}
+              <div className="p-4 border-t border-gray-200 bg-gray-50 text-center text-sm text-gray-600">
+                Показано {levelWords.length} слов • Нажмите на слово для просмотра
               </div>
             </div>
           </div>
