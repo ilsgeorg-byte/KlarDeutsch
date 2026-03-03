@@ -312,7 +312,7 @@ export default function TrainerPage() {
 
   return (
     <div
-      className={`${styles.pageWrapper} bg-slate-50 min-h-screen font-sans flex flex-col`}
+      className={`${styles.pageWrapper} bg-slate-50 dark:bg-gray-900 min-h-screen font-sans flex flex-col`}
     >
       <main className="flex-1 flex flex-col items-center px-4 w-full pt-8 pb-12">
         {/* Стильный переключатель уровней */}

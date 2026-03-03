@@ -27,13 +27,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Сохранение темы и применение класса
   useEffect(() => {
     if (!isLoaded) return;
-    
+
     localStorage.setItem('globalTheme', theme);
-    
+
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
+      console.log('🌙 Dark theme applied');
     } else {
       document.documentElement.classList.remove('dark');
+      console.log('☀️ Light theme applied');
     }
   }, [theme, isLoaded]);
 
