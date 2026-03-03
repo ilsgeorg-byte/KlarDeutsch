@@ -32,6 +32,10 @@ interface Word {
   collocations?: string;
   audio_url?: string;
   is_favorite?: boolean;
+  next_review?: string;
+  interval?: number;
+  ease_factor?: number;
+  reps?: number;
 }
 
 export default function ProfilePage() {
@@ -98,22 +102,25 @@ export default function ProfilePage() {
     fetchData();
   }, [router]);
 
-  // Загрузка слов для уровня
+  // Загрузка слов для уровня (только те, что в изучении)
   const loadLevelWords = async (level: string) => {
     setLoadingLevel(true);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`/api/words?level=${level}&limit=100`, {
+      
+      // Загружаем слова из тренажёра (только learning слова)
+      const res = await fetch(`/api/trainer/words?level=${level}&limit=100`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       
       if (res.ok) {
         const data = await res.json();
-        setLevelWords(data.data || []);
+        setLevelWords(Array.isArray(data) ? data : []);
         setSelectedLevel(level);
       }
     } catch (err) {
       console.error("Failed to load level words:", err);
+      setLevelWords([]);
     } finally {
       setLoadingLevel(false);
     }
@@ -380,9 +387,14 @@ export default function ProfilePage() {
               <div className="flex items-center justify-between p-6 border-b border-gray-200">
                 <div className="flex items-center gap-3">
                   <BookOpen className="text-blue-600" size={28} />
-                  <h3 className="text-2xl font-bold text-gray-900">
-                    Слова уровня {selectedLevel}
-                  </h3>
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-900">
+                      Слова уровня {selectedLevel}
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      В изучении: {levelWords.length} слов
+                    </p>
+                  </div>
                 </div>
                 <button
                   onClick={() => setSelectedLevel(null)}
@@ -421,13 +433,18 @@ export default function ProfilePage() {
                           </span>
                         </div>
                         <span className="text-sm text-gray-600">{word.ru}</span>
-                        <div className="flex items-center gap-2 mt-2">
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
                           <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold uppercase">
                             {word.level}
                           </span>
                           {word.topic && (
                             <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
                               {word.topic}
+                            </span>
+                          )}
+                          {word.next_review && (
+                            <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                              Повтор: {new Date(word.next_review).toLocaleDateString('ru-RU')}
                             </span>
                           )}
                         </div>
