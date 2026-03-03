@@ -39,6 +39,14 @@ const shuffleArray = <T,>(array: T[]): T[] => {
   return shuffled;
 };
 
+// Форматирование времени
+const formatTime = (ms: number): string => {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
+
 export default function TrainerPage() {
   const [words, setWords] = useState<TrainerWord[]>([]);
   const [level, setLevel] = useState("A1");
@@ -47,6 +55,15 @@ export default function TrainerPage() {
   const [loading, setLoading] = useState(false);
   const [audioStatus, setAudioStatus] = useState<string | null>(null);
   const router = useRouter();
+
+  // Статистика сессии
+  const [sessionStats, setSessionStats] = useState({
+    total: 0,      // Всего пройдено
+    correct: 0,    // Правильных ответов (3, 4, 5)
+    hard: 0,       // Сложных (1)
+    known: 0,      // Знаю (0)
+    startTime: Date.now(),
+  });
 
   // Проверка авторизации
   useEffect(() => {
@@ -162,6 +179,14 @@ export default function TrainerPage() {
         setWords(data);
         setIndex(0);
         setShowAnswer(false);
+        // Сброс статистики при загрузке новых слов
+        setSessionStats({
+          total: 0,
+          correct: 0,
+          hard: 0,
+          known: 0,
+          startTime: Date.now(),
+        });
       }
     } catch (e) {
       setAudioStatus("Ошибка загрузки слов");
@@ -230,6 +255,15 @@ export default function TrainerPage() {
         return;
       }
       
+      // Обновляем статистику
+      setSessionStats(prev => ({
+        ...prev,
+        total: prev.total + 1,
+        correct: rating >= 3 ? prev.correct + 1 : prev.correct,
+        hard: rating === 1 ? prev.hard + 1 : prev.hard,
+        known: rating === 0 ? prev.known + 1 : prev.known,
+      }));
+      
       handleNext();
     } catch (err) {
       console.error("Rate error:", err);
@@ -280,7 +314,7 @@ export default function TrainerPage() {
     >
       <main className="flex-1 flex flex-col items-center px-4 w-full pt-8 pb-12">
         {/* Стильный переключатель уровней */}
-        <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200 mb-8 w-full max-w-md overflow-x-auto">
+        <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200 mb-4 w-full max-w-md overflow-x-auto">
   {["A1", "A2", "B1", "B2", "C1"].map((lvl) => (
     <button
       key={lvl}
@@ -300,6 +334,38 @@ export default function TrainerPage() {
             </button>
           ))}
         </div>
+
+        {/* Статистика сессии */}
+        {sessionStats.total > 0 && (
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mb-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-gray-700">📊 Сессия</h3>
+              <span className="text-xs text-gray-500">
+                ⏱️ {formatTime(Date.now() - sessionStats.startTime)}
+              </span>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              <div className="text-center">
+                <div className="text-lg font-bold text-gray-900">{sessionStats.total}</div>
+                <div className="text-[10px] text-gray-500 uppercase">Всего</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-bold text-green-600">
+                  {sessionStats.total > 0 ? Math.round((sessionStats.correct / sessionStats.total) * 100) : 0}%
+                </div>
+                <div className="text-[10px] text-gray-500 uppercase">Успех</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-bold text-orange-500">{sessionStats.hard}</div>
+                <div className="text-[10px] text-gray-500 uppercase">Сложно</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-bold text-blue-600">{sessionStats.known}</div>
+                <div className="text-[10px] text-gray-500 uppercase">Знаю</div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Контейнер карточки */}
         <div className="w-full max-w-md relative perspective-1000">
