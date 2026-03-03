@@ -59,7 +59,7 @@ export default function Header() {
     if (!isMounted) return null;
 
     return (
-        <header className="w-full bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+        <header className="w-full bg-white dark:bg-gray-800 border-b border-slate-200 dark:border-gray-700 sticky top-0 z-50 shadow-sm transition-colors duration-300">
             <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between overflow-x-hidden w-full gap-2">
 
 
@@ -68,8 +68,8 @@ export default function Header() {
                     <div className="bg-blue-600 text-white p-1.5 rounded-lg">
                         <BookOpen size={20} />
                     </div>
-                    <span className="text-xl font-bold text-slate-800 tracking-tight">
-                        Klar<span className="text-blue-600">Deutsch</span>
+                    <span className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">
+                        Klar<span className="text-blue-600 dark:text-blue-400">Deutsch</span>
                     </span>
                 </Link>
 
@@ -80,8 +80,8 @@ export default function Header() {
                             key={link.href}
                             href={link.href}
                             className={`text-sm font-semibold transition-colors py-2 ${isActive(link.href)
-                                ? "text-blue-600 border-b-2 border-blue-600"
-                                : "text-slate-600 hover:text-blue-600"
+                                ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+                                : "text-slate-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
                                 }`}
                         >
                             {link.label}
@@ -94,19 +94,19 @@ export default function Header() {
                     {/* Переключатель темы */}
                     <button
                         onClick={toggleTheme}
-                        className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-800 transition-colors"
+                        className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-700 transition-colors"
                         title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
                     >
                         {theme === 'dark' ? (
                             <Sun className="w-5 h-5 text-yellow-500" />
                         ) : (
-                            <Moon className="w-5 h-5 text-slate-600" />
+                            <Moon className="w-5 h-5 text-slate-600 dark:text-gray-300" />
                         )}
                     </button>
                     
                     <Link
                         href="/profile"
-                        className="flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-blue-600 transition-colors"
+                        className="flex items-center gap-2 text-sm font-semibold text-slate-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                     >
                         <User size={18} />
                         Профиль
@@ -125,7 +125,7 @@ export default function Header() {
                 {/* Мобильная кнопка меню */}
 
                 <button
-                    className="md:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg z-50 flex-shrink-0 ml-auto"
+                    className="md:hidden p-2 text-slate-600 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-gray-700 rounded-lg z-50 flex-shrink-0 ml-auto"
 
                     onClick={() => setIsMenuOpen(!isMenuOpen)}
                     aria-label="Toggle menu"
@@ -135,7 +135,7 @@ export default function Header() {
 
                 {/* Мобильное выпадающее меню */}
                 <div className={`
-                    fixed inset-0 bg-white z-40 transform transition-transform duration-300 ease-in-out pt-20 flex flex-col md:hidden
+                    fixed inset-0 bg-white dark:bg-gray-900 z-40 transform transition-transform duration-300 ease-in-out pt-20 flex flex-col md:hidden
                     ${isMenuOpen ? "translate-x-0" : "translate-x-full"}
                 `}>
                     <nav className="flex flex-col px-6 gap-2">
@@ -143,9 +143,9 @@ export default function Header() {
                             <Link
                                 key={link.href}
                                 href={link.href}
-                                className={`text-lg font-semibold py-4 border-b border-slate-100 flex items-center ${isActive(link.href)
-                                    ? "text-blue-600"
-                                    : "text-slate-700"
+                                className={`text-lg font-semibold py-4 border-b border-slate-100 dark:border-gray-700 flex items-center ${isActive(link.href)
+                                    ? "text-blue-600 dark:text-blue-400"
+                                    : "text-slate-700 dark:text-gray-200"
                                     }`}
                             >
                                 {link.label}
@@ -166,7 +166,7 @@ export default function Header() {
                                 </>
                             ) : (
                                 <>
-                                    <Moon className="w-5 h-5 text-slate-600" />
+                                    <Moon className="w-5 h-5 text-slate-600 dark:text-gray-300" />
                                     Тёмная тема
                                 </>
                             )}
