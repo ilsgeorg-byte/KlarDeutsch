@@ -51,6 +51,7 @@ try:
     from routes.trainer import trainer_bp
     from routes.auth import auth_bp
     from routes.ai_enrich import ai_enrich_bp
+    from routes.learning import learning_bp
     from db import init_db
 except ImportError:
     from .routes.words import words_bp
@@ -59,6 +60,7 @@ except ImportError:
     from .routes.trainer import trainer_bp
     from .routes.auth import auth_bp
     from .routes.ai_enrich import ai_enrich_bp
+    from .routes.learning import learning_bp
     from .db import init_db
 
 # Инициализируем базу данных (создаем таблицы если их нет)
@@ -70,6 +72,7 @@ app.register_blueprint(diary_bp)
 app.register_blueprint(trainer_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(ai_enrich_bp)
+app.register_blueprint(learning_bp)
 
 
 # === Управление соединением с БД на уровне запроса ===

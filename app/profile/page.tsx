@@ -108,8 +108,8 @@ export default function ProfilePage() {
     try {
       const token = localStorage.getItem("token");
       
-      // Загружаем слова из тренажёра (только learning слова)
-      const res = await fetch(`/api/trainer/words?level=${level}&limit=100`, {
+      // Загружаем ВСЕ слова в изучении через новый API
+      const res = await fetch(`/api/learning/words?level=${level}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       
@@ -392,7 +392,8 @@ export default function ProfilePage() {
                       Слова уровня {selectedLevel}
                     </h3>
                     <p className="text-sm text-gray-500">
-                      В изучении: {levelWords.length} слов
+                      В изучении: {stats?.detailed.find(d => d.level === selectedLevel && d.status === 'learning')?.count || 0} • 
+                      Показано: {levelWords.length}
                     </p>
                   </div>
                 </div>
