@@ -1,0 +1,92 @@
+[
+  {
+    "id": 1177,
+    "de": "bleiben",
+    "ru": "оставаться",
+    "article": null,
+    "verb_forms": "bleibt, blieb, ist geblieben",
+    "example_de": "Ich bleibe zu Hause.",
+    "example_ru": "Я остаюсь дома."
+  },
+  {
+    "id": 1178,
+    "de": "brauchen",
+    "ru": "нуждаться",
+    "article": null,
+    "verb_forms": "braucht, brauchte, hat gebraucht",
+    "example_de": "Ich brauche Hilfe.",
+    "example_ru": "Мне нужна помощь."
+  },
+  {
+    "id": 1179,
+    "de": "bringen",
+    "ru": "принести",
+    "article": null,
+    "verb_forms": "bringt, brachte, hat gebracht",
+    "example_de": "Bringen Sie mir ein Glas Wasser.",
+    "example_ru": "Принесите мне стакан воды."
+  },
+  {
+    "id": 1180,
+    "de": "danken",
+    "ru": "благодарить",
+    "article": null,
+    "verb_forms": "dankt, dankte, hat gedankt",
+    "example_de": "Ich danke Ihnen.",
+    "example_ru": "Я благодарю вас."
+  },
+  {
+    "id": 1181,
+    "de": "denken",
+    "ru": "думать",
+    "article": null,
+    "verb_forms": "denkt, dachte, hat gedacht",
+    "example_de": "Was denkst du?",
+    "example_ru": "Что ты думаешь?"
+  },
+  {
+    "id": 1182,
+    "de": "fragen",
+    "ru": "спрашивать",
+    "article": null,
+    "verb_forms": "fragt, fragte, hat gefragt",
+    "example_de": "Darf ich etwas fragen?",
+    "example_ru": "Можно кое-что спросить?"
+  },
+  {
+    "id": 1183,
+    "de": "geben",
+    "ru": "давать",
+    "article": null,
+    "verb_forms": "gibt, gab, hat gegeben",
+    "example_de": "Gib mir bitte das Brot.",
+    "example_ru": "Дай мне, пожалуйста, хлеб."
+  },
+  {
+    "id": 1185,
+    "de": "nehmen",
+    "ru": "брать",
+    "article": null,
+    "verb_forms": "nimmt, nahm, hat genommen",
+    "example_de": "Ich nehme einen Tee.",
+    "example_ru": "Я возьму чай."
+  },
+  {
+    "id": 1187,
+    "de": "warten",
+    "ru": "ждать",
+    "article": null,
+    "verb_forms": "wartet, wartete, hat gewartet",
+    "example_de": "Warten Sie eine Minute.",
+    "example_ru": "Подождите минуту."
+  },
+  {
+    "id": 1188,
+    "de": "wohnen",
+    "ru": "проживать",
+    "article": null,
+    "verb_forms": "wohnt, wohnte, hat gewohnt",
+    "example_de": "Ich wohne in Berlin.",
+    "example_ru": "Я живу в Берлине."
+  }
+]
