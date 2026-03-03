@@ -4,6 +4,7 @@ import "./globals.css";
 // Импортируем наши глобальные компоненты
 import Header from "./components/Header";
 import Footer from "./components/Footer";
+import { ThemeProvider } from "./context/ThemeContext";
 
 const inter = Inter({ subsets: ["latin", "cyrillic"] });
 
@@ -18,18 +19,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ru">
-      <body className={`${inter.className} min-h-screen flex flex-col bg-slate-50`}>
-        {/* Глобальная шапка - будет на всех страницах */}
-        <Header />
+    <html lang="ru" suppressHydrationWarning>
+      <body className={`${inter.className} min-h-screen flex flex-col bg-slate-50 dark:bg-gray-900 transition-colors duration-300`}>
+        <ThemeProvider>
+          {/* Глобальная шапка - будет на всех страницах */}
+          <Header />
 
-        {/* Основной контент страницы, растягивается чтобы прижать футер вниз */}
-        <main className="flex-1 flex flex-col">
-          {children}
-        </main>
+          {/* Основной контент страницы, растягивается чтобы прижать футер вниз */}
+          <main className="flex-1 flex flex-col">
+            {children}
+          </main>
 
-        {/* Глобальный подвал - будет на всех страницах */}
-        <Footer />
+          {/* Глобальный подвал - будет на всех страницах */}
+          <Footer />
+        </ThemeProvider>
       </body>
     </html>
   );

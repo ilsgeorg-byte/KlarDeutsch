@@ -1,14 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpen, Menu, X, LogOut, User } from "lucide-react";
+import { BookOpen, Menu, X, LogOut, User, Moon, Sun } from "lucide-react";
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useTheme } from "../context/ThemeContext";
 
 
 export default function Header() {
     const pathname = usePathname();
-    const router = useRouter(); // <-- Добавляем роутер
+    const router = useRouter();
+    const { theme, toggleTheme } = useTheme();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isMounted, setIsMounted] = useState(false);
    
@@ -87,8 +89,21 @@ export default function Header() {
                     ))}
                 </nav>
 
-                {/* Десктопный профиль */}
+                {/* Десктопный профиль + тема */}
                 <div className="hidden md:flex items-center gap-4">
+                    {/* Переключатель темы */}
+                    <button
+                        onClick={toggleTheme}
+                        className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-800 transition-colors"
+                        title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
+                    >
+                        {theme === 'dark' ? (
+                            <Sun className="w-5 h-5 text-yellow-500" />
+                        ) : (
+                            <Moon className="w-5 h-5 text-slate-600" />
+                        )}
+                    </button>
+                    
                     <Link
                         href="/profile"
                         className="flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-blue-600 transition-colors"
@@ -97,8 +112,8 @@ export default function Header() {
                         Профиль
                     </Link>
 
-                     <button 
-                        onClick={handleLogout} 
+                     <button
+                        onClick={handleLogout}
                         className="flex items-center gap-2 text-sm font-semibold text-red-500 hover:text-red-600 transition-colors bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg"
                     >
                         <LogOut size={16} />
@@ -138,8 +153,26 @@ export default function Header() {
                         ))}
                     </nav>
 
-                    <div className="mt-auto px-6 py-8 flex flex-col gap-4 bg-slate-50 border-t border-slate-200">
-                        <Link 
+                    <div className="mt-auto px-6 py-8 flex flex-col gap-4 bg-slate-50 dark:bg-gray-800 border-t border-slate-200 dark:border-gray-700">
+                        {/* Переключатель темы (мобильный) */}
+                        <button
+                            onClick={toggleTheme}
+                            className="flex items-center justify-center gap-2 w-full py-3 bg-white dark:bg-gray-700 border border-slate-200 dark:border-gray-600 text-slate-700 dark:text-gray-200 rounded-xl font-semibold shadow-sm transition-colors"
+                        >
+                            {theme === 'dark' ? (
+                                <>
+                                    <Sun className="w-5 h-5 text-yellow-500" />
+                                    Светлая тема
+                                </>
+                            ) : (
+                                <>
+                                    <Moon className="w-5 h-5 text-slate-600" />
+                                    Тёмная тема
+                                </>
+                            )}
+                        </button>
+                        
+                        <Link
                             href="/profile"
                             onClick={() => setIsMenuOpen(false)}
                             className="flex items-center justify-center gap-2 w-full py-3 bg-white border border-slate-200 text-slate-700 hover:text-blue-600 hover:border-blue-200 rounded-xl font-semibold shadow-sm transition-colors"
@@ -148,7 +181,7 @@ export default function Header() {
                             Профиль
                         </Link>
 
-                        <button 
+                        <button
                             onClick={handleLogout}
                             className="flex items-center justify-center gap-2 w-full py-3 bg-red-50 hover:bg-red-100 transition-colors text-red-600 rounded-xl font-semibold"
                     >
