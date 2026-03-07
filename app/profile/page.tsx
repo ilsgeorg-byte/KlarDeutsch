@@ -229,48 +229,48 @@ export default function ProfilePage() {
           <div className="flex flex-col gap-12">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {/* Карточки основных показателей */}
-              <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex flex-col items-center text-center">
-                <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-4">
+              <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col items-center text-center">
+                <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center mb-4">
                   <Layers size={32} />
                 </div>
-                <span className="text-sm font-medium text-gray-400 mb-1 uppercase tracking-wider">
+                <span className="text-sm font-medium text-gray-400 dark:text-gray-500 mb-1 uppercase tracking-wider">
                   Всего в базе
                 </span>
-                <span className="text-4xl font-black text-gray-900">{totalWordsInDb}</span>
-                <span className="text-xs text-gray-400 mt-2">слов всех уровней</span>
+                <span className="text-4xl font-black text-gray-900 dark:text-white">{totalWordsInDb}</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 mt-2">слов всех уровней</span>
               </div>
 
-              <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex flex-col items-center text-center">
-                <div className="w-16 h-16 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center mb-4">
+              <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col items-center text-center">
+                <div className="w-16 h-16 bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-2xl flex items-center justify-center mb-4">
                   <CheckCircle size={32} />
                 </div>
-                <span className="text-sm font-medium text-gray-400 mb-1 uppercase tracking-wider">
+                <span className="text-sm font-medium text-gray-400 dark:text-gray-500 mb-1 uppercase tracking-wider">
                   Выучено
                 </span>
-                <span className="text-4xl font-black text-gray-900">{knownWords}</span>
-                <span className="text-xs text-gray-400 mt-2">помечено как "знаю"</span>
+                <span className="text-4xl font-black text-gray-900 dark:text-white">{knownWords}</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 mt-2">помечено как "знаю"</span>
               </div>
 
-              <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex flex-col items-center text-center">
-                <div className="w-16 h-16 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center mb-4">
+              <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col items-center text-center">
+                <div className="w-16 h-16 bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-2xl flex items-center justify-center mb-4">
                   <TrendingUp size={32} />
                 </div>
-                <span className="text-sm font-medium text-gray-400 mb-1 uppercase tracking-wider">
+                <span className="text-sm font-medium text-gray-400 dark:text-gray-500 mb-1 uppercase tracking-wider">
                   В процессе
                 </span>
-                <span className="text-4xl font-black text-gray-900">{learningWords}</span>
-                <span className="text-xs text-gray-400 mt-2">активно тренируются</span>
+                <span className="text-4xl font-black text-gray-900 dark:text-white">{learningWords}</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 mt-2">активно тренируются</span>
               </div>
             </div>
 
             {/* Секция избранных слов */}
-            <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+            <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-3">
                 <Star className="text-yellow-500" fill="#f59e0b" /> Избранные слова ({favorites.length})
               </h2>
 
               {favorites.length === 0 ? (
-                <p className="text-gray-500 py-4">
+                <p className="text-gray-500 dark:text-gray-400 py-4">
                   У вас пока нет избранных слов. Добавляйте их в словаре!
                 </p>
               ) : (
@@ -301,8 +301,8 @@ export default function ProfilePage() {
 
             {/* Прогресс по уровням */}
             <div className="mt-4">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-                <BookOpen className="text-blue-600" /> Прогресс по уровням
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-3">
+                <BookOpen className="text-blue-600 dark:text-blue-400" /> Прогресс по уровням
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {["A1", "A2", "B1", "B2", "C1"].map((lvl) => {
@@ -316,34 +316,34 @@ export default function ProfilePage() {
                     <div
                       key={lvl}
                       onClick={() => loadLevelWords(lvl)}
-                      className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-lg hover:border-blue-300 transition-all"
+                      className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 cursor-pointer hover:shadow-lg hover:border-blue-300 transition-all"
                     >
                       <div className="flex justify-between items-center mb-4">
-                        <span className="px-3 py-1 bg-gray-900 text-white text-xs font-bold rounded-lg">
+                        <span className="px-3 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs font-bold rounded-lg">
                           {lvl}
                         </span>
-                        <span className="text-sm font-bold text-blue-600">{percent}%</span>
+                        <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{percent}%</span>
                       </div>
 
-                      <div className="w-full bg-gray-100 h-2 rounded-full mb-6 overflow-hidden">
+                      <div className="w-full bg-gray-100 dark:bg-gray-700 h-2 rounded-full mb-6 overflow-hidden">
                         <div
-                          className="bg-blue-600 h-full rounded-full transition-all duration-1000"
+                          className="bg-blue-600 dark:bg-blue-500 h-full rounded-full transition-all duration-1000"
                           style={{ width: `${percent}%` }}
                         ></div>
                       </div>
 
                       <div className="flex flex-col gap-2">
                         <div className="flex justify-between text-sm">
-                          <span className="text-gray-500">Выучено</span>
-                          <span className="font-semibold text-gray-900">
+                          <span className="text-gray-500 dark:text-gray-400">Выучено</span>
+                          <span className="font-semibold text-gray-900 dark:text-white">
                             {known} / {total}
                           </span>
                         </div>
                         <div className="flex justify-between text-sm">
-                          <span className="text-gray-500">Тренируется</span>
-                          <span className="font-semibold text-orange-600">{learning}</span>
+                          <span className="text-gray-500 dark:text-gray-400">Тренируется</span>
+                          <span className="font-semibold text-orange-600 dark:text-orange-400">{learning}</span>
                         </div>
-                        <div className="text-xs text-blue-600 mt-2 text-center">
+                        <div className="text-xs text-blue-600 dark:text-blue-400 mt-2 text-center">
                           👆 Нажми чтобы увидеть слова
                         </div>
                       </div>

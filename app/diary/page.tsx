@@ -178,16 +178,16 @@ export default function DiaryPage() {
   const groupedHistory = groupHistoryByDate(history);
 
   return (
-    <div className={styles.pageWrapper}>
+    <div className={`${styles.pageWrapper} bg-slate-50 dark:bg-gray-900 min-h-screen`}>
 
       <main className={styles.container}>
-        <h1 className={styles.title}>Мой дневник</h1>
-        <p className={styles.subtitle}>Пишите на немецком, и ИИ поможет исправить ошибки</p>
+        <h1 className={`${styles.title} text-slate-800 dark:text-white`}>Мой дневник</h1>
+        <p className={`${styles.subtitle} text-slate-600 dark:text-gray-400`}>Пишите на немецком, и ИИ поможет исправить ошибки</p>
 
         <section className={styles.mainContent}>
-          <div className={styles.card}>
+          <div className={`${styles.card} dark:bg-gray-800 dark:border-gray-700`}>
             <textarea
-              className={styles.textArea}
+              className={`${styles.textArea} dark:bg-gray-700 dark:border-gray-600 dark:text-white`}
               placeholder="Напишите что-нибудь на немецком... (например: Ich habe ein Hund)"
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -195,7 +195,7 @@ export default function DiaryPage() {
             />
 
             <button
-              className={styles.checkBtn}
+              className={`${styles.checkBtn} dark:bg-blue-600 dark:hover:bg-blue-700`}
               onClick={handleCheck}
               disabled={isLoading || !text.trim()}
             >
@@ -213,25 +213,25 @@ export default function DiaryPage() {
             </button>
 
             {error && (
-              <div style={{ marginTop: '20px', color: '#ef4444', display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <div className="text-red-500 dark:text-red-400" style={{ marginTop: '20px', display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <AlertCircle size={20} />
                 <span>{error}</span>
               </div>
             )}
 
             {result && (
-              <div className={styles.resultSection}>
-                <h3 className={styles.resultTitle}>
-                  <CheckCircle2 color="#22c55e" size={24} />
+              <div className={`${styles.resultSection} dark:bg-gray-700 dark:border-gray-600`}>
+                <h3 className={`${styles.resultTitle} text-slate-800 dark:text-white`}>
+                  <CheckCircle2 className="text-green-500" size={24} />
                   Результат проверки:
                 </h3>
 
-                <div className={styles.correctedText}>
+                <div className={`${styles.correctedText} text-slate-800 dark:text-white`}>
                   {result.corrected}
                 </div>
 
-                <div className={styles.explanation}>
-                  <h4>Что мы исправили:</h4>
+                <div className={`${styles.explanation} text-slate-600 dark:text-gray-300`}>
+                  <h4 className="text-slate-800 dark:text-white">Что мы исправили:</h4>
                   <p>{result.explanation}</p>
                 </div>
 
@@ -274,19 +274,19 @@ export default function DiaryPage() {
         </section>
 
         <aside className={styles.historySection}>
-          <h3 className={styles.resultTitle}>История записей</h3>
+          <h3 className={`${styles.resultTitle} text-slate-800 dark:text-white`}>История записей</h3>
           {history.length === 0 ? (
-            <p style={{ color: '#94a3b8', textAlign: 'center', marginTop: '40px' }}>У вас пока нет записей</p>
+            <p className="text-slate-500 dark:text-gray-400" style={{ textAlign: 'center', marginTop: '40px' }}>У вас пока нет записей</p>
           ) : (
-            <div className={styles.historyList}>
+            <div className={`${styles.historyList} dark:bg-gray-800 dark:border-gray-700`}>
               {Object.entries(groupedHistory).map(([dateLabel, items]) => (
                 <div key={dateLabel} className={styles.dateGroup}>
-                  <div className={styles.dateHeader}>
+                  <div className={`${styles.dateHeader} text-slate-700 dark:text-gray-300`}>
                     <Calendar size={14} />
                     {dateLabel}
                   </div>
                   {items.map((item) => (
-                    <div key={item.id} className={styles.historyItem}>
+                    <div key={item.id} className={`${styles.historyItem} dark:bg-gray-700 dark:border-gray-600`}>
                       <button
                         className={styles.deleteBtn}
                         onClick={() => handleDelete(item.id)}
@@ -295,17 +295,17 @@ export default function DiaryPage() {
                         <Trash2 size={16} />
                       </button>
                       <div className={styles.historyHeader}>
-                        <span className={styles.historyDate}>{item.created_at.split(' ')[1]}</span>
+                        <span className={`${styles.historyDate} text-slate-600 dark:text-gray-400`}>{item.created_at.split(' ')[1]}</span>
                       </div>
                       <div className={styles.historyContent}>
-                        <div className={styles.historyOriginal}>
-                          <strong>Текст:</strong> {item.original_text}
+                        <div className={`${styles.historyOriginal} text-slate-800 dark:text-white`}>
+                          <strong className="text-slate-700 dark:text-gray-300">Текст:</strong> {item.original_text}
                         </div>
-                        <div className={styles.historyCorrected}>
+                        <div className={`${styles.historyCorrected} text-slate-700 dark:text-gray-200`}>
                           {item.corrected_text}
                         </div>
                         {item.explanation && (
-                          <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '8px', paddingLeft: '12px', borderLeft: '2px solid #e2e8f0' }}>
+                          <div className="text-slate-500 dark:text-gray-400" style={{ fontSize: '0.85rem', marginTop: '8px', paddingLeft: '12px', borderLeft: '2px solid #e2e8f0' }}>
                             {item.explanation}
                           </div>
                         )}
