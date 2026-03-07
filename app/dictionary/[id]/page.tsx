@@ -121,12 +121,12 @@ export default function WordDetailPage() {
       return (
         <>
           <span className="text-green-500 font-extrabold">das</span>{" "}
-          <span className="text-slate-800 font-extrabold">{text.slice(4)}</span>
+          <span className="text-slate-800 dark:text-white font-extrabold">{text.slice(4)}</span>
         </>
       );
     }
 
-    return <span className="text-slate-800 font-extrabold">{text}</span>;
+    return <span className="text-slate-800 dark:text-white font-extrabold">{text}</span>;
   };
 
   if (loading) {

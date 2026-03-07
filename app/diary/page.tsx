@@ -305,7 +305,7 @@ export default function DiaryPage() {
                           {item.corrected_text}
                         </div>
                         {item.explanation && (
-                          <div className={`${styles.explanation} dark`} style={{ fontSize: '0.85rem', marginTop: '8px', paddingLeft: '12px', borderLeft: '2px solid #e2e8f0' }}>
+                          <div className="text-slate-500 dark:text-gray-400" style={{ fontSize: '0.85rem', marginTop: '8px', paddingLeft: '12px', borderLeft: '2px solid #e2e8f0' }}>
                             {item.explanation}
                           </div>
                         )}

@@ -88,7 +88,6 @@ export default function WordCard({ word, onPlayAudio, onToggleFavorite }: WordCa
             overflow: 'hidden',
             border: '1px solid #e2e8f0',
             borderRadius: '16px',
-            background: '#ffffff',
             transition: 'box-shadow 0.2s',
         }}
             onMouseOver={(e) => e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.05)'}

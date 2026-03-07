@@ -174,12 +174,12 @@ export default function ProfilePage() {
       return (
         <>
           <span className="text-green-500 font-extrabold">das</span>{" "}
-          <span className="text-gray-900 font-extrabold">{text.slice(4)}</span>
+          <span className="text-gray-900 dark:text-white font-extrabold">{text.slice(4)}</span>
         </>
       );
     }
 
-    return <span className="text-gray-900 font-extrabold">{text}</span>;
+    return <span className="text-gray-900 dark:text-white font-extrabold">{text}</span>;
   };
 
   return (
