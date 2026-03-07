@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import styles from "./Diary.module.css";
-import { Sparkles, CheckCircle2, AlertCircle, Loader2, Trash2, Calendar } from "lucide-react";
+import { Sparkles, CheckCircle2, AlertCircle, Loader2, Trash2, Calendar, Clock } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function DiaryPage() {
@@ -285,33 +285,43 @@ export default function DiaryPage() {
                     <Calendar size={14} />
                     {dateLabel}
                   </div>
-                  {items.map((item) => (
-                    <div key={item.id} className={`${styles.historyItem} dark:bg-gray-700 dark:border-gray-600`}>
-                      <button
-                        className={styles.deleteBtn}
-                        onClick={() => handleDelete(item.id)}
-                        title="Удалить запись"
+                  {items.map((item) => {
+                    // Обрезаем текст до 2 строк
+                    const previewText = item.original_text.length > 100 
+                      ? item.original_text.substring(0, 100) + '...' 
+                      : item.original_text;
+                    
+                    return (
+                      <div 
+                        key={item.id} 
+                        className={`${styles.historyItem} dark:bg-gray-700 dark:border-gray-600 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors`}
+                        onClick={() => window.location.href = `/diary/${item.id}`}
                       >
-                        <Trash2 size={16} />
-                      </button>
-                      <div className={styles.historyHeader}>
-                        <span className={`${styles.historyDate} text-slate-600 dark:text-gray-400`}>{item.created_at.split(' ')[1]}</span>
-                      </div>
-                      <div className={styles.historyContent}>
-                        <div className={`${styles.historyOriginal} text-slate-800 dark:text-white`}>
-                          <strong className="text-slate-700 dark:text-gray-300">Текст:</strong> {item.original_text}
+                        <button
+                          className={styles.deleteBtn}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(item.id);
+                          }}
+                          title="Удалить запись"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                        <div className={styles.historyHeader}>
+                          <Clock size={14} className="text-slate-400" />
+                          <span className={`${styles.historyDate} text-slate-600 dark:text-gray-400`}>{item.created_at.split(' ')[1]}</span>
                         </div>
-                        <div className={`${styles.historyCorrected} text-black dark:!text-black font-bold`}>
-                          {item.corrected_text}
+                        <div className={styles.historyContent}>
+                          <p className="text-slate-700 dark:text-gray-200 text-sm leading-relaxed">
+                            {previewText}
+                          </p>
+                          <p className="text-blue-600 dark:text-blue-400 text-xs mt-2 font-medium">
+                            → Подробнее
+                          </p>
                         </div>
-                        {item.explanation && (
-                          <div className="text-slate-500 dark:text-gray-400" style={{ fontSize: '0.85rem', marginTop: '8px', paddingLeft: '12px', borderLeft: '2px solid #e2e8f0' }}>
-                            {item.explanation}
-                          </div>
-                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ))}
             </div>

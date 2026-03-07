@@ -177,7 +177,7 @@ def get_history():
             WHERE user_id = %s
             ORDER BY created_at DESC
         """, (request.user_id,))
-        
+
         columns = [desc[0] for desc in cur.description]
         results = []
         for row in cur.fetchall():
@@ -186,18 +186,55 @@ def get_history():
             if item['created_at']:
                 item['created_at'] = item['created_at'].strftime("%Y-%m-%d %H:%M")
             results.append(item)
-            
+
         cur.close()
         conn.close()
+        
         return jsonify(results), 200
     except Exception as e:
         print(f"History Error: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+
+@diary_bp.route('/history/<int:entry_id>', methods=['GET'])
+@token_required
+def get_entry(entry_id):
+    """Получить одну запись по ID"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, user_id, original_text, corrected_text, explanation, created_at
+            FROM diary_entries
+            WHERE id = %s AND user_id = %s
+        """, (entry_id, request.user_id))
+
+        row = cur.fetchone()
+        
+        if not row:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Запись не найдена"}), 404
+
+        columns = ['id', 'user_id', 'original_text', 'corrected_text', 'explanation', 'created_at']
+        result = dict(zip(columns, row))
+        
+        # Форматируем дату
+        if result['created_at']:
+            result['created_at'] = result['created_at'].strftime("%Y-%m-%d %H:%M")
+
+        cur.close()
+        conn.close()
+        
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @diary_bp.route('/history/<int:entry_id>', methods=['DELETE'])
 @token_required
 def delete_entry(entry_id):
-    """Удалить запись из истории"""
+    """Удалить запись"""
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -207,7 +244,6 @@ def delete_entry(entry_id):
         conn.close()
         return jsonify({"status": "success"}), 200
     except Exception as e:
-        print(f"Delete Error: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @diary_bp.route('/extract-words', methods=['POST'])
