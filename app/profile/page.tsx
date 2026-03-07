@@ -379,29 +379,29 @@ export default function ProfilePage() {
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
             onClick={() => setSelectedLevel(null)}
           >
-            <div 
-              className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden"
+            <div
+              className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Заголовок */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
                 <div className="flex items-center gap-3">
-                  <BookOpen className="text-blue-600" size={28} />
+                  <BookOpen className="text-blue-600 dark:text-blue-400" size={28} />
                   <div>
-                    <h3 className="text-2xl font-bold text-gray-900">
+                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
                       Слова уровня {selectedLevel}
                     </h3>
-                    <p className="text-sm text-gray-500">
-                      В изучении: {stats?.detailed.find(d => d.level === selectedLevel && d.status === 'learning')?.count || 0} • 
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      В изучении: {stats?.detailed.find(d => d.level === selectedLevel && d.status === 'learning')?.count || 0} •
                       Показано: {levelWords.length}
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => setSelectedLevel(null)}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
                 >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-6 h-6 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
@@ -414,7 +414,7 @@ export default function ProfilePage() {
                     <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
                   </div>
                 ) : levelWords.length === 0 ? (
-                  <p className="text-center text-gray-500 py-8">
+                  <p className="text-center text-gray-500 dark:text-gray-400 py-8">
                     Нет слов этого уровня
                   </p>
                 ) : (
@@ -426,25 +426,25 @@ export default function ProfilePage() {
                           setSelectedLevel(null);
                           router.push(`/dictionary/${word.id}`);
                         }}
-                        className="p-4 border border-gray-200 rounded-2xl hover:border-blue-300 hover:bg-blue-50 transition-all text-left"
+                        className="p-4 border border-gray-200 dark:border-gray-700 rounded-2xl hover:border-blue-300 dark:hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-gray-700 transition-all text-left"
                       >
                         <div className="flex items-center gap-2 mb-2">
-                          <span className="font-bold text-gray-900">
+                          <span className="font-bold text-gray-900 dark:text-white">
                             {renderWordWithArticle(word)}
                           </span>
                         </div>
-                        <span className="text-sm text-gray-600">{word.ru}</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-300">{word.ru}</span>
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
-                          <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold uppercase">
+                          <span className="text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2 py-0.5 rounded-full font-bold uppercase">
                             {word.level}
                           </span>
                           {word.topic && (
-                            <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                            <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded-full">
                               {word.topic}
                             </span>
                           )}
                           {word.next_review && (
-                            <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                            <span className="text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full">
                               Повтор: {new Date(word.next_review).toLocaleDateString('ru-RU')}
                             </span>
                           )}
@@ -456,7 +456,7 @@ export default function ProfilePage() {
               </div>
 
               {/* Подвал */}
-              <div className="p-4 border-t border-gray-200 bg-gray-50 text-center text-sm text-gray-600">
+              <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 text-center text-sm text-gray-600 dark:text-gray-300">
                 Показано {levelWords.length} слов • Нажмите на слово для просмотра
               </div>
             </div>

@@ -118,10 +118,16 @@
   border: 1px solid #bbf7d0;
   padding: 20px;
   border-radius: 16px;
-  color: #166534;
+  color: #14532d;
   font-size: 1.1rem;
   line-height: 1.6;
   margin-bottom: 20px;
+}
+
+.correctedText.dark {
+  background: #14532d;
+  border-color: #166534;
+  color: #bbf7d0;
 }
 
 .explanation {

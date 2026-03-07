@@ -93,10 +93,20 @@
   border: 1px solid #f0f0f0;
 }
 
+.card.dark {
+  background: #1f2937;
+  border-color: #374151;
+}
+
 .card:hover {
   transform: translateY(-4px);
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
   border-color: #e0e0e0;
+}
+
+.card.dark:hover {
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  border-color: #4b5563;
 }
 
 .label {
