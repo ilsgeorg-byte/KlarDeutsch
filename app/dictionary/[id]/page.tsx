@@ -95,7 +95,7 @@ export default function WordDetailPage() {
         return (
           <>
             <span className={`${colorClass} font-extrabold`}>{wordObj.article}</span>{" "}
-            <span className="text-slate-800 font-extrabold">{text}</span>
+            <span className="text-slate-800 dark:text-white font-extrabold">{text}</span>
           </>
         );
       }
@@ -105,7 +105,7 @@ export default function WordDetailPage() {
       return (
         <>
           <span className="text-blue-500 font-extrabold">der</span>{" "}
-          <span className="text-slate-800 font-extrabold">{text.slice(4)}</span>
+          <span className="text-slate-800 dark:text-white font-extrabold">{text.slice(4)}</span>
         </>
       );
     }
@@ -113,7 +113,7 @@ export default function WordDetailPage() {
       return (
         <>
           <span className="text-red-500 font-extrabold">die</span>{" "}
-          <span className="text-slate-800 font-extrabold">{text.slice(4)}</span>
+          <span className="text-slate-800 dark:text-white font-extrabold">{text.slice(4)}</span>
         </>
       );
     }

@@ -301,11 +301,11 @@ export default function DiaryPage() {
                         <div className={`${styles.historyOriginal} text-slate-800 dark:text-white`}>
                           <strong className="text-slate-700 dark:text-gray-300">Текст:</strong> {item.original_text}
                         </div>
-                        <div className={`${styles.historyCorrected} text-slate-700 dark:text-gray-200`}>
+                        <div className={`${styles.historyCorrected} text-slate-900 dark:text-white`}>
                           {item.corrected_text}
                         </div>
                         {item.explanation && (
-                          <div className="text-slate-500 dark:text-gray-400" style={{ fontSize: '0.85rem', marginTop: '8px', paddingLeft: '12px', borderLeft: '2px solid #e2e8f0' }}>
+                          <div className={`${styles.explanation} dark`} style={{ fontSize: '0.85rem', marginTop: '8px', paddingLeft: '12px', borderLeft: '2px solid #e2e8f0' }}>
                             {item.explanation}
                           </div>
                         )}

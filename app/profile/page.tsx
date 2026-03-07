@@ -148,7 +148,7 @@ export default function ProfilePage() {
         return (
           <>
             <span className={`${colorClass} font-extrabold`}>{wordObj.article}</span>{" "}
-            <span className="text-gray-900 font-extrabold">{text}</span>
+            <span className="text-gray-900 dark:text-white font-extrabold">{text}</span>
           </>
         );
       }
@@ -158,7 +158,7 @@ export default function ProfilePage() {
       return (
         <>
           <span className="text-blue-500 font-extrabold">der</span>{" "}
-          <span className="text-gray-900 font-extrabold">{text.slice(4)}</span>
+          <span className="text-gray-900 dark:text-white font-extrabold">{text.slice(4)}</span>
         </>
       );
     }
@@ -166,7 +166,7 @@ export default function ProfilePage() {
       return (
         <>
           <span className="text-red-500 font-extrabold">die</span>{" "}
-          <span className="text-gray-900 font-extrabold">{text.slice(4)}</span>
+          <span className="text-gray-900 dark:text-white font-extrabold">{text.slice(4)}</span>
         </>
       );
     }
@@ -279,17 +279,16 @@ export default function ProfilePage() {
                     <button
                       key={word.id}
                       onClick={() => router.push(`/dictionary/${word.id}`)}
-                      className="p-4 border border-gray-100 rounded-2xl hover:border-blue-200 hover:bg-blue-50/30 transition-all text-left flex flex-col gap-1"
+                      className="p-4 border border-gray-100 dark:border-gray-700 rounded-2xl hover:border-blue-200 dark:hover:border-blue-600 hover:bg-blue-50/30 dark:hover:bg-gray-700 transition-all text-left flex flex-col gap-1"
                     >
                       <div className="flex items-center gap-2">
-                        {/* убрали отдельный word.article, оставляем только хелпер */}
-                        <span className="font-bold text-gray-900">
+                        <span className="font-bold text-gray-900 dark:text-white">
                           {renderWordWithArticle(word)}
                         </span>
                       </div>
-                      <span className="text-sm text-gray-500">{word.ru}</span>
+                      <span className="text-sm text-gray-500 dark:text-gray-300">{word.ru}</span>
                       <div className="mt-2 flex items-center gap-2">
-                        <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded-full font-bold uppercase">
+                        <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded-full font-bold uppercase">
                           {word.level}
                         </span>
                       </div>

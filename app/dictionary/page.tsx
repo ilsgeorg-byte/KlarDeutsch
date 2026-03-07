@@ -166,7 +166,7 @@ export default function DictionaryPage() {
                     <p className="text-slate-500 dark:text-gray-400" style={{ textAlign: 'center', marginTop: '20px' }}>{message}</p>
                 )}
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }} className="dark">
                     {words.map((word) => (
                         <WordCard
                             key={word.id}
