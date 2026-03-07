@@ -14,19 +14,19 @@ export default function HomePage() {
         className={`${styles.container} flex-1 flex flex-col items-center justify-center`}
         style={{ textAlign: 'center', maxWidth: '800px', margin: '0 auto', padding: '60px 20px' }}
       >
-        <h1 style={{ fontSize: '3.5rem', fontWeight: '800', color: '#1e293b', marginBottom: '24px', lineHeight: '1.2' }}>
-          Учи немецкий <span style={{ color: '#2563eb' }}>легко</span>
+        <h1 className="text-slate-800 dark:text-white" style={{ fontSize: '3.5rem', fontWeight: '800', marginBottom: '24px', lineHeight: '1.2' }}>
+          Учи немецкий <span className="text-blue-600 dark:text-blue-400" style={{ color: '#2563eb' }}>легко</span>
         </h1>
 
-        <p style={{ fontSize: '1.25rem', color: '#64748b', lineHeight: '1.6', marginBottom: '48px', maxWidth: '600px' }}>
+        <p className="text-slate-600 dark:text-gray-300" style={{ fontSize: '1.25rem', lineHeight: '1.6', marginBottom: '48px', maxWidth: '600px' }}>
           Твой персональный помощник для уровня A1.
           Тренируй слова, записывай произношение и веди дневник.
         </p>
 
         <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <a href="/trainer" style={{
+          <a href="/trainer" className="dark:bg-blue-500 dark:hover:bg-blue-600" style={{
             textDecoration: 'none',
-            background: '#2563eb', // Обновил цвет под современный синий (blue-600)
+            background: '#2563eb',
             color: 'white',
             padding: '16px 32px',
             borderRadius: '16px',
@@ -46,7 +46,7 @@ export default function HomePage() {
           >
             Начать тренировку →
           </a>
-          <a href="/diary" style={{
+          <a href="/diary" className="dark:bg-gray-800 dark:text-blue-400 dark:border-gray-600" style={{
             textDecoration: 'none',
             background: 'white',
             color: '#2563eb',

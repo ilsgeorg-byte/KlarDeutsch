@@ -102,13 +102,14 @@ export default function DictionaryPage() {
     };
 
     return (
-        <div className={styles.pageWrapper}>
+        <div className={`${styles.pageWrapper} bg-slate-50 dark:bg-gray-900 min-h-screen`}>
 
             <main className={styles.container} style={{ maxWidth: '800px', justifyContent: 'flex-start' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '10px' }}>
-                    <h1 className={styles.pageTitle} style={{ margin: 0 }}>Словарь</h1>
+                    <h1 className={`${styles.pageTitle} text-slate-800 dark:text-white`} style={{ margin: 0 }}>Словарь</h1>
                     <button
                         onClick={() => setIsModalOpen(true)}
+                        className="dark:bg-blue-600"
                         style={{
                             padding: '10px 20px',
                             backgroundColor: '#3b82f6',
@@ -128,7 +129,7 @@ export default function DictionaryPage() {
                         Добавить слово
                     </button>
                 </div>
-                <p style={{ textAlign: 'center', color: '#64748b', marginBottom: '30px' }}>
+                <p className="text-slate-600 dark:text-gray-400" style={{ textAlign: 'center', marginBottom: '30px' }}>
                     Ищи слова, изучай примеры и слушай произношение
                 </p>
 
@@ -147,6 +148,7 @@ export default function DictionaryPage() {
                         placeholder="Поиск слова (напр. 'Hund' или 'собака')..."
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
+                        className="dark:bg-gray-800 dark:border-gray-600 dark:text-white"
                         style={{
                             width: '100%',
                             padding: '16px 16px 16px 48px',
@@ -161,7 +163,7 @@ export default function DictionaryPage() {
                 </div>
 
                 {message && (
-                    <p style={{ textAlign: 'center', color: '#94a3b8', marginTop: '20px' }}>{message}</p>
+                    <p className="text-slate-500 dark:text-gray-400" style={{ textAlign: 'center', marginTop: '20px' }}>{message}</p>
                 )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
@@ -176,11 +178,11 @@ export default function DictionaryPage() {
                 </div>
 
                 {query.length > 0 && query.length < 2 && (
-                    <p style={{ textAlign: 'center', color: '#94a3b8', marginTop: '20px' }}>Введите минимум 2 символа для поиска</p>
+                    <p className="text-slate-500 dark:text-gray-400" style={{ textAlign: 'center', marginTop: '20px' }}>Введите минимум 2 символа для поиска</p>
                 )}
 
                 {query.length === 0 && (
-                    <div style={{ textAlign: 'center', marginTop: '40px', color: '#94a3b8' }}>
+                    <div className="text-slate-500 dark:text-gray-400" style={{ textAlign: 'center', marginTop: '40px' }}>
                         <BookOpen size={48} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
                         <p>Начни вводить слово выше, чтобы увидеть перевод и примеры</p>
                     </div>

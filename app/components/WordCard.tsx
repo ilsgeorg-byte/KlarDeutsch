@@ -77,7 +77,7 @@ export default function WordCard({ word, onPlayAudio, onToggleFavorite }: WordCa
 
 
     return (
-        <div className={styles.card} style={{
+        <div className={`${styles.card} dark:bg-gray-800 dark:border-gray-700`} style={{
             width: '100%',
             marginBottom: '16px',
             position: 'relative',
@@ -98,7 +98,7 @@ export default function WordCard({ word, onPlayAudio, onToggleFavorite }: WordCa
                 <span style={{
                     fontSize: '0.76rem', padding: '3px 10px', borderRadius: '12px',
                     background: '#e0f2fe', color: '#0369a1', fontWeight: 'bold', border: '1px solid #bae6fd'
-                }}>
+                }} className="dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800">
                     {word.level}
                 </span>
             </div>
@@ -126,7 +126,7 @@ export default function WordCard({ word, onPlayAudio, onToggleFavorite }: WordCa
             >
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '8px', width: '100%' }}>
                     <div style={{ flex: 1 }}>
-                        <h3 style={{ margin: 0, fontSize: '1.75rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', fontWeight: '800' }}>
+                        <h3 className="text-slate-800 dark:text-white" style={{ margin: 0, fontSize: '1.75rem', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', fontWeight: '800' }}>
                             {/* Здесь мы вызываем умную функцию, передавая весь объект word */}
                             <span>{renderWordWithArticle(word)}</span>
                         </h3>
@@ -136,25 +136,25 @@ export default function WordCard({ word, onPlayAudio, onToggleFavorite }: WordCa
                 {(word.plural || word.verb_forms) && (
                     <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
                         {word.plural && (
-                            <span style={{ fontSize: '0.85rem', color: '#64748b', background: '#f1f5f9', padding: '2px 8px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                                Pl: <span style={{ fontWeight: '600', color: '#475569' }}>{word.plural}</span>
+                            <span className="dark:bg-gray-700 dark:border-gray-600" style={{ fontSize: '0.85rem', color: '#64748b', background: '#f1f5f9', padding: '2px 8px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                                Pl: <span className="dark:text-gray-300" style={{ fontWeight: '600', color: '#475569' }}>{word.plural}</span>
                             </span>
                         )}
                         {word.verb_forms && (
-                            <span style={{ fontSize: '0.85rem', color: '#64748b', background: '#f1f5f9', padding: '2px 8px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                            <span className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300" style={{ fontSize: '0.85rem', color: '#64748b', background: '#f1f5f9', padding: '2px 8px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
                                 {word.verb_forms}
                             </span>
                         )}
                     </div>
                 )}
 
-                <p style={{ fontSize: '1.25rem', color: '#334155', marginBottom: '20px', fontWeight: '500' }}>
+                <p className="text-slate-600 dark:text-gray-300" style={{ fontSize: '1.25rem', color: '#334155', marginBottom: '20px', fontWeight: '500' }}>
                     {word.ru}
                 </p>
 
                 {/* БЛОК ЛИНГВИСТИКИ */}
                 {(word.synonyms || word.antonyms || word.collocations) && (
-                    <div style={{
+                    <div className="dark:bg-gray-700 dark:border-gray-600" style={{
                         background: '#f8fafc', padding: '12px 16px', borderRadius: '10px',
                         marginBottom: '20px', border: '1px solid #f1f5f9', fontSize: '0.9rem',
                         display: 'flex', flexDirection: 'column', gap: '8px'
@@ -216,16 +216,16 @@ export default function WordCard({ word, onPlayAudio, onToggleFavorite }: WordCa
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
                         {(word.examples && word.examples.length > 0) ? (
                             word.examples.map((ex, idx) => (
-                                <div key={idx} style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '12px', borderLeft: '4px solid #3b82f6', width: '100%' }}>
+                                <div key={idx} className="dark:bg-gray-600" style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '12px', borderLeft: '4px solid #3b82f6', width: '100%' }}>
                                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '4px' }}>
                                         <BookOpen size={16} style={{ marginTop: '2px', color: '#94a3b8', minWidth: '16px' }} />
-                                        <p style={{ margin: 0, fontStyle: 'italic', color: '#1e293b', fontSize: '0.95rem', lineHeight: '1.4', fontWeight: '500' }}>{ex.de}</p>
+                                        <p className="text-slate-700 dark:text-gray-200" style={{ margin: 0, fontStyle: 'italic', color: '#1e293b', fontSize: '0.95rem', lineHeight: '1.4', fontWeight: '500' }}>{ex.de}</p>
                                     </div>
-                                    <p style={{ margin: '4px 0 0 24px', color: '#64748b', fontSize: '0.85rem' }}>{ex.ru}</p>
+                                    <p className="text-slate-500 dark:text-gray-400" style={{ margin: '4px 0 0 24px', color: '#64748b', fontSize: '0.85rem' }}>{ex.ru}</p>
                                 </div>
                             ))
                         ) : (
-                            <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '12px', borderLeft: '4px solid #3b82f6', width: '100%' }}>
+                            <div className="dark:bg-gray-600" style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '12px', borderLeft: '4px solid #3b82f6', width: '100%' }}>
                                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '4px' }}>
                                     <BookOpen size={16} style={{ marginTop: '2px', color: '#94a3b8', minWidth: '16px' }} />
                                     <p style={{ margin: 0, fontStyle: 'italic', color: '#1e293b', fontSize: '0.95rem', lineHeight: '1.4', fontWeight: '500' }}>{word.example_de}</p>
