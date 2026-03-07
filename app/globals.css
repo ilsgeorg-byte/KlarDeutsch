@@ -2,6 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Тёмная тема для карточек слов */
+.word-card-dark {
+  background: #1f2937 !important;
+  border-color: #374151 !important;
+}
+
+.word-card-dark:hover {
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3) !important;
+  border-color: #4b5563 !important;
+}
+
+.word-card-dark * {
+  color: #f3f4f6 !important;
+}
+
+.word-card-dark [class*="text-"] {
+  color: inherit !important;
+}
+
+
 
 
 

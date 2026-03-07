@@ -77,7 +77,7 @@ export default function WordCard({ word, onPlayAudio, onToggleFavorite }: WordCa
 
 
     return (
-        <div className={`${styles.card} dark`} style={{
+        <div className={`${styles.card} word-card-dark`} style={{
             width: '100%',
             marginBottom: '16px',
             position: 'relative',
