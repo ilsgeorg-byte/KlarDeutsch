@@ -84,7 +84,7 @@ export default function WordCard({ word, onPlayAudio, onToggleFavorite }: WordCa
             textAlign: 'left',
             alignItems: 'flex-start',
             minHeight: 'auto',
-            padding: 0,
+            padding: '24px',
             overflow: 'hidden',
             border: '1px solid #e2e8f0',
             borderRadius: '16px',

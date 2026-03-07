@@ -2,10 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Тёмная тема для карточек слов */
+/* Тёмная тема для карточек слов (как на /dictionary/[id]) */
 .word-card-dark {
   background: #1f2937 !important;
   border-color: #374151 !important;
+  color: #f3f4f6 !important;
 }
 
 .word-card-dark:hover {
@@ -13,13 +14,59 @@
   border-color: #4b5563 !important;
 }
 
-.word-card-dark * {
+/* Заголовки и текст */
+.word-card-dark h3,
+.word-card-dark p,
+.word-card-dark span {
   color: #f3f4f6 !important;
 }
 
-.word-card-dark [class*="text-"] {
-  color: inherit !important;
+/* Сохраняем цвета для артиклей */
+.word-card-dark .text-blue-500,
+.word-card-dark [class*="text-blue"] {
+  color: #60a5fa !important;
 }
+
+.word-card-dark .text-red-500,
+.word-card-dark [class*="text-red"] {
+  color: #f87171 !important;
+}
+
+.word-card-dark .text-green-500,
+.word-card-dark [class*="text-green"] {
+  color: #34d399 !important;
+}
+
+/* Бейджи */
+.word-card-dark [class*="bg-blue"] {
+  background: #1e3a5f !important;
+  border-color: #1e3a5f !important;
+}
+
+.word-card-dark [class*="bg-slate"] {
+  background: #334155 !important;
+  border-color: #475569 !important;
+}
+
+.word-card-dark [class*="bg-gray"] {
+  background: #374151 !important;
+}
+
+/* Примеры */
+.word-card-dark [class*="border-blue"] {
+  border-color: #1e40af !important;
+}
+
+.word-card-dark [style*="background: #f8fafc"],
+.word-card-dark [style*="background:#f8fafc"] {
+  background: #1e293b !important;
+}
+
+.word-card-dark [style*="background: #f0f9ff"],
+.word-card-dark [style*="background:#f0f9ff"] {
+  background: #0c4a6e !important;
+}
+
 
 
 
