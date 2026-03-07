@@ -301,7 +301,7 @@ export default function DiaryPage() {
                         <div className={`${styles.historyOriginal} text-slate-800 dark:text-white`}>
                           <strong className="text-slate-700 dark:text-gray-300">Текст:</strong> {item.original_text}
                         </div>
-                        <div className={`${styles.historyCorrected} text-black dark:text-white font-bold`}>
+                        <div className={`${styles.historyCorrected} text-black dark:!text-black font-bold`}>
                           {item.corrected_text}
                         </div>
                         {item.explanation && (
