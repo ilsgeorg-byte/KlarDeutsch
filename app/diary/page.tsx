@@ -181,7 +181,7 @@ export default function DiaryPage() {
     <div className={`${styles.pageWrapper} bg-slate-50 dark:bg-gray-900 min-h-screen`}>
 
       <main className={styles.container}>
-        <h1 className={`${styles.title} text-slate-800 dark:text-white`}>Мой дневник</h1>
+        <h1 className={`${styles.title} text-slate-800 dark:text-white`}>Мои записи</h1>
         <p className={`${styles.subtitle} text-slate-600 dark:text-gray-400`}>Пишите на немецком, и ИИ поможет исправить ошибки</p>
 
         <section className={styles.mainContent}>

@@ -20,7 +20,7 @@ export default function HomePage() {
 
         <p className="text-slate-600 dark:text-gray-300" style={{ fontSize: '1.25rem', lineHeight: '1.6', marginBottom: '48px', maxWidth: '600px' }}>
           Твой персональный помощник для уровня A1.
-          Тренируй слова, записывай произношение и веди дневник.
+          Тренируй слова, записывай произношение и веди записи.
         </p>
 
         <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>

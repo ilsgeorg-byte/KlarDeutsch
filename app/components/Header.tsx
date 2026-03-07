@@ -48,7 +48,7 @@ export default function Header() {
         { href: "/", label: "Главная" },
         { href: "/dictionary", label: "Словарь" },
         { href: "/trainer", label: "Тренажер" },
-        { href: "/diary", label: "Дневник" },
+        { href: "/diary", label: "Записи" },
     ];
 
     const isActive = (path: string) => {
