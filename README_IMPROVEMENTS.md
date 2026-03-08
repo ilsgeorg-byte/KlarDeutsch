@@ -278,6 +278,7 @@ psql -U user database_name < backup.sql
 - Создан модуль `api/utils/sanitization_utils.py` с функциями для очистки строк, валидации email, имен пользователей и т.д.
 - Обновлены все Pydantic схемы в `api/schemas.py` для использования новых валидаторов
 - Добавлена документация по санитизации в `api/SANITIZATION_GUIDELINES.md`
+- Реализовано ограничение частоты запросов (rate limiting) с помощью flask-limiter для защиты от DDoS и brute-force атак
 
 ## 📊 Возможные улучшения на будущее
 
