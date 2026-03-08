@@ -4,6 +4,17 @@ Pydantic схемы для валидации данных API KlarDeutsch
 
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Literal
+import re
+from utils.sanitization_utils import (
+    sanitize_string,
+    sanitize_text_for_sql,
+    sanitize_html_content,
+    validate_level as validate_level_func,
+    validate_word_rating,
+    sanitize_email as sanitize_email_func,
+    sanitize_username as sanitize_username_func,
+    sanitize_password as sanitize_password_func
+)
 
 
 # === Общие типы ===
@@ -20,12 +31,23 @@ class UserRegister(BaseModel):
     email: str = Field(..., min_length=5, max_length=100, description="Email")
     password: str = Field(..., min_length=6, max_length=128, description="Пароль")
     
+    @field_validator('username')
+    @classmethod
+    def validate_and_sanitize_username(cls, v):
+        return sanitize_username_func(v)
+    
     @field_validator('email')
     @classmethod
-    def validate_email(cls, v):
-        if '@' not in v or '.' not in v.split('@')[-1]:
+    def validate_and_sanitize_email(cls, v):
+        sanitized = sanitize_email_func(v)
+        if not sanitized:
             raise ValueError('Неверный формат email')
-        return v
+        return sanitized
+    
+    @field_validator('password')
+    @classmethod
+    def validate_and_sanitize_password(cls, v):
+        return sanitize_password_func(v)
 
 
 class UserLogin(BaseModel):
@@ -47,12 +69,31 @@ class WordCreate(BaseModel):
     example_de: Optional[str] = Field(default="", max_length=500, description="Пример на немецком")
     example_ru: Optional[str] = Field(default="", max_length=500, description="Пример на русском")
     user_id: Optional[int] = None
+    
+    @field_validator('de', 'ru', 'article', 'topic', 'verb_forms', 'example_de', 'example_ru')
+    @classmethod
+    def validate_and_sanitize_strings(cls, v):
+        if v is None:
+            return v
+        return sanitize_text_for_sql(sanitize_string(v, max_length=500))
+    
+    @field_validator('level')
+    @classmethod
+    def validate_level_field(cls, v):
+        if not validate_level_func(v):
+            raise ValueError(f'Неверный уровень: {v}. Допустимые значения: A1, A2, B1, B2, C1')
+        return v
 
 
 class WordSearch(BaseModel):
     """Схема поиска слов"""
     query: str = Field(..., min_length=2, max_length=100, description="Поисковый запрос")
     limit: int = Field(default=50, ge=1, le=100, description="Максимум результатов")
+    
+    @field_validator('query')
+    @classmethod
+    def validate_and_sanitize_query(cls, v):
+        return sanitize_text_for_sql(sanitize_string(v, max_length=100))
 
 
 class WordQuery(BaseModel):
@@ -60,6 +101,13 @@ class WordQuery(BaseModel):
     level: LevelType = Field(default="A1")
     skip: int = Field(default=0, ge=0, le=10000)
     limit: int = Field(default=100, ge=1, le=500)
+    
+    @field_validator('level')
+    @classmethod
+    def validate_level_field(cls, v):
+        if not validate_level_func(v):
+            raise ValueError(f'Неверный уровень: {v}. Допустимые значения: A1, A2, B1, B2, C1')
+        return v
 
 
 # === Trainer схемы ===
@@ -72,7 +120,7 @@ class RateWordRequest(BaseModel):
     @field_validator('rating')
     @classmethod
     def validate_rating(cls, v):
-        if v not in [0, 1, 3, 5]:
+        if not validate_word_rating(v):
             raise ValueError('Рейтинг должен быть 0, 1, 3 или 5')
         return v
 
@@ -81,6 +129,13 @@ class TrainingQuery(BaseModel):
     """Схема query параметров для тренировки"""
     level: LevelType = Field(default="A1")
     limit: int = Field(default=10, ge=1, le=100)
+    
+    @field_validator('level')
+    @classmethod
+    def validate_level_field(cls, v):
+        if not validate_level_func(v):
+            raise ValueError(f'Неверный уровень: {v}. Допустимые значения: A1, A2, B1, B2, C1')
+        return v
 
 
 # === Diary схемы ===
@@ -88,6 +143,11 @@ class TrainingQuery(BaseModel):
 class DiaryCorrectionRequest(BaseModel):
     """Схема запроса коррекции текста"""
     text: str = Field(..., min_length=1, max_length=5000, description="Текст для коррекции")
+    
+    @field_validator('text')
+    @classmethod
+    def validate_and_sanitize_text(cls, v):
+        return sanitize_text_for_sql(sanitize_string(v, max_length=5000))
 
 
 class DiaryWordsAdd(BaseModel):
@@ -132,6 +192,13 @@ class AIEnrichRequest(BaseModel):
     """Схема запроса к AI для обогащения слова"""
     de: str = Field(..., min_length=1, max_length=200, description="Немецкое слово")
     ru: Optional[str] = Field(default="", max_length=200, description="Русский перевод (опционально)")
+    
+    @field_validator('de', 'ru')
+    @classmethod
+    def validate_and_sanitize_ai_request_fields(cls, v):
+        if v is None:
+            return v
+        return sanitize_text_for_sql(sanitize_string(v, max_length=200))
 
 
 # === Response схемы ===
