@@ -7,12 +7,24 @@ import jwt
 import logging
 from typing import Optional, Dict, Any
 
-# Настраиваем логирование
+# Настраиваем логирование и конфигурацию токенов
 logger = logging.getLogger(__name__)
 
 # Секретный ключ (в продакшене должен быть в .env.local)
 # Минимальная длина для HS256: 32 байта (256 бит)
+# Основной секретный ключ для доступа
+# Основной секретный ключ для доступа
+# Основной секретный ключ для доступа
 SECRET_KEY = os.environ.get("JWT_SECRET", "klardeutsch-super-secret-key-change-in-production!")
+
+# Секретный ключ для обновления токенов
+REFRESH_SECRET_KEY = os.environ.get("JWT_REFRESH_SECRET", "klardeutsch-refresh-secret-key-change-in-production!")
+
+# Секретный ключ для обновления токенов
+REFRESH_SECRET_KEY = os.environ.get("JWT_REFRESH_SECRET", "klardeutsch-refresh-secret-key-change-in-production!")
+
+# Секретный ключ для обновления токенов
+REFRESH_SECRET_KEY = os.environ.get("JWT_REFRESH_SECRET", "klardeutsch-refresh-secret-key-change-in-production!")
 
 
 class TokenError(Exception):
@@ -69,6 +81,27 @@ def get_token_from_header() -> Optional[str]:
     
     Returns:
         Токен или None, если заголовок отсутствует
+    """
+    from flask import request
+    
+    token_type = request.headers.get('X-Token-Type', 'access')
+    auth_header = request.headers.get('Authorization')
+    if not auth_header:
+        return None
+    
+    if not auth_header.startswith('Bearer '):
+        logger.warning(f"Неверный формат Authorization: {auth_header[:10]}...")
+        return None
+    
+    return auth_header.split(" ")[1]
+
+
+def get_refresh_token_from_header() -> Optional[str]:
+    """
+    Извлекает токен обновления из заголовка Authorization
+    
+    Returns:
+        Токен обновления или None, если заголовок отсутствует
     """
     from flask import request
     
@@ -129,4 +162,7 @@ def get_current_user_id_required() -> int:
         raise TokenMissingError("Токен отсутствует")
     
     data = decode_token(token)
-    return data['user_id']
+    user_id = data.get('user_id')
+    if user_id is None:
+        raise TokenInvalidError("Некорректный токен: отсутствует user_id")
+    return user_id
