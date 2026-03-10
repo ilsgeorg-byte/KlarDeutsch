@@ -1,295 +1,273 @@
 #!/usr/bin/env python3
 """
-Скрипт оптимизации базы данных KlarDeutsch
-Применяет индексы для ускорения SQL-запросов
+Script to apply strategic indexes for optimal database performance
 """
-
 import os
 import sys
-import io
-from dotenv import load_dotenv
+import logging
+from contextlib import contextmanager
 
-# Фикс для Windows: устанавливаем UTF-8 для stdout
-if sys.platform == 'win32':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+# Add parent directory to path
+api_dir = os.path.dirname(os.path.abspath(__file__))
+if api_dir not in sys.path:
+    sys.path.insert(0, api_dir)
 
-# Загружаем переменные окружения
-load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env.local'))
+from db import get_db_connection
 
-import psycopg2
-from psycopg2.extras import RealDictCursor
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-def get_connection():
-    url = os.environ.get("POSTGRES_URL")
-    if not url:
-        raise Exception("POSTGRES_URL не найдена в .env.local")
-    return psycopg2.connect(url)
-
-def check_extension_exists(cur, extension_name):
-    """Проверяет, установлено ли расширение"""
-    cur.execute("SELECT 1 FROM pg_extension WHERE extname = %s", (extension_name,))
-    return cur.fetchone() is not None
-
-def check_index_exists(cur, index_name):
-    """Проверяет, существует ли индекс"""
-    cur.execute("""
-        SELECT 1 FROM pg_indexes 
-        WHERE indexname = %s AND schemaname = 'public'
-    """, (index_name,))
-    return cur.fetchone() is not None
-
-def create_index_safe(cur, conn, index_name, create_sql):
-    """Создаёт индекс, если он не существует"""
-    if check_index_exists(cur, index_name):
-        print(f"  ⚡ {index_name} — уже существует")
-        return False
-    
-    try:
-        print(f"  📝 {index_name} — создаём...")
-        # CONCURRENTLY не работает в транзакции, поэтому делаем commit перед и после
-        conn.commit()
-        cur.execute(create_sql.replace("CONCURRENTLY", ""))  # Убираем CONCURRENTLY для работы в транзакции
-        print(f"  ✅ {index_name} — создан")
-        return True
-    except Exception as e:
-        print(f"  ❌ {index_name} — ошибка: {e}")
-        conn.rollback()
-        return False
-
-def main():
-    print("=" * 60)
-    print("🔧 Оптимизация базы данных KlarDeutsch")
-    print("=" * 60)
-    
+def apply_indexes():
+    """Apply strategic indexes for optimal query performance"""
     conn = None
-    created_count = 0
-    error_count = 0
+    cur = None
     
     try:
-        conn = get_connection()
+        conn = get_db_connection()
         cur = conn.cursor()
         
-        print("\n📊 Подключение к базе данных... ✅")
+        logger.info("Applying strategic indexes for optimal performance...")
         
-        # Получение размера таблиц
+        # Indexes for the words table
+        logger.info("Creating indexes for words table...")
+        
+        # Index for level-based queries (used in GET /api/words and trainer)
         cur.execute("""
-            SELECT relname, n_live_tup 
-            FROM pg_stat_user_tables 
-            WHERE schemaname = 'public'
-            ORDER BY n_live_tup DESC
+            CREATE INDEX IF NOT EXISTS idx_words_level 
+            ON words (level)
         """)
-        print("\n📈 Размер таблиц:")
-        for row in cur.fetchall():
-            print(f"   {row[0]}: {row[1]:,} строк")
+        logger.info("✓ Created index on words.level")
         
-        # ============================================================
-        # 1. Trainer API индексы
-        # ============================================================
-        print("\n" + "=" * 60)
-        print("1️⃣  Trainer API — индексы для выборки слов")
-        print("=" * 60)
+        # Index for topic-based queries (used in GET /api/words/by-topic/<topic>)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_words_topic 
+            ON words (topic)
+        """)
+        logger.info("✓ Created index on words.topic")
         
-        indexes = [
-            ("idx_user_words_user_level", 
-             "CREATE INDEX CONCURRENTLY idx_user_words_user_level ON user_words (user_id, word_id)"),
-            
-            ("idx_words_level", 
-             "CREATE INDEX CONCURRENTLY idx_words_level ON words (level)"),
-            
-            ("idx_user_words_word_user", 
-             "CREATE INDEX CONCURRENTLY idx_user_words_word_user ON user_words (word_id, user_id)"),
-        ]
+        # Composite index for level + user_id (used in most word queries)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_words_level_user_id 
+            ON words (level, user_id)
+        """)
+        logger.info("✓ Created composite index on words (level, user_id)")
         
-        for name, sql in indexes:
-            if create_index_safe(cur, conn, name, sql):
-                created_count += 1
+        # Index for user_id (used in personal word queries)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_words_user_id 
+            ON words (user_id)
+        """)
+        logger.info("✓ Created index on words.user_id")
         
-        # ============================================================
-        # 2. pg_trgm расширение для поиска
-        # ============================================================
-        print("\n" + "=" * 60)
-        print("2️⃣  Поиск — расширение pg_trgm")
-        print("=" * 60)
+        # Indexes for text search (used in GET /api/words/search)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_words_de_gin 
+            ON words USING gin(to_tsvector('german', de))
+        """)
+        logger.info("✓ Created GIN index for German text search")
         
-        if not check_extension_exists(cur, 'pg_trgm'):
-            print("  📝 Установка расширения pg_trgm...")
-            try:
-                cur.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
-                print("  ✅ pg_trgm — установлено")
-                created_count += 1
-            except Exception as e:
-                print(f"  ⚠️  pg_trgm — ошибка: {e}")
-                print("  💡 Возможно, требуется суперпользователь для установки расширения")
-                error_count += 1
-        else:
-            print("  ✅ pg_trgm — уже установлено")
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_words_ru_gin 
+            ON words USING gin(to_tsvector('russian', ru))
+        """)
+        logger.info("✓ Created GIN index for Russian text search")
         
-        # Индексы для поиска
-        search_indexes = [
-            ("idx_words_de_trgm", 
-             "CREATE INDEX CONCURRENTLY idx_words_de_trgm ON words USING GIN (de gin_trgm_ops)"),
-            
-            ("idx_words_ru_trgm", 
-             "CREATE INDEX CONCURRENTLY idx_words_ru_trgm ON words USING GIN (ru gin_trgm_ops)"),
-        ]
+        # Alternative pattern matching indexes for search
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_words_de_text_pattern_ops 
+            ON words (de varchar_pattern_ops)
+        """)
+        logger.info("✓ Created pattern index for German text search")
         
-        for name, sql in search_indexes:
-            if create_index_safe(cur, conn, name, sql):
-                created_count += 1
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_words_ru_text_pattern_ops 
+            ON words (ru varchar_pattern_ops)
+        """)
+        logger.info("✓ Created pattern index for Russian text search")
         
-        # ============================================================
-        # 3. Audio API индексы
-        # ============================================================
-        print("\n" + "=" * 60)
-        print("3️⃣  Audio API — индексы для записей")
-        print("=" * 60)
+        # Index for ID ordering (used in pagination)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_words_id 
+            ON words (id)
+        """)
+        logger.info("✓ Created index on words.id")
         
-        # Проверяем существование таблицы recordings
-        cur.execute("SELECT to_regclass('public.recordings')")
-        if cur.fetchone()[0]:
-            audio_indexes = [
-                ("idx_recordings_created_at", 
-                 "CREATE INDEX CONCURRENTLY idx_recordings_created_at ON recordings (created_at)"),
-                
-                ("idx_recordings_user_created", 
-                 "CREATE INDEX CONCURRENTLY idx_recordings_user_created ON recordings (user_id, created_at DESC)"),
-            ]
-            
-            for name, sql in audio_indexes:
-                if create_index_safe(cur, conn, name, sql):
-                    created_count += 1
-        else:
-            print("  ⚠️  Таблица recordings не найдена — пропускаем")
+        # Indexes for the user_words table (used in trainer functionality)
+        logger.info("Creating indexes for user_words table...")
         
-        # ============================================================
-        # 4. Diary API индексы
-        # ============================================================
-        print("\n" + "=" * 60)
-        print("4️⃣  Diary API — индексы для записей дневника")
-        print("=" * 60)
+        # Index for next_review (critical for trainer - finding words to review)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_user_words_next_review 
+            ON user_words (next_review)
+        """)
+        logger.info("✓ Created index on user_words.next_review")
         
-        # Проверяем существование таблицы diary_entries
-        cur.execute("SELECT to_regclass('public.diary_entries')")
-        if cur.fetchone()[0]:
-            diary_indexes = [
-                ("idx_diary_user_created", 
-                 "CREATE INDEX CONCURRENTLY idx_diary_user_created ON diary_entries (user_id, created_at DESC)"),
-            ]
-            
-            for name, sql in diary_indexes:
-                if create_index_safe(cur, conn, name, sql):
-                    created_count += 1
-        else:
-            print("  ⚠️  Таблица diary_entries не найдена — пропускаем")
+        # Composite index for user_id + next_review (used in trainer queries)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_user_words_user_review 
+            ON user_words (user_id, next_review)
+        """)
+        logger.info("✓ Created composite index on user_words (user_id, next_review)")
         
-        # ============================================================
-        # 5. Stats API индексы
-        # ============================================================
-        print("\n" + "=" * 60)
-        print("5️⃣  Stats API — индексы для агрегации")
-        print("=" * 60)
+        # Index for user_id + status (used in trainer and stats)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_user_words_user_status 
+            ON user_words (user_id, status)
+        """)
+        logger.info("✓ Created composite index on user_words (user_id, status)")
         
-        stats_indexes = [
-            ("idx_words_level_topic", 
-             "CREATE INDEX CONCURRENTLY idx_words_level_topic ON words (level, topic)"),
-            
-            ("idx_user_words_status", 
-             "CREATE INDEX CONCURRENTLY idx_user_words_status ON user_words (user_id, status)"),
-        ]
+        # Index for user_id (used in various queries)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_user_words_user_id 
+            ON user_words (user_id)
+        """)
+        logger.info("✓ Created index on user_words.user_id")
         
-        for name, sql in stats_indexes:
-            if create_index_safe(cur, conn, name, sql):
-                created_count += 1
+        # Index for word_id (used in joins)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_user_words_word_id 
+            ON user_words (word_id)
+        """)
+        logger.info("✓ Created index on user_words.word_id")
         
-        # ============================================================
-        # 6. Favorites API индексы
-        # ============================================================
-        print("\n" + "=" * 60)
-        print("6️⃣  Favorites API — индексы для избранного")
-        print("=" * 60)
+        # Indexes for the user_favorites table
+        logger.info("Creating indexes for user_favorites table...")
         
-        fav_indexes = [
-            ("idx_user_favorites_word", 
-             "CREATE INDEX CONCURRENTLY idx_user_favorites_word ON user_favorites (word_id, user_id)"),
-        ]
+        # Index for user_id (used in GET /api/favorites)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_user_favorites_user_id 
+            ON user_favorites (user_id)
+        """)
+        logger.info("✓ Created index on user_favorites.user_id")
         
-        for name, sql in fav_indexes:
-            if create_index_safe(cur, conn, name, sql):
-                created_count += 1
+        # Index for word_id (used in joins and favorite toggling)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_user_favorites_word_id 
+            ON user_favorites (word_id)
+        """)
+        logger.info("✓ Created index on user_favorites.word_id")
         
-        # ============================================================
-        # 7. Обновление статистики (ANALYZE)
-        # ============================================================
-        print("\n" + "=" * 60)
-        print("7️⃣  Обновление статистики (ANALYZE)")
-        print("=" * 60)
+        # Composite index for user-word pairs (used in toggle_favorite)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_user_favorites_user_word 
+            ON user_favorites (user_id, word_id)
+        """)
+        logger.info("✓ Created composite index on user_favorites (user_id, word_id)")
         
-        tables = ['words', 'user_words', 'user_favorites']
+        # Indexes for the user_word_notes table
+        logger.info("Creating indexes for user_word_notes table...")
         
-        # Проверяем существование таблиц перед ANALYZE
-        for table in tables:
-            cur.execute(f"SELECT to_regclass('public.{table}')")
-            if cur.fetchone()[0]:
-                print(f"  📊 ANALYZE {table}...")
-                cur.execute(f"ANALYZE {table}")
-                print(f"  ✅ {table} — обновлено")
+        # Composite index for user-word pairs (used in notes queries)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_user_word_notes_user_word 
+            ON user_word_notes (user_id, word_id)
+        """)
+        logger.info("✓ Created composite index on user_word_notes (user_id, word_id)")
         
-        # Проверяем diary_entries и recordings
-        for table in ['diary_entries', 'recordings']:
-            cur.execute(f"SELECT to_regclass('public.{table}')")
-            if cur.fetchone()[0]:
-                print(f"  📊 ANALYZE {table}...")
-                cur.execute(f"ANALYZE {table}")
-                print(f"  ✅ {table} — обновлено")
+        # Index for the recordings table
+        logger.info("Creating indexes for recordings table...")
         
-        # Сохраняем изменения
+        # Index for user_id (used in audio functionality)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_recordings_user_id 
+            ON recordings (user_id)
+        """)
+        logger.info("✓ Created index on recordings.user_id")
+        
+        # Commit all changes
         conn.commit()
+        logger.info("✅ All strategic indexes applied successfully!")
         
-        # ============================================================
-        # Итоги
-        # ============================================================
-        print("\n" + "=" * 60)
-        print("✅ ОПТИМИЗАЦИЯ ЗАВЕРШЕНА")
-        print("=" * 60)
-        print(f"\n📊 Результаты:")
-        print(f"   Создано индексов: {created_count}")
-        print(f"   Ошибок: {error_count}")
+        # Show some statistics about the indexes
+        logger.info("\n📊 Index statistics:")
         
-        # Показываем список всех индексов
-        print("\n📋 Созданные индексы:")
+        # Count total words
+        cur.execute("SELECT COUNT(*) FROM words")
+        total_words = cur.fetchone()[0]
+        logger.info(f"Total words in database: {total_words}")
+        
+        # Count total user_words
+        cur.execute("SELECT COUNT(*) FROM user_words")
+        total_user_words = cur.fetchone()[0]
+        logger.info(f"Total user-word progress records: {total_user_words}")
+        
+        # Show index information
         cur.execute("""
-            SELECT indexname, indexdef 
+            SELECT indexname 
             FROM pg_indexes 
-            WHERE schemaname = 'public' AND indexname LIKE 'idx_%'
-            ORDER BY indexname
+            WHERE tablename IN ('words', 'user_words', 'user_favorites', 'user_word_notes', 'recordings')
+            ORDER BY tablename, indexname
         """)
+        indexes = cur.fetchall()
+        logger.info(f"Total indexes created: {len(indexes)}")
         
-        for row in cur.fetchall():
-            print(f"   • {row[0]}")
-        
-        cur.close()
-        conn.close()
-        
-        print("\n" + "=" * 60)
-        print("💡 Следующие шаги:")
-        print("   1. Проверьте время поиска слов (цель: <100ms)")
-        print("   2. Настройте еженедельный ANALYZE")
-        print("   3. При >5,000 слов: проверьте работу pg_trgm")
-        print("=" * 60)
-        
-        return 0
+        for idx in indexes:
+            logger.info(f"  - {idx[0]}")
         
     except Exception as e:
+        logger.error(f"Error applying indexes: {str(e)}")
         if conn:
             conn.rollback()
-        print(f"\n❌ КРИТИЧЕСКАЯ ОШИБКА: {e}")
-        print(f"Тип ошибки: {type(e).__name__}")
-        import traceback
-        traceback.print_exc()
-        return 1
+        raise
     finally:
+        if cur:
+            cur.close()
         if conn:
-            conn.close()
+            from db import return_db_connection
+            return_db_connection(conn)
+
+def validate_indexes():
+    """Validate that all expected indexes exist"""
+    conn = None
+    cur = None
+    
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        logger.info("\n🔍 Validating indexes...")
+        
+        # Check for critical indexes
+        critical_indexes = [
+            ('words', 'idx_words_level'),
+            ('words', 'idx_words_level_user_id'),
+            ('user_words', 'idx_user_words_next_review'),
+            ('user_words', 'idx_user_words_user_review'),
+            ('user_favorites', 'idx_user_favorites_user_id'),
+            ('user_favorites', 'idx_user_favorites_word_id')
+        ]
+        
+        all_good = True
+        for table_name, index_name in critical_indexes:
+            cur.execute("""
+                SELECT 1 FROM pg_indexes 
+                WHERE tablename = %s AND indexname = %s
+            """, (table_name, index_name))
+            
+            if not cur.fetchone():
+                logger.warning(f"❌ Missing critical index: {index_name} on {table_name}")
+                all_good = False
+            else:
+                logger.info(f"✓ Found critical index: {index_name}")
+        
+        if all_good:
+            logger.info("✅ All critical indexes are present!")
+        else:
+            logger.warning("⚠️  Some critical indexes are missing!")
+            
+    except Exception as e:
+        logger.error(f"Error validating indexes: {str(e)}")
+        raise
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            from db import return_db_connection
+            return_db_connection(conn)
 
 if __name__ == "__main__":
-    sys.exit(main())
+    logger.info("🚀 Starting strategic indexing process...")
+    apply_indexes()
+    validate_indexes()
+    logger.info("✅ Strategic indexing completed successfully!")
