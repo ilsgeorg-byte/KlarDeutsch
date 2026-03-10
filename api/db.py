@@ -1,6 +1,7 @@
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from psycopg2 import pool
 from dotenv import load_dotenv
 from contextlib import contextmanager
 import logging
@@ -8,12 +9,16 @@ import logging
 # Настраиваем логирование
 logger = logging.getLogger(__name__)
 
-# Загружаем переменные окружения из .env.local (который лежит в корне проекта)
+# Загружаем переменные окружения из .env.local (который лежит в коре проекта)
 # Указываем путь к корню, так как db.py лежит в api/
 dotenv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env.local')
 load_dotenv(dotenv_path)
 
-def get_db_connection():
+# Initialize connection pool
+connection_pool = None
+
+def init_connection_pool():
+    global connection_pool
     url = os.environ.get("POSTGRES_URL")
     if not url:
         # Если переменной нет, попробуем найти другую (Prisma иногда дает другое имя)
@@ -24,12 +29,49 @@ def get_db_connection():
         raise Exception("POSTGRES_URL не найдена в переменных окружения")
 
     try:
-        conn = psycopg2.connect(url)
-        logger.debug("Successfully connected to DB")
+        # Create a thread-safe connection pool
+        min_conn = int(os.environ.get("DB_MIN_CONNECTIONS", 2))
+        max_conn = int(os.environ.get("DB_MAX_CONNECTIONS", 10))
+        
+        connection_pool = psycopg2.pool.ThreadedConnectionPool(
+            minconn=min_conn,
+            maxconn=max_conn,
+            dsn=url
+        )
+        logger.info(f"Connection pool initialized with {min_conn}-{max_conn} connections")
+    except Exception as e:
+        logger.error(f"Error initializing connection pool: {str(e)}")
+        raise
+
+def get_db_connection():
+    global connection_pool
+    
+    # Initialize pool if not already done
+    if connection_pool is None:
+        init_connection_pool()
+    
+    try:
+        conn = connection_pool.getconn()
+        logger.debug("Successfully got connection from pool")
         return conn
     except Exception as e:
-        logger.error(f"Error connecting to DB: {str(e)}")
+        logger.error(f"Error getting connection from pool: {str(e)}")
         raise
+
+def return_db_connection(conn):
+    """Return a connection back to the pool"""
+    global connection_pool
+    try:
+        if connection_pool:
+            connection_pool.putconn(conn)
+            logger.debug("Connection returned to pool")
+    except Exception as e:
+        logger.error(f"Error returning connection to pool: {str(e)}")
+        # If we can't return to pool, close the connection
+        try:
+            conn.close()
+        except:
+            pass
 
 
 @contextmanager
@@ -37,7 +79,7 @@ def get_db_cursor():
     """
     Контекстный менеджер для работы с БД.
     
-    Автоматически закрывает соединение и курсор, даже если произошло исключение.
+    Автоматически возвращает соединение в пул и закрывает курсор, даже если произошло исключение.
     Коммит выполняется только если не было исключений.
     
     Использование:
@@ -64,7 +106,7 @@ def get_db_cursor():
         if cur:
             cur.close()
         if conn:
-            conn.close()
+            return_db_connection(conn)
 
 def init_db():
     try:
@@ -143,7 +185,7 @@ def init_db():
             cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_words_de_ru_private ON words (de, ru, user_id) WHERE user_id IS NOT NULL;")
         except Exception as e:
             print(f"Warning during words index update: {e}")
-            conn.rollback() 
+            conn.rollback()
 
         # Таблица аудиозаписей
         cur.execute("""
@@ -192,10 +234,19 @@ def init_db():
         
         conn.commit()
         cur.close()
-        conn.close()
+        return_db_connection(conn)
         print("Database initialized successfully with new linguistic columns!")
     except Exception as e:
         print(f"Error initializing DB: {e}")
+        # Connection will be closed in the exception handler above
+
+def close_connection_pool():
+    """Close all connections in the pool when shutting down the application"""
+    global connection_pool
+    if connection_pool:
+        connection_pool.closeall()
+        logger.info("All connections in pool closed")
+        connection_pool = None
 
 if __name__ == "__main__":
     init_db()
