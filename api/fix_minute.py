@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Исправить Minute обратно (ИИ ошибся)
+Исправить Zeitung = газета
 """
 
 import os, sys, io
@@ -15,19 +15,25 @@ import psycopg2
 conn = psycopg2.connect(os.environ.get("POSTGRES_URL"))
 cur = conn.cursor()
 
-# Исправляем Minute
-print("Исправление Minute = минута...\n")
+# Исправляем die Zeitung -> Zeitung
+print("Исправление Zeitung...\n")
 cur.execute("""
-    UPDATE words SET 
-        ru = 'минута',
+    UPDATE words SET
+        de = 'Zeitung',
+        ru = 'газета',
         article = 'die',
-        ai_checked_at = NULL
-    WHERE de = 'Minute'
+        plural = 'Zeitungen'
+    WHERE de = 'die Zeitung'
 """)
-
 conn.commit()
+print(f"Исправлено записей: {cur.rowcount}")
+
+# Проверка
+cur.execute("SELECT id, de, ru, article, plural FROM words WHERE de = 'Zeitung'")
+row = cur.fetchone()
+if row:
+    print(f"\nТеперь: {row}")
+
 cur.close()
 conn.close()
-
-print("✅ Исправлено!")
-print("\nТеперь: die Minute = минута (правильно)")
+print("\nГотово!")
