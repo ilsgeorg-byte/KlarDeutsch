@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """
-AI проверка слов в базе данных KlarDeutsch
-Использует Groq API для проверки правильности слов и переводов
+Улучшенная проверка слов в базе данных KlarDeutsch
+Добавляет проверку:
+- Множественного числа у существительных
+- Форм глаголов (Infinitiv, Präsens, Präteritum, Perfekt)
+- Правильности артиклей
+- Переводов с учетом контекста
 """
 
 import os
@@ -40,7 +44,6 @@ client = OpenAI(
 
 # Модель для проверки
 MODEL_NAME = "llama-3.3-70b-versatile"  # Точная, меньше ошибок
-# MODEL_NAME = "llama-3.1-8b-instant"  # Быстрая, но чаще ошибается
 
 # === Подключение к БД ===
 def get_db_connection():
@@ -49,37 +52,50 @@ def get_db_connection():
         raise Exception("POSTGRES_URL не найдена")
     return psycopg2.connect(url)
 
-# === Промпт для ИИ ===
-CHECK_PROMPT = '''Ты - строгий эксперт по немецкому языку. Проверь слово.
+# === Промпт для ИИ с улучшенной проверкой ===
+ENHANCED_CHECK_PROMPT = '''Ты - строгий эксперт по немецкому языку. Проверь слово и его формы.
 
 Слово: {de}
 Перевод: {ru}
 Артикль: {article}
 Формы глагола: {verb_forms}
+Множественное число: {plural}
 
-Определи тип слова и проверяй по правилам:
+Определи тип слова и проверяй по полным правилам:
 
-1. **Прилагательные** (быстрый, легкий, трудный и т.д.):
-   - Артикль должен быть ПУСТЫМ
-   - Формы глагола должны быть ПУСТЫМИ
+1. **Существительные** (дом, стол, книга и т.д.):
+   - Должны иметь артикль: der/masculine, die/feminine, das/neuter
+   - Должны иметь форму множественного числа (если применимо)
+   - Проверь правильность артикля и формы множественного числа
+   - Пример: "Haus" - артикль "das", множественное "die Hauser"
 
 2. **Глаголы** (делать, идти, видеть и т.д.):
-   - Артикль должен быть ПУСТЫМ
-   - Формы глагола: Infinitiv, Praeteritum, Partizip II (через запятую)
+   - Не должны иметь артикля
+   - Должны иметь формы: Infinitiv, Praeteritum, Partizip II (через запятую)
+   - Пример: "gehen" - "gehen, ging, ist gegangen"
 
-3. **Существительные** (дом, стол, книга и т.д.):
-   - Артикль: der/die/das
-   - Формы глагола должны быть ПУСТЫМИ
+3. **Прилагательные** (быстрый, легкий, трудный и т.д.):
+   - Не должны иметь артикля
+   - Не должны иметь форм глагола или множественного числа
+
+ВАЖНО: Проверь перевод на точность и контекст. Убедись, что:
+- Перевод соответствует значению немецкого слова
+- Учтены возможные значения слова в разных контекстах
+- Множественное число правильно образовано
+- Формы глагола правильные (особенно неправильные глаголы)
 
 Верни ТОЛЬКО валидный JSON без markdown:
 {{
   "word_type": "adjective|verb|noun",
   "valid": true/false,
   "errors": [],
-  "corrected_de": "",
-  "corrected_ru": "",
-  "corrected_article": "",
-  "corrected_verb_forms": "",
+  "corrections": {{
+    "de": "исправленное немецкое слово",
+    "ru": "исправленный перевод",
+    "article": "исправленный артикль",
+    "verb_forms": "исправленные формы глагола",
+    "plural": "исправленная форма множественного числа"
+  }},
   "confidence": 0.0-1.0
 }}
 
@@ -117,8 +133,8 @@ def has_mixed_alphabet(text):
     
     return False
 
-def check_word_with_ai(de, ru, article, verb_forms):
-    """Проверяет слово через ИИ"""
+def check_word_with_enhanced_ai(de, ru, article, verb_forms, plural=None):
+    """Проверяет слово через ИИ с улучшенной логикой"""
     
     # Сначала проверяем на смешение алфавитов (локально, без ИИ)
     if has_mixed_alphabet(ru):
@@ -126,7 +142,7 @@ def check_word_with_ai(de, ru, article, verb_forms):
         return {
             'valid': False,
             'errors': ['Смешение алфавитов (кириллица + латиница)'],
-            'corrected_ru': ru,  # Нужно исправить вручную
+            'corrections': {'ru': ru},  # Нужно исправить вручную
             'confidence': 1.0
         }, None
     
@@ -135,17 +151,18 @@ def check_word_with_ai(de, ru, article, verb_forms):
         return {
             'valid': False,
             'errors': ['Смешение алфавитов в немецком слове'],
-            'corrected_de': de,
+            'corrections': {'de': de},
             'confidence': 1.0
         }, None
     
     # Если смешения нет — продолжаем проверку через ИИ
     try:
-        prompt = CHECK_PROMPT.format(
+        prompt = ENHANCED_CHECK_PROMPT.format(
             de=de,
             ru=ru,
             article=article or "пусто",
-            verb_forms=verb_forms or "пусто"
+            verb_forms=verb_forms or "пусто",
+            plural=plural or "пусто"
         )
         
         response = client.chat.completions.create(
@@ -155,7 +172,7 @@ def check_word_with_ai(de, ru, article, verb_forms):
                 {"role": "user", "content": prompt}
             ],
             temperature=0.1,
-            max_tokens=500
+            max_tokens=800
         )
         
         content = response.choices[0].message.content.strip()
@@ -179,6 +196,7 @@ def check_word_with_ai(de, ru, article, verb_forms):
         return {
             'valid': True,
             'errors': [],
+            'corrections': {},
             'confidence': 0.5,
             'note': 'JSON не распарсен, но слово скорее верно'
         }, f"JSON ошибка: {e}. Ответ ИИ: {content[:100]}"
@@ -191,7 +209,7 @@ def get_words_to_check(conn, limit=CHECK_LIMIT):
     
     # Сначала пробуем получить непроверенные слова
     cur.execute("""
-        SELECT id, de, ru, article, verb_forms, level
+        SELECT id, de, ru, article, verb_forms, plural, level
         FROM words
         WHERE ai_checked_at IS NULL
         ORDER BY id
@@ -206,14 +224,15 @@ def get_words_to_check(conn, limit=CHECK_LIMIT):
             'ru': row[2],
             'article': row[3],
             'verb_forms': row[4],
-            'level': row[5]
+            'plural': row[5],
+            'level': row[6]
         })
     
     # Если все слова уже проверены, берём старые (по дате проверки)
     if not words:
         print("Все слова уже проверены! Проверяем старые...")
         cur.execute("""
-            SELECT id, de, ru, article, verb_forms, level
+            SELECT id, de, ru, article, verb_forms, plural, level
             FROM words
             ORDER BY ai_checked_at ASC NULLS FIRST
             LIMIT %s
@@ -226,7 +245,8 @@ def get_words_to_check(conn, limit=CHECK_LIMIT):
                 'ru': row[2],
                 'article': row[3],
                 'verb_forms': row[4],
-                'level': row[5]
+                'plural': row[5],
+                'level': row[6]
             })
     
     cur.close()
@@ -262,37 +282,17 @@ def update_word_in_db(conn, word_id, corrections):
     """Обновляет слово в БД с учётом типа слова"""
     cur = conn.cursor()
 
-    # Получаем тип слова из результата ИИ
-    word_type = corrections.get('word_type', 'unknown')
+    # Получаем значения и обрезаем если слишком длинные
+    de = corrections.get('de')
+    ru = corrections.get('ru')
+    article = corrections.get('article')
+    verb_forms = corrections.get('verb_forms')
+    plural = corrections.get('plural')
     
     # Преобразуем verb_forms из dict в строку если нужно
-    verb_forms = corrections.get('corrected_verb_forms')
     if isinstance(verb_forms, dict):
         verb_forms = f"{verb_forms.get('Infinitiv', '')}, {verb_forms.get('Präteritum', '')}, {verb_forms.get('Partizip II', '')}"
 
-    # Получаем значения и обрезаем если слишком длинные
-    de = corrections.get('corrected_de')
-    ru = corrections.get('corrected_ru')
-    article = corrections.get('corrected_article')
-    
-    # === ВАЛИДАЦИЯ ПО ТИПУ СЛОВА ===
-    
-    # Прилагательные и глаголы НЕ должны иметь артикль
-    if word_type in ['adjective', 'verb']:
-        if article and len(article) > 3:  # ИИ пытается добавить артикль — игнорируем
-            print(f"  [SKIP] Игнорируем артикль для {word_type}: {article}")
-            article = None
-    
-    # Существительные НЕ должны иметь verb_forms
-    if word_type == 'noun':
-        if verb_forms and len(verb_forms) > 10:  # ИИ пытается добавить формы глагола
-            print(f"  [SKIP] Игнорируем verb_forms для noun: {verb_forms}")
-            verb_forms = None
-    
-    # Артикль должен быть коротким (der/die/das или пусто)
-    if article and len(article) > 10:
-        article = None  # Игнорируем длинные "исправления"
-    
     # Обрезаем длинные значения
     if de and len(de) > 200:
         de = de[:200]
@@ -300,24 +300,27 @@ def update_word_in_db(conn, word_id, corrections):
         ru = ru[:200]
     if verb_forms and len(verb_forms) > 200:
         verb_forms = verb_forms[:200]
+    if plural and len(plural) > 200:
+        plural = plural[:200]
 
-    # Используем COALESCE чтобы не обновлять пустые значения
-    cur.execute("""
-        UPDATE words SET
-            de = COALESCE(NULLIF(%s, ''), de),
-            ru = COALESCE(NULLIF(%s, ''), ru),
-            article = COALESCE(NULLIF(%s, ''), article),
-            verb_forms = COALESCE(NULLIF(%s, ''), verb_forms),
-            ai_checked_at = NOW()
-        WHERE id = %s
-    """, (de, ru, article, verb_forms, word_id))
+    # Используем COALESCE чтобы не обновлять пустые значения, но всегда обновляем ai_checked_at
+        cur.execute("""
+            UPDATE words SET
+                de = COALESCE(NULLIF(%s, ''), de),
+                ru = COALESCE(NULLIF(%s, ''), ru),
+                article = COALESCE(NULLIF(%s, ''), article),
+                verb_forms = COALESCE(NULLIF(%s, ''), verb_forms),
+                plural = COALESCE(NULLIF(%s, ''), plural),
+                ai_checked_at = NOW()
+            WHERE id = %s
+        """, (de, ru, article, verb_forms, plural, word_id))
     
     conn.commit()
     cur.close()
 
 def main():
     print("=" * 60)
-    print("AI проверка слов немецкого языка")
+    print("УЛУЧШЕННАЯ AI проверка слов немецкого языка")
     print("=" * 60)
     
     if DRY_RUN:
@@ -344,11 +347,12 @@ def main():
         if i % 10 == 0 or i == len(words):
             print(f"Проверено: {i}/{len(words)}...")
         
-        result, error = check_word_with_ai(
+        result, error = check_word_with_enhanced_ai(
             word['de'],
             word['ru'],
             word['article'],
-            word['verb_forms']
+            word['verb_forms'],
+            word['plural']
         )
         
         if error:
@@ -371,14 +375,17 @@ def main():
             for err in result.get('errors', []):
                 print(f"      - {err}")
             
-            if result.get('corrected_de') and result['corrected_de'] != word['de']:
-                print(f"      -> Немецкий: {word['de']} -> {result['corrected_de']}")
-            if result.get('corrected_ru') and result['corrected_ru'] != word['ru']:
-                print(f"      -> Перевод: {word['ru']} -> {result['corrected_ru']}")
-            if result.get('corrected_article') and result['corrected_article'] != word['article']:
-                print(f"      -> Артикль: {word['article']} -> {result['corrected_article']}")
-            if result.get('corrected_verb_forms') and result['corrected_verb_forms'] != word['verb_forms']:
-                print(f"      -> Формы: {word['verb_forms']} -> {result['corrected_verb_forms']}")
+            corrections = result.get('corrections', {})
+            if corrections.get('de') and corrections['de'] != word['de']:
+                print(f"      -> Немецкий: {word['de']} -> {corrections['de']}")
+            if corrections.get('ru') and corrections['ru'] != word['ru']:
+                print(f"      -> Перевод: {word['ru']} -> {corrections['ru']}")
+            if corrections.get('article') and corrections['article'] != word['article']:
+                print(f"      -> Артикль: {word['article']} -> {corrections['article']}")
+            if corrections.get('verb_forms') and corrections['verb_forms'] != word['verb_forms']:
+                print(f"      -> Формы: {word['verb_forms']} -> {corrections['verb_forms']}")
+            if corrections.get('plural') and corrections['plural'] != word['plural']:
+                print(f"      -> Множественное: {word['plural']} -> {corrections['plural']}")
             
             stats['invalid'] += 1
             stats['errors'].append({
@@ -390,7 +397,7 @@ def main():
             
             # Исправляем в БД если не DRY_RUN
             if not DRY_RUN:
-                update_word_in_db(conn, word['id'], result)
+                update_word_in_db(conn, word['id'], corrections)
                 print(f"   [ИСПРАВЛЕНО в БД]")
             
             mark_word_as_checked(conn, word['id'])  # Отмечаем как проверенное

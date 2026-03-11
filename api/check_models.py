@@ -16,6 +16,6 @@ headers = {
 response = requests.get(url, headers=headers)
 models = response.json()
 
-print("✅ Доступные модели на твоём Groq аккаунте:")
+print("Доступные модели на твоём Groq аккаунте:")
 for model in sorted(models.get("data", []), key=lambda x: x["id"]):
     print(f"  - {model['id']}")
