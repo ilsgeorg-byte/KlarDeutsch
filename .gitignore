@@ -38,7 +38,14 @@ next-env.d.ts
 __pycache__/
 *.py[cod]
 *$py.class
-/api/venv
-/api/.venv
-/api/__pycache__
+.venv/
+venv/
+*.pyc
+*$py.class
+
+# API uploads
 /api/uploads/
+
+# Tools data files (generated)
+/tools/*.json
+/tools/*.txt
