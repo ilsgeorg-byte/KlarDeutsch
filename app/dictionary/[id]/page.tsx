@@ -25,7 +25,8 @@ interface Word {
 }
 
 export default function WordDetailPage() {
-  const { id } = useParams();
+  const params = useParams();
+  const id = params?.id as string;
   const router = useRouter();
   const [word, setWord] = useState<Word | null>(null);
   const [loading, setLoading] = useState(true);
