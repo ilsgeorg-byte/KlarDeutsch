@@ -9,6 +9,7 @@ if api_dir not in sys.path:
 
 from .auth import token_required
 from db import get_db_connection
+from utils.cache_decorator import cache_response, invalidate_user_cache
 
 learning_bp = Blueprint('learning', __name__, url_prefix='/api/learning')
 logger = logging.getLogger(__name__)
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 @learning_bp.route('/words', methods=['GET'])
 @token_required
+@cache_response('learning:words', ttl=300, user_specific=True)
 def get_learning_words():
     """
     Получить ВСЕ слова в изучении (статус 'learning')
@@ -66,6 +68,7 @@ def get_learning_words():
 
 @learning_bp.route('/stats', methods=['GET'])
 @token_required
+@cache_response('learning:stats', ttl=60, user_specific=True)
 def get_learning_stats():
     """
     Получить детальную статистику по изучению

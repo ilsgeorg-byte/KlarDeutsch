@@ -13,6 +13,7 @@ if api_dir not in sys.path:
 from .auth import token_required
 from db import get_db_connection
 from schemas import TrainingQuery, RateWordRequest, VALID_LEVELS
+from utils.cache_decorator import cache_response, invalidate_user_cache
 
 trainer_bp = Blueprint('trainer', __name__, url_prefix='/api/trainer')
 
@@ -32,6 +33,7 @@ EASE_PENALTY_HARD = 0.3  # Агрессивнее стандартного 0.2
 
 @trainer_bp.route('/words', methods=['GET'])
 @token_required
+@cache_response('trainer:words', ttl=300, user_specific=True)
 def get_training_words():
     """
     Получить слова для тренировки:
@@ -106,13 +108,13 @@ def get_training_words():
 def rate_word():
     """
     Обновить прогресс слова по улучшенному алгоритму SM-2
-    
+
     Rating:
     - 0: Знаю (убрать из колоды)
     - 1: Сложно (повтор через 10 минут)
     - 3: Хорошо (стандартный интервал)
     - 5: Легко (увеличенный интервал)
-    
+
     Улучшения:
     - Fuzzing: случайный разброс интервала для предотвращения "куч"
     - Агрессивное снижение ease_factor для "Сложно"
@@ -124,7 +126,7 @@ def rate_word():
             rate_data = RateWordRequest.model_validate(request.json or {})
         except ValueError as e:
             return jsonify({"error": str(e)}), 400
-        
+
         word_id = rate_data.word_id
         rating = rate_data.rating
 
@@ -150,14 +152,14 @@ def rate_word():
                 interval, ease_factor, reps = row
 
             # === Улучшенный алгоритм SM-2 ===
-            
+
             if rating == 1:
                 # "Сложно" - агрессивное снижение
                 reps = 0
                 interval = 0  # 0 дней = повтор через 10 минут
                 ease_factor = max(1.3, ease_factor - EASE_PENALTY_HARD)
                 logger.info(f"Слово {word_id}: сложно, interval=0 (10 мин), ease_factor={ease_factor:.2f}")
-                
+
             elif rating >= 3:
                 # "Хорошо" (3) или "Легко" (5)
                 if reps == 0:
@@ -166,24 +168,24 @@ def rate_word():
                     interval = 6  # Второй повтор - 6 дней
                 else:
                     interval = round(interval * ease_factor)
-                
+
                 reps += 1
-                
+
                 # Модификатор для "Легко" - бонус к ease_factor
                 rating_bonus = 0.1 if rating == 5 else 0
                 ease_factor = ease_factor + (0.1 - (5 - rating) * (0.08 + (5 - rating) * 0.02)) + rating_bonus
-                
+
                 # Применяем fuzzing (случайный разброс)
                 if interval > 1:  # Не применяем к интервалам в 1 день
                     fuzz_range = interval * FUZZING_FACTOR
                     fuzz = random.uniform(-fuzz_range, fuzz_range)
                     interval = max(1, round(interval + fuzz))
-                
+
                 logger.info(f"Слово {word_id}: rating={rating}, interval={interval} дней, ease_factor={ease_factor:.2f}")
-            
+
             # Ограничиваем ease_factor минимумом
             ease_factor = max(1.3, ease_factor)
-            
+
             # Вычисляем дату следующего повторения
             if interval == 0:
                 # "Сложно" - повтор через 10 минут (внутри той же сессии)
@@ -202,10 +204,13 @@ def rate_word():
                     next_review = EXCLUDED.next_review,
                     status = 'learning'
             """, (request.user_id, word_id, interval, ease_factor, reps, next_review))
-        
+
         conn.commit()
         cur.close()
         conn.close()
+
+        # Инвалидируем кэш пользователя после изменения прогресса
+        invalidate_user_cache(request.user_id, prefix='trainer:')
         
         return jsonify({"status": "success"}), 200
     except Exception as e:
@@ -213,6 +218,7 @@ def rate_word():
 
 @trainer_bp.route('/stats', methods=['GET'])
 @token_required
+@cache_response('trainer:stats', ttl=60, user_specific=True)
 def get_stats():
     """Статистика по изучению слов"""
     try:

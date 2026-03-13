@@ -11,6 +11,7 @@ if api_dir not in sys.path:
 from db import get_db_connection
 from .auth import token_required, SECRET_KEY
 from utils.token_utils import get_current_user_id_optional
+from utils.cache_decorator import cache_response, cache_invalidate, invalidate_user_cache
 
 words_bp = Blueprint('words', __name__, url_prefix='/api')
 
@@ -36,6 +37,7 @@ def get_current_user_id():
     return user_id
 
 @words_bp.route('/words', methods=['GET'])
+@cache_response('words:list', ttl=3600)
 def get_words():
     """
     Получить список слов по уровню.
@@ -106,6 +108,7 @@ def get_words():
         return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 @words_bp.route('/words/<int:word_id>', methods=['GET'])
+@cache_response('words:detail', ttl=3600)
 def get_word(word_id: int):
     """Получить одно слово по ID"""
     try:
@@ -147,6 +150,7 @@ def get_word(word_id: int):
         return jsonify({"error": str(e)}), 500
 
 @words_bp.route('/words/by-topic/<topic>', methods=['GET'])
+@cache_response('words:topic', ttl=3600)
 def get_words_by_topic(topic: str):
     """Получить слова по теме"""
     try:
@@ -191,6 +195,7 @@ def get_words_by_topic(topic: str):
         return jsonify({"error": str(e)}), 500
 
 @words_bp.route('/levels', methods=['GET'])
+@cache_response('words:levels', ttl=86400)
 def get_levels():
     """Получить список всех доступных уровней"""
     try:
@@ -209,6 +214,7 @@ def get_levels():
         return jsonify({"error": str(e)}), 500
 
 @words_bp.route('/topics', methods=['GET'])
+@cache_response('words:topics', ttl=86400)
 def get_topics():
     """Получить список всех доступных тем"""
     try:
@@ -233,6 +239,7 @@ def get_topics():
         return jsonify({"error": str(e)}), 500
 
 @words_bp.route('/words/search', methods=['GET'])
+@cache_response('words:search', ttl=300)
 def search_words():
     """
     Поиск слов по тексту (немецкий или русский).
@@ -303,6 +310,7 @@ def search_words():
 
 @words_bp.route('/favorites', methods=['GET'])
 @token_required
+@cache_response('user:favorites', ttl=300, user_specific=True)
 def get_favorites():
     """Получить список избранных слов пользователя"""
     try:
@@ -330,32 +338,38 @@ def get_favorites():
 
 @words_bp.route('/words/<int:word_id>/favorite', methods=['POST'])
 @token_required
+@cache_invalidate('user:favorites:*')
 def toggle_favorite(word_id: int):
     """Добавить или удалить слово из избранного"""
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        
+
         # Проверяем, в избранном ли оно уже
         cur.execute("SELECT 1 FROM user_favorites WHERE user_id = %s AND word_id = %s", (request.user_id, word_id))
         is_fav = cur.fetchone()
-        
+
         if is_fav:
             cur.execute("DELETE FROM user_favorites WHERE user_id = %s AND word_id = %s", (request.user_id, word_id))
             status = "removed"
         else:
             cur.execute("INSERT INTO user_favorites (user_id, word_id) VALUES (%s, %s)", (request.user_id, word_id))
             status = "added"
-            
+
         conn.commit()
         cur.close()
         conn.close()
+        
+        # Инвалидируем пользовательский кэш
+        invalidate_user_cache(request.user_id)
+        
         return jsonify({"status": "success", "action": status}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @words_bp.route('/words/custom', methods=['POST'])
 @token_required
+@cache_invalidate('words:list:*', 'words:topics:*', 'words:search:*')
 def add_custom_word():
     """Добавить личное слово пользователя"""
     try:
@@ -368,30 +382,34 @@ def add_custom_word():
         verb_forms = data.get('verb_forms', '').strip()
         example_de = data.get('example_de', '').strip()
         example_ru = data.get('example_ru', '').strip()
-        
+
         if not de or not ru:
             return jsonify({"error": "Поля 'de' и 'ru' обязательны"}), 400
-            
+
         conn = get_db_connection()
         cur = conn.cursor()
-        
+
         try:
             cur.execute("""
                 INSERT INTO words (de, ru, article, level, topic, verb_forms, example_de, example_ru, user_id)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """, (de, ru, article, level, topic, verb_forms, example_de, example_ru, request.user_id))
-            
+
             word_id = cur.fetchone()[0]
             conn.commit()
-            
+
             cur.close()
             conn.close()
+            
+            # Инвалидируем пользовательский кэш
+            invalidate_user_cache(request.user_id)
+            
             return jsonify({"status": "success", "word_id": word_id}), 201
         except Exception as e:
             if "unique" in str(e).lower():
                 return jsonify({"error": "Такое слово уже есть в вашем списке или в общем доступе"}), 400
             raise e
-            
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500

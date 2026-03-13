@@ -9,4 +9,5 @@ bcrypt
 PyJWT
 bleach
 flask-limiter
+redis==5.0.1
 
