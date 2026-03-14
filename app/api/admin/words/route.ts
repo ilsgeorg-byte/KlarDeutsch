@@ -1,7 +1,7 @@
 /**
  * API для управления словами
  * GET - список слов с пагинацией и еще фильтрами
- * POST - добавить новое слово 
+ * POST - добавить новое слово 1
  */
 
 import { NextRequest, NextResponse } from 'next/server';

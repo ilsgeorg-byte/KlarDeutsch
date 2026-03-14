@@ -3,7 +3,7 @@ import sys
 import os
 import logging
 
-# Добавляем родительскую директорию в path
+# Добавляем родительскую директорию в path 1
 api_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if api_dir not in sys.path:
     sys.path.insert(0, api_dir)
