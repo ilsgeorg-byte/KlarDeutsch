@@ -51,6 +51,7 @@ export default function AdminWordsPage() {
     level: 'A1',
     topic: '',
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     loadWords();
@@ -109,7 +110,11 @@ export default function AdminWordsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Предотвращаем повторную отправку
+    if (isSubmitting) return;
+    
     console.log('Form submit:', { editingWord, formData });
+    setIsSubmitting(true);
 
     try {
       // Определяем метод и URL
@@ -148,6 +153,8 @@ export default function AdminWordsPage() {
       console.error('Form submit error:', err);
       setError(err.message);
       setTimeout(() => setError(''), 3000);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -427,13 +434,19 @@ export default function AdminWordsPage() {
               </div>
               
               <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-                <button type="submit" className="adminBtn adminBtnPrimary" style={{ flex: 1 }}>
-                  {editingWord ? 'Сохранить' : 'Добавить'}
+                <button
+                  type="submit"
+                  className="adminBtn adminBtnPrimary"
+                  style={{ flex: 1, opacity: isSubmitting ? 0.7 : 1, cursor: isSubmitting ? 'not-allowed' : 'pointer' }}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Сохранение...' : (editingWord ? 'Сохранить' : 'Добавить')}
                 </button>
                 <button
                   type="button"
                   onClick={closeModal}
                   className="adminBtn adminBtnSecondary"
+                  disabled={isSubmitting}
                 >
                   Отмена
                 </button>
