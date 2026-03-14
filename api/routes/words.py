@@ -367,6 +367,129 @@ def toggle_favorite(word_id: int):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@words_bp.route('/words/<int:word_id>', methods=['PUT'])
+@token_required
+@cache_invalidate('words:list:*', 'words:detail:*', 'words:topics:*', 'words:search:*')
+def update_word(word_id: int):
+    """Обновить слово по ID (для обычных пользователей - только свои слова)"""
+    try:
+        data = request.json
+        de = data.get('de', '').strip()
+        ru = data.get('ru', '').strip()
+        article = data.get('article', '').strip()
+        level = data.get('level', 'A1')
+        topic = data.get('topic', '').strip()
+        verb_forms = data.get('verb_forms', '').strip()
+        example_de = data.get('example_de', '').strip()
+        example_ru = data.get('example_ru', '').strip()
+
+        if not de or not ru:
+            return jsonify({"error": "Поля 'de' и 'ru' обязательны"}), 400
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Проверяем, существует ли слово и принадлежит ли оно пользователю
+        cur.execute("SELECT user_id FROM words WHERE id = %s", (word_id,))
+        result = cur.fetchone()
+        
+        if not result:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Слово не найдено"}), 404
+        
+        word_user_id = result[0]
+        # Только администраторы могут изменять общие слова (где user_id IS NULL)
+        # Пользователи могут изменять только свои слова
+        if word_user_id is not None and word_user_id != request.user_id:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Нет прав для изменения этого слова"}), 403
+
+        # Обновляем слово
+        cur.execute("""
+            UPDATE words
+            SET de = %s, ru = %s, article = %s, level = %s, topic = %s,
+                verb_forms = %s, example_de = %s, example_ru = %s
+            WHERE id = %s
+        """, (de, ru, article, level, topic, verb_forms, example_de, example_ru, word_id))
+
+        if cur.rowcount == 0:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Слово не найдено"}), 404
+
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        # Инвалидируем пользовательский кэш
+        invalidate_user_cache(request.user_id)
+        
+        return jsonify({"status": "success", "word_id": word_id}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@words_bp.route('/admin/words/<int:word_id>', methods=['PUT'])
+@token_required
+def update_word_admin(word_id: int):
+    """Обновить слово по ID (для администраторов - любые слова)"""
+    try:
+        # Проверяем права администратора
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT role FROM users WHERE id = %s", (request.user_id,))
+        result = cur.fetchone()
+        cur.close()
+        conn.close()
+        
+        if not result or result[0] != 'admin':
+            return jsonify({"error": "Требуются права администратора"}), 403
+
+        data = request.json
+        de = data.get('de', '').strip()
+        ru = data.get('ru', '').strip()
+        article = data.get('article', '').strip()
+        level = data.get('level', 'A1')
+        topic = data.get('topic', '').strip()
+        verb_forms = data.get('verb_forms', '').strip()
+        example_de = data.get('example_de', '').strip()
+        example_ru = data.get('example_ru', '').strip()
+
+        if not de or not ru:
+            return jsonify({"error": "Поля 'de' и 'ru' обязательны"}), 400
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Обновляем слово (администратор может обновить любое слово)
+        cur.execute("""
+            UPDATE words
+            SET de = %s, ru = %s, article = %s, level = %s, topic = %s,
+                verb_forms = %s, example_de = %s, example_ru = %s
+            WHERE id = %s
+        """, (de, ru, article, level, topic, verb_forms, example_de, example_ru, word_id))
+
+        if cur.rowcount == 0:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Слово не найдено"}), 404
+
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        # Инвалидируем пользовательский кэш
+        invalidate_user_cache(request.user_id)
+        
+        return jsonify({"status": "success", "word_id": word_id}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @words_bp.route('/words/custom', methods=['POST'])
 @token_required
 @cache_invalidate('words:list:*', 'words:topics:*', 'words:search:*')
