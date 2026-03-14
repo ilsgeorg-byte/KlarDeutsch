@@ -186,3 +186,134 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { id, de, ru, article, level, topic, verb_forms, example_de, example_ru } = body;
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'ID слова обязателен' },
+        { status: 400 }
+      );
+    }
+
+    if (!de || !ru) {
+      return NextResponse.json(
+        { error: 'Поля de и ru обязательны' },
+        { status: 400 }
+      );
+    }
+
+    // Пробуем через Flask API (если есть endpoint для обновления)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/words/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${process.env.ADMIN_API_TOKEN}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        return NextResponse.json(data);
+      }
+    } catch (apiError) {
+      console.log('Flask API unavailable, using direct DB access');
+    }
+
+    // Если API недоступен - напрямую в БД
+    const dbPool = getPool();
+    if (!dbPool) {
+      return NextResponse.json(
+        { error: 'Database not configured' },
+        { status: 500 }
+      );
+    }
+
+    const result = await dbPool.query(
+      `UPDATE words 
+       SET de = $1, ru = $2, article = $3, level = $4, topic = $5, 
+           verb_forms = $6, example_de = $7, example_ru = $8
+       WHERE id = $9
+       RETURNING id`,
+      [de, ru, article || '', level || 'A1', topic || '', 
+       verb_forms || '', example_de || '', example_ru || '', id]
+    );
+
+    if (result.rowCount === 0) {
+      return NextResponse.json(
+        { error: 'Слово не найдено' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ status: 'success', word_id: id });
+  } catch (error) {
+    console.error('Admin words PUT error:', error);
+    return NextResponse.json(
+      { error: 'Ошибка сервера: ' + (error instanceof Error ? error.message : String(error)) },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'ID слова обязателен' },
+        { status: 400 }
+      );
+    }
+
+    // Пробуем через Flask API
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/words/${id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${process.env.ADMIN_API_TOKEN}`,
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        return NextResponse.json(data);
+      }
+    } catch (apiError) {
+      console.log('Flask API unavailable, using direct DB access');
+    }
+
+    // Если API недоступен - напрямую из БД
+    const dbPool = getPool();
+    if (!dbPool) {
+      return NextResponse.json(
+        { error: 'Database not configured' },
+        { status: 500 }
+      );
+    }
+
+    const result = await dbPool.query('DELETE FROM words WHERE id = $1', [id]);
+
+    if (result.rowCount === 0) {
+      return NextResponse.json(
+        { error: 'Слово не найдено' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ status: 'success' });
+  } catch (error) {
+    console.error('Admin words DELETE error:', error);
+    return NextResponse.json(
+      { error: 'Ошибка сервера' },
+      { status: 500 }
+    );
+  }
+}

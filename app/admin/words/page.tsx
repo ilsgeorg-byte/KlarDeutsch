@@ -101,12 +101,21 @@ export default function AdminWordsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
-      const res = await fetch('/api/admin/words', {
-        method: 'POST',
+      // Определяем метод и URL
+      const method = editingWord ? 'PUT' : 'POST';
+      const url = '/api/admin/words';
+      
+      // Добавляем ID для обновления
+      const body = editingWord 
+        ? { ...formData, id: editingWord.id }
+        : formData;
+
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
@@ -116,7 +125,7 @@ export default function AdminWordsPage() {
       setSuccess(editingWord ? 'Слово обновлено' : 'Слово добавлено');
       setShowModal(false);
       loadWords();
-      
+
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
       setError(err.message);
@@ -128,12 +137,20 @@ export default function AdminWordsPage() {
     if (!confirm('Удалить это слово?')) return;
 
     try {
-      // TODO: API для удаления
+      const res = await fetch(`/api/admin/words?id=${wordId}`, {
+        method: 'DELETE',
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || 'Ошибка удаления');
+
       setSuccess('Слово удалено');
       loadWords();
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
       setError(err.message);
+      setTimeout(() => setError(''), 3000);
     }
   };
 
