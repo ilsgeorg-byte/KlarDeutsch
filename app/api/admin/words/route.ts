@@ -226,7 +226,7 @@ export async function PUT(request: NextRequest) {
 
     // Пробуем через Flask API (если есть endpoint для обновления)
     try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/words/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/words/${body.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
