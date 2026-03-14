@@ -36,9 +36,15 @@ export default function AdminWordsPage() {
 
   // Функция для закрытия модального окна со сбросом состояний
   const closeModal = () => {
+    console.log('closeModal called');
     setEditingWord(null);
     setFormData({ de: '', ru: '', article: '', level: 'A1', topic: '' });
     setShowModal(false);
+    
+    // Принудительно проверяем через setTimeout
+    setTimeout(() => {
+      console.log('After closeModal:', { showModal: false, editingWord: null });
+    }, 100);
   };
 
   // Modal
@@ -110,8 +116,13 @@ export default function AdminWordsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('=== handleSubmit called ===');
+    
     // Предотвращаем повторную отправку
-    if (isSubmitting) return;
+    if (isSubmitting) {
+      console.log('Already submitting, ignoring');
+      return;
+    }
     
     console.log('Form submit:', { editingWord, formData });
     setIsSubmitting(true);
@@ -143,10 +154,13 @@ export default function AdminWordsPage() {
 
       setSuccess(editingWord ? 'Слово обновлено' : 'Слово добавлено');
       
-      // Закрываем модальное окно
+      console.log('Calling closeModal...');
       closeModal();
+      console.log('closeModal returned');
       
+      console.log('Reloading words...');
       await loadWords();
+      console.log('Words reloaded');
 
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
@@ -155,6 +169,7 @@ export default function AdminWordsPage() {
       setTimeout(() => setError(''), 3000);
     } finally {
       setIsSubmitting(false);
+      console.log('=== handleSubmit finished ===');
     }
   };
 

@@ -14,10 +14,17 @@ let pool: Pool | null = null;
 
 function getPool() {
   if (!pool && POSTGRES_URL) {
+    // Проверяем тип подключения
+    const isNeon = POSTGRES_URL.includes('neon') || POSTGRES_URL.includes('supabase');
+    
+    console.log('Creating DB pool, isNeon:', isNeon);
+    
     pool = new Pool({
       connectionString: POSTGRES_URL,
-      ssl: POSTGRES_URL.includes('neon') ? { rejectUnauthorized: false } : false,
+      ssl: isNeon ? { rejectUnauthorized: false } : undefined,
     });
+    
+    console.log('DB pool created successfully');
   }
   return pool;
 }
@@ -192,7 +199,10 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const { id, de, ru, article, level, topic, verb_forms, example_de, example_ru } = body;
 
+    console.log('PUT /api/admin/words:', { id, de, ru, level });
+
     if (!id) {
+      console.error('PUT error: missing id');
       return NextResponse.json(
         { error: 'ID слова обязателен' },
         { status: 400 }
@@ -200,6 +210,7 @@ export async function PUT(request: NextRequest) {
     }
 
     if (!de || !ru) {
+      console.error('PUT error: missing de or ru');
       return NextResponse.json(
         { error: 'Поля de и ru обязательны' },
         { status: 400 }
@@ -226,23 +237,31 @@ export async function PUT(request: NextRequest) {
     }
 
     // Если API недоступен - напрямую в БД
+    console.log('Connecting to database...');
+    console.log('POSTGRES_URL set:', !!POSTGRES_URL);
+    
     const dbPool = getPool();
     if (!dbPool) {
+      console.error('Database pool not created - POSTGRES_URL not configured');
       return NextResponse.json(
         { error: 'Database not configured' },
         { status: 500 }
       );
     }
 
+    console.log('Executing UPDATE query...');
+    
     const result = await dbPool.query(
-      `UPDATE words 
-       SET de = $1, ru = $2, article = $3, level = $4, topic = $5, 
+      `UPDATE words
+       SET de = $1, ru = $2, article = $3, level = $4, topic = $5,
            verb_forms = $6, example_de = $7, example_ru = $8
        WHERE id = $9
        RETURNING id`,
-      [de, ru, article || '', level || 'A1', topic || '', 
+      [de, ru, article || '', level || 'A1', topic || '',
        verb_forms || '', example_de || '', example_ru || '', id]
     );
+
+    console.log('UPDATE result:', { rowCount: result.rowCount, rows: result.rows });
 
     if (result.rowCount === 0) {
       return NextResponse.json(
@@ -254,8 +273,9 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ status: 'success', word_id: id });
   } catch (error) {
     console.error('Admin words PUT error:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { error: 'Ошибка сервера: ' + (error instanceof Error ? error.message : String(error)) },
+      { error: 'Ошибка сервера: ' + errorMessage },
       { status: 500 }
     );
   }
