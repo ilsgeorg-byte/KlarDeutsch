@@ -238,8 +238,8 @@ export async function PUT(request: NextRequest) {
     }
     
     // Прямой доступ к базе данных
-    const dbPool = getPool();
-    if (!dbPool) {
+    const pool = getPool();
+    if (!pool) {
       console.error('Database pool not created - POSTGRES_URL not configured');
       return NextResponse.json(
         { error: 'Database not configured' },
@@ -248,8 +248,8 @@ export async function PUT(request: NextRequest) {
     }
 
     console.log('Executing UPDATE query...');
-    
-    const result = await dbPool.query(
+
+    const updateResult = await pool.query(
       `UPDATE words
        SET de = $1, ru = $2, article = $3, level = $4, topic = $5,
            verb_forms = $6, example_de = $7, example_ru = $8
@@ -259,9 +259,9 @@ export async function PUT(request: NextRequest) {
        verb_forms || '', example_de || '', example_ru || '', id]
     );
 
-    console.log('UPDATE result:', { rowCount: result.rowCount, rows: result.rows });
+    console.log('UPDATE result:', { rowCount: updateResult.rowCount, rows: updateResult.rows });
 
-    if (result.rowCount === 0) {
+    if (updateResult.rowCount === 0) {
       return NextResponse.json(
         { error: 'Слово не найдено' },
         { status: 404 }
