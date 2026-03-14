@@ -6,7 +6,7 @@ import { NextResponse } from 'next/server';
 import { Pool } from 'pg';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
-const POSTGRES_URL = process.env.POSTGRES_URL;
+const POSTGRES_URL = process.env.POSTGRES_URL || '';
 
 // Создаём пул подключений к БД
 let pool: Pool | null = null;
@@ -15,7 +15,7 @@ function getPool() {
   if (!pool && POSTGRES_URL) {
     pool = new Pool({
       connectionString: POSTGRES_URL,
-      ssl: POSTGRES_URL.includes('neon') ? { rejectUnauthorized: false } : false,
+      ssl: POSTGRES_URL.includes('neon') ? { rejectUnauthorized: false } : undefined,
     });
   }
   return pool;

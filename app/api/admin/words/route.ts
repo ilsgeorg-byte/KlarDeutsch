@@ -1,14 +1,14 @@
 /**
  * API для управления словами
- * GET - список слов с пагинацией и еще фильтрами
- * POST - добавить новое слово 1
+ * GET - список слов с пагинацией и фильтрами
+ * POST - добавить новое слово
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
-const POSTGRES_URL = process.env.POSTGRES_URL;
+const POSTGRES_URL = process.env.POSTGRES_URL || '';
 
 let pool: Pool | null = null;
 
@@ -16,21 +16,21 @@ function getPool() {
   if (!pool && POSTGRES_URL) {
     // Проверяем тип подключения
     const isNeon = POSTGRES_URL.includes('neon') || POSTGRES_URL.includes('supabase');
-    
+
     console.log('Creating DB pool, isNeon:', isNeon);
-    
+
     // Добавляем sslmode=verify-full для подавления предупреждения
     let connectionString = POSTGRES_URL;
     if (!connectionString.includes('sslmode=')) {
       const separator = connectionString.includes('?') ? '&' : '?';
       connectionString = `${connectionString}${separator}sslmode=verify-full`;
     }
-    
+
     pool = new Pool({
       connectionString,
       ssl: isNeon ? { rejectUnauthorized: false } : undefined,
     });
-    
+
     console.log('DB pool created successfully');
   }
   return pool;
@@ -284,8 +284,8 @@ export async function PUT(request: NextRequest) {
     }
 
     console.log('Executing UPDATE query...');
-    
-    const result = await dbPool.query(
+
+    const result = await (dbPool as Pool).query(
       `UPDATE words
        SET de = $1, ru = $2, article = $3, level = $4, topic = $5,
            verb_forms = $6, example_de = $7, example_ru = $8
