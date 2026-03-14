@@ -19,8 +19,15 @@ function getPool() {
     
     console.log('Creating DB pool, isNeon:', isNeon);
     
+    // Добавляем sslmode=verify-full для подавления предупреждения
+    let connectionString = POSTGRES_URL;
+    if (!connectionString.includes('sslmode=')) {
+      const separator = connectionString.includes('?') ? '&' : '?';
+      connectionString = `${connectionString}${separator}sslmode=verify-full`;
+    }
+    
     pool = new Pool({
-      connectionString: POSTGRES_URL,
+      connectionString,
       ssl: isNeon ? { rejectUnauthorized: false } : undefined,
     });
     

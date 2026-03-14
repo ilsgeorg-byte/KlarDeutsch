@@ -130,7 +130,7 @@ export default function AdminWordsPage() {
     try {
       // Определяем метод и URL
       const method = editingWord ? 'PUT' : 'POST';
-      const url = '/api/admin/words';
+      const url = '/api/admin/words';  // Всегда один URL
 
       // Добавляем ID для обновления
       const body = editingWord
