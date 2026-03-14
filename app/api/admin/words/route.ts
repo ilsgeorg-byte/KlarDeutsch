@@ -202,6 +202,8 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  console.log('=== PUT /api/admin/words START ===');
+  
   try {
     const body = await request.json();
     const { id, de, ru, article, level, topic, verb_forms, example_de, example_ru } = body;
@@ -224,11 +226,10 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Пропускаем вызов Flask API, если используем прямой доступ к БД
-    // (поскольку Flask API недоступен на Vercel)
-    console.log('Skipping Flask API call, using direct DB access');
+    // Пропускаем вызов Flask API, используем прямой доступ к БД
+    console.log('Using direct DB access');
     console.log('POSTGRES_URL set:', !!POSTGRES_URL);
-    
+
     if (!POSTGRES_URL) {
       console.error('Database not configured');
       return NextResponse.json(
@@ -236,11 +237,13 @@ export async function PUT(request: NextRequest) {
         { status: 500 }
       );
     }
-    
+
     // Прямой доступ к базе данных
     const pool = getPool();
+    console.log('DB pool created:', !!pool);
+    
     if (!pool) {
-      console.error('Database pool not created - POSTGRES_URL not configured');
+      console.error('Database pool not created');
       return NextResponse.json(
         { error: 'Database not configured' },
         { status: 500 }
@@ -268,46 +271,14 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ status: 'success', word_id: id });
-
-    // Если API недоступен - напрямую в БД
-    console.log('Connecting to database...');
-    console.log('POSTGRES_URL set:', !!POSTGRES_URL);
-    
-    const dbPool = getPool();
-    if (!dbPool) {
-      console.error('Database pool not created - POSTGRES_URL not configured');
-      return NextResponse.json(
-        { error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-
-    console.log('Executing UPDATE query...');
-
-    const result = await (dbPool as Pool).query(
-      `UPDATE words
-       SET de = $1, ru = $2, article = $3, level = $4, topic = $5,
-           verb_forms = $6, example_de = $7, example_ru = $8
-       WHERE id = $9
-       RETURNING id`,
-      [de, ru, article || '', level || 'A1', topic || '',
-       verb_forms || '', example_de || '', example_ru || '', id]
-    );
-
-    console.log('UPDATE result:', { rowCount: result.rowCount, rows: result.rows });
-
-    if (result.rowCount === 0) {
-      return NextResponse.json(
-        { error: 'Слово не найдено' },
-        { status: 404 }
-      );
-    }
-
+    console.log('=== PUT /api/admin/words SUCCESS ===');
     return NextResponse.json({ status: 'success', word_id: id });
   } catch (error) {
+    console.error('=== PUT /api/admin/words ERROR ===');
     console.error('Admin words PUT error:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Error message:', errorMessage);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'no stack');
     return NextResponse.json(
       { error: 'Ошибка сервера: ' + errorMessage },
       { status: 500 }
