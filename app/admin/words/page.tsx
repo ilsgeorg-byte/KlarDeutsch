@@ -34,6 +34,13 @@ export default function AdminWordsPage() {
   const [total, setTotal] = useState(0);
   const limit = 20;
 
+  // Функция для закрытия модального окна со сбросом состояний
+  const closeModal = () => {
+    setEditingWord(null);
+    setFormData({ de: '', ru: '', article: '', level: 'A1', topic: '' });
+    setShowModal(false);
+  };
+
   // Modal
   const [showModal, setShowModal] = useState(false);
   const [editingWord, setEditingWord] = useState<Word | null>(null);
@@ -101,16 +108,20 @@ export default function AdminWordsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    console.log('Form submit:', { editingWord, formData });
 
     try {
       // Определяем метод и URL
       const method = editingWord ? 'PUT' : 'POST';
       const url = '/api/admin/words';
-      
+
       // Добавляем ID для обновления
-      const body = editingWord 
+      const body = editingWord
         ? { ...formData, id: editingWord.id }
         : formData;
+
+      console.log('Sending request:', { method, url, body });
 
       const res = await fetch(url, {
         method,
@@ -118,16 +129,23 @@ export default function AdminWordsPage() {
         body: JSON.stringify(body),
       });
 
+      console.log('Response status:', res.status);
+
       const data = await res.json();
+      console.log('Response data:', data);
 
       if (!res.ok) throw new Error(data.error || 'Ошибка сохранения');
 
       setSuccess(editingWord ? 'Слово обновлено' : 'Слово добавлено');
-      setShowModal(false);
-      loadWords();
+      
+      // Закрываем модальное окно
+      closeModal();
+      
+      await loadWords();
 
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
+      console.error('Form submit error:', err);
       setError(err.message);
       setTimeout(() => setError(''), 3000);
     }
@@ -314,18 +332,21 @@ export default function AdminWordsPage() {
 
       {/* Modal */}
       {showModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-        }} onClick={() => setShowModal(false)}>
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+          onClick={closeModal}
+        >
           <div
             style={{
               background: 'white',
@@ -341,7 +362,7 @@ export default function AdminWordsPage() {
             <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: 24 }}>
               {editingWord ? 'Редактировать слово' : 'Новое слово'}
             </h3>
-            
+
             <form onSubmit={handleSubmit} className="adminForm">
               <div className="adminFormGroup">
                 <label className="adminFormLabel">Немецкое слово *</label>
@@ -411,7 +432,7 @@ export default function AdminWordsPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowModal(false)}
+                  onClick={closeModal}
                   className="adminBtn adminBtnSecondary"
                 >
                   Отмена
