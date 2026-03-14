@@ -224,24 +224,51 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Пробуем через Flask API (если есть endpoint для обновления)
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/words/${body.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${process.env.ADMIN_API_TOKEN}`,
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        return NextResponse.json(data);
-      }
-    } catch (apiError) {
-      console.log('Flask API unavailable, using direct DB access');
+    // Пропускаем вызов Flask API, если используем прямой доступ к БД
+    // (поскольку Flask API недоступен на Vercel)
+    console.log('Skipping Flask API call, using direct DB access');
+    console.log('POSTGRES_URL set:', !!POSTGRES_URL);
+    
+    if (!POSTGRES_URL) {
+      console.error('Database not configured');
+      return NextResponse.json(
+        { error: 'Database not configured' },
+        { status: 500 }
+      );
     }
+    
+    // Прямой доступ к базе данных
+    const dbPool = getPool();
+    if (!dbPool) {
+      console.error('Database pool not created - POSTGRES_URL not configured');
+      return NextResponse.json(
+        { error: 'Database not configured' },
+        { status: 500 }
+      );
+    }
+
+    console.log('Executing UPDATE query...');
+    
+    const result = await dbPool.query(
+      `UPDATE words
+       SET de = $1, ru = $2, article = $3, level = $4, topic = $5,
+           verb_forms = $6, example_de = $7, example_ru = $8
+       WHERE id = $9
+       RETURNING id`,
+      [de, ru, article || '', level || 'A1', topic || '',
+       verb_forms || '', example_de || '', example_ru || '', id]
+    );
+
+    console.log('UPDATE result:', { rowCount: result.rowCount, rows: result.rows });
+
+    if (result.rowCount === 0) {
+      return NextResponse.json(
+        { error: 'Слово не найдено' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ status: 'success', word_id: id });
 
     // Если API недоступен - напрямую в БД
     console.log('Connecting to database...');
