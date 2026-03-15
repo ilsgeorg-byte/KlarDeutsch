@@ -8,7 +8,7 @@ if api_dir not in sys.path:
     sys.path.insert(0, api_dir)
 
 from .auth import token_required
-from db import get_db_connection
+from db import get_db_connection, get_db_cursor
 from utils.cache_decorator import cache_response, invalidate_user_cache
 
 learning_bp = Blueprint('learning', __name__, url_prefix='/api/learning')

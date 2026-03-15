@@ -8,7 +8,7 @@ api_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if api_dir not in sys.path:
     sys.path.insert(0, api_dir)
 
-from db import get_db_connection
+from db import get_db_connection, get_db_cursor
 from .auth import token_required, SECRET_KEY
 from utils.token_utils import get_current_user_id_optional
 from utils.cache_decorator import cache_response, cache_invalidate, invalidate_user_cache

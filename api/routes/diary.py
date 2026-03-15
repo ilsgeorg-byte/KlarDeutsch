@@ -5,7 +5,7 @@ import logging
 import google.generativeai as genai
 from openai import OpenAI
 from .auth import token_required
-from db import get_db_connection
+from db import get_db_connection, get_db_cursor
 
 diary_bp = Blueprint('diary', __name__, url_prefix='/api/diary')
 

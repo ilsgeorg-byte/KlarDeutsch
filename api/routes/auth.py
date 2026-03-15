@@ -6,7 +6,7 @@ import bcrypt
 import logging
 from flask import Blueprint, request, jsonify, current_app
 from functools import wraps
-from db import get_db_connection
+from db import get_db_connection, get_db_cursor
 from utils.token_utils import (
     decode_token, 
     TokenError, 
