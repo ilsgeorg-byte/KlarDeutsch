@@ -56,44 +56,39 @@ def get_words():
         if level not in allowed_levels:
             return jsonify({"error": f"Неверный уровень. Допустимые: {', '.join(allowed_levels)}"}), 400
         
-        conn = get_db_connection()
-        cur = conn.cursor()
+        with get_db_cursor() as cur:
+            # Получаем общее количество слов для уровня
+            cur.execute("SELECT COUNT(*) FROM words WHERE level = %s", (level,))
+            total = cur.fetchone()[0]
 
-        # Получаем общее количество слов для уровня
-        cur.execute("SELECT COUNT(*) FROM words WHERE level = %s", (level,))
-        total = cur.fetchone()[0]
+            # Получаем слова с пагинацией И НОВЫМИ КОЛОНКАМИ
+            user_id = get_current_user_id()
+            if user_id:
+                cur.execute("""
+                    SELECT w.id, w.level, w.topic, w.de, w.ru, w.article, w.verb_forms, w.example_de, w.example_ru, w.audio_url,
+                           w.plural, w.examples, w.synonyms, w.antonyms, w.collocations,
+                           (f.word_id IS NOT NULL) as is_favorite
+                    FROM words w
+                    LEFT JOIN user_favorites f ON w.id = f.word_id AND f.user_id = %s
+                    WHERE w.level = %s AND (w.user_id IS NULL OR w.user_id = %s)
+                    ORDER BY w.id
+                    LIMIT %s OFFSET %s
+                """, (user_id, level, user_id, limit, skip))
+            else:
+                cur.execute("""
+                    SELECT id, level, topic, de, ru, article, verb_forms, example_de, example_ru, audio_url,
+                           plural, examples, synonyms, antonyms, collocations,
+                           false as is_favorite
+                    FROM words
+                    WHERE level = %s AND user_id IS NULL
+                    ORDER BY id
+                    LIMIT %s OFFSET %s
+                """, (level, limit, skip))
 
-        # Получаем слова с пагинацией И НОВЫМИ КОЛОНКАМИ
-        user_id = get_current_user_id()
-        if user_id:
-            cur.execute("""
-                SELECT w.id, w.level, w.topic, w.de, w.ru, w.article, w.verb_forms, w.example_de, w.example_ru, w.audio_url,
-                       w.plural, w.examples, w.synonyms, w.antonyms, w.collocations,
-                       (f.word_id IS NOT NULL) as is_favorite
-                FROM words w
-                LEFT JOIN user_favorites f ON w.id = f.word_id AND f.user_id = %s
-                WHERE w.level = %s AND (w.user_id IS NULL OR w.user_id = %s)
-                ORDER BY w.id
-                LIMIT %s OFFSET %s
-            """, (user_id, level, user_id, limit, skip))
-        else:
-            cur.execute("""
-                SELECT id, level, topic, de, ru, article, verb_forms, example_de, example_ru, audio_url,
-                       plural, examples, synonyms, antonyms, collocations,
-                       false as is_favorite
-                FROM words 
-                WHERE level = %s AND user_id IS NULL
-                ORDER BY id
-                LIMIT %s OFFSET %s
-            """, (level, limit, skip))
-
-        columns = [desc[0] for desc in cur.description]
-        results = []
-        for row in cur.fetchall():
-            results.append(dict(zip(columns, row)))
-
-        cur.close()
-        conn.close()
+            columns = [desc[0] for desc in cur.description]
+            results = []
+            for row in cur.fetchall():
+                results.append(dict(zip(columns, row)))
         
         return jsonify({
             "data": results,
@@ -112,39 +107,35 @@ def get_words():
 def get_word(word_id: int):
     """Получить одно слово по ID"""
     try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        user_id = get_current_user_id()
-        if user_id:
-            cur.execute("""
-                SELECT w.id, w.level, w.topic, w.de, w.ru, w.article, w.verb_forms, w.example_de, w.example_ru, w.audio_url,
-                       w.plural, w.examples, w.synonyms, w.antonyms, w.collocations,
-                       (f.word_id IS NOT NULL) as is_favorite
-                FROM words w
-                LEFT JOIN user_favorites f ON w.id = f.word_id AND f.user_id = %s
-                WHERE w.id = %s AND (w.user_id IS NULL OR w.user_id = %s)
-            """, (user_id, word_id, user_id))
-        else:
-            cur.execute("""
-                SELECT id, level, topic, de, ru, article, verb_forms, example_de, example_ru, audio_url,
-                       plural, examples, synonyms, antonyms, collocations,
-                       false as is_favorite
-                FROM words 
-                WHERE id = %s AND user_id IS NULL
-            """, (word_id,))
-        
-        row = cur.fetchone()
-        columns = [desc[0] for desc in cur.description]
-        cur.close()
-        conn.close()
-        
-        if not row:
-            return jsonify({"error": "Слово не найдено"}), 404
-        
-        result = dict(zip(columns, row))
-        
-        return jsonify(result), 200
+        with get_db_cursor() as cur:
+            user_id = get_current_user_id()
+            if user_id:
+                cur.execute("""
+                    SELECT w.id, w.level, w.topic, w.de, w.ru, w.article, w.verb_forms, w.example_de, w.example_ru, w.audio_url,
+                           w.plural, w.examples, w.synonyms, w.antonyms, w.collocations,
+                           (f.word_id IS NOT NULL) as is_favorite
+                    FROM words w
+                    LEFT JOIN user_favorites f ON w.id = f.word_id AND f.user_id = %s
+                    WHERE w.id = %s AND (w.user_id IS NULL OR w.user_id = %s)
+                """, (user_id, word_id, user_id))
+            else:
+                cur.execute("""
+                    SELECT id, level, topic, de, ru, article, verb_forms, example_de, example_ru, audio_url,
+                           plural, examples, synonyms, antonyms, collocations,
+                           false as is_favorite
+                    FROM words
+                    WHERE id = %s AND user_id IS NULL
+                """, (word_id,))
+            
+            row = cur.fetchone()
+            columns = [desc[0] for desc in cur.description]
+            
+            if not row:
+                return jsonify({"error": "Слово не найдено"}), 404
+            
+            result = dict(zip(columns, row))
+            
+            return jsonify(result), 200
     
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -157,39 +148,34 @@ def get_words_by_topic(topic: str):
         skip = int(request.args.get("skip", 0))
         limit = min(int(request.args.get("limit", 100)), 500)
         
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        # Проверяем, что тема существует
-        cur.execute("SELECT COUNT(*) FROM words WHERE topic = %s", (topic,))
-        total = cur.fetchone()[0]
-        
-        if total == 0:
-            return jsonify({"error": "Тема не найдена"}), 404
-        
-        cur.execute("""
-            SELECT id, level, topic, de, ru, article, verb_forms, example_de, example_ru, audio_url,
-                   plural, examples, synonyms, antonyms, collocations
-            FROM words 
-            WHERE topic = %s
-            ORDER BY id
-            LIMIT %s OFFSET %s
-        """, (topic, limit, skip))
-        
-        columns = [desc[0] for desc in cur.description]
-        results = []
-        for row in cur.fetchall():
-            results.append(dict(zip(columns, row)))
-        
-        cur.close()
-        conn.close()
-        
-        return jsonify({
-            "data": results,
-            "total": total,
-            "skip": skip,
-            "limit": limit
-        }), 200
+        with get_db_cursor() as cur:
+            # Проверяем, что тема существует
+            cur.execute("SELECT COUNT(*) FROM words WHERE topic = %s", (topic,))
+            total = cur.fetchone()[0]
+            
+            if total == 0:
+                return jsonify({"error": "Тема не найдена"}), 404
+            
+            cur.execute("""
+                SELECT id, level, topic, de, ru, article, verb_forms, example_de, example_ru, audio_url,
+                       plural, examples, synonyms, antonyms, collocations
+                FROM words
+                WHERE topic = %s
+                ORDER BY id
+                LIMIT %s OFFSET %s
+            """, (topic, limit, skip))
+            
+            columns = [desc[0] for desc in cur.description]
+            results = []
+            for row in cur.fetchall():
+                results.append(dict(zip(columns, row)))
+            
+            return jsonify({
+                "data": results,
+                "total": total,
+                "skip": skip,
+                "limit": limit
+            }), 200
     
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -199,16 +185,11 @@ def get_words_by_topic(topic: str):
 def get_levels():
     """Получить список всех доступных уровней"""
     try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        cur.execute("SELECT DISTINCT level FROM words ORDER BY level")
-        levels = [row[0] for row in cur.fetchall()]
-        
-        cur.close()
-        conn.close()
-        
-        return jsonify({"levels": levels}), 200
+        with get_db_cursor() as cur:
+            cur.execute("SELECT DISTINCT level FROM words ORDER BY level")
+            levels = [row[0] for row in cur.fetchall()]
+            
+            return jsonify({"levels": levels}), 200
     
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -220,20 +201,15 @@ def get_topics():
     try:
         level = request.args.get("level")
         
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        if level:
-            cur.execute("SELECT DISTINCT topic FROM words WHERE level = %s ORDER BY topic", (level,))
-        else:
-            cur.execute("SELECT DISTINCT topic FROM words ORDER BY topic")
-        
-        topics = [row[0] for row in cur.fetchall()]
-        
-        cur.close()
-        conn.close()
-        
-        return jsonify({"topics": topics}), 200
+        with get_db_cursor() as cur:
+            if level:
+                cur.execute("SELECT DISTINCT topic FROM words WHERE level = %s ORDER BY topic", (level,))
+            else:
+                cur.execute("SELECT DISTINCT topic FROM words ORDER BY topic")
+            
+            topics = [row[0] for row in cur.fetchall()]
+            
+            return jsonify({"topics": topics}), 200
     
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -258,52 +234,47 @@ def search_words():
             
         user_id = get_current_user_id()
         
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        if user_id:
-            cur.execute("""
-                SELECT w.id, w.level, w.topic, w.de, w.ru, w.article, w.verb_forms, w.example_de, w.example_ru, w.audio_url,
-                       w.plural, w.examples, w.synonyms, w.antonyms, w.collocations,
-                       (f.word_id IS NOT NULL) as is_favorite
-                FROM words w
-                LEFT JOIN user_favorites f ON w.id = f.word_id AND f.user_id = %s
-                WHERE (w.de ILIKE %s OR w.ru ILIKE %s) AND (w.user_id IS NULL OR w.user_id = %s)
-                ORDER BY 
-                    CASE 
-                        WHEN w.de ILIKE %s THEN 1
-                        WHEN w.ru ILIKE %s THEN 2
-                        ELSE 3 
-                    END, 
-                    w.de
-                LIMIT %s
-            """, (user_id, search_pattern, search_pattern, user_id, query, query, limit))
-        else:
-            cur.execute("""
-                SELECT id, level, topic, de, ru, article, verb_forms, example_de, example_ru, audio_url,
-                       plural, examples, synonyms, antonyms, collocations,
-                       false as is_favorite
-                FROM words 
-                WHERE (de ILIKE %s OR ru ILIKE %s) AND user_id IS NULL
-                ORDER BY 
-                    CASE 
-                        WHEN de ILIKE %s THEN 1
-                        WHEN ru ILIKE %s THEN 2
-                        ELSE 3 
-                    END, 
-                    de
-                LIMIT %s
-            """, (search_pattern, search_pattern, query, query, limit))
-        
-        columns = [desc[0] for desc in cur.description]
-        results = []
-        for row in cur.fetchall():
-            results.append(dict(zip(columns, row)))
+        with get_db_cursor() as cur:
+            if user_id:
+                cur.execute("""
+                    SELECT w.id, w.level, w.topic, w.de, w.ru, w.article, w.verb_forms, w.example_de, w.example_ru, w.audio_url,
+                           w.plural, w.examples, w.synonyms, w.antonyms, w.collocations,
+                           (f.word_id IS NOT NULL) as is_favorite
+                    FROM words w
+                    LEFT JOIN user_favorites f ON w.id = f.word_id AND f.user_id = %s
+                    WHERE (w.de ILIKE %s OR w.ru ILIKE %s) AND (w.user_id IS NULL OR w.user_id = %s)
+                    ORDER BY
+                        CASE
+                            WHEN w.de ILIKE %s THEN 1
+                            WHEN w.ru ILIKE %s THEN 2
+                            ELSE 3
+                        END,
+                        w.de
+                    LIMIT %s
+                """, (user_id, search_pattern, search_pattern, user_id, query, query, limit))
+            else:
+                cur.execute("""
+                    SELECT id, level, topic, de, ru, article, verb_forms, example_de, example_ru, audio_url,
+                           plural, examples, synonyms, antonyms, collocations,
+                           false as is_favorite
+                    FROM words
+                    WHERE (de ILIKE %s OR ru ILIKE %s) AND user_id IS NULL
+                    ORDER BY
+                        CASE
+                            WHEN de ILIKE %s THEN 1
+                            WHEN ru ILIKE %s THEN 2
+                            ELSE 3
+                        END,
+                        de
+                    LIMIT %s
+                """, (search_pattern, search_pattern, query, query, limit))
             
-        cur.close()
-        conn.close()
-        
-        return jsonify({"data": results, "query": query}), 200
+            columns = [desc[0] for desc in cur.description]
+            results = []
+            for row in cur.fetchall():
+                results.append(dict(zip(columns, row)))
+                
+            return jsonify({"data": results, "query": query}), 200
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -314,25 +285,21 @@ def search_words():
 def get_favorites():
     """Получить список избранных слов пользователя"""
     try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        cur.execute("""
-            SELECT w.id, w.level, w.topic, w.de, w.ru, w.article, w.verb_forms, w.example_de, w.example_ru, w.audio_url,
-                   w.plural, w.examples, w.synonyms, w.antonyms, w.collocations,
-                   true as is_favorite
-            FROM words w
-            JOIN user_favorites f ON w.id = f.word_id
-            WHERE f.user_id = %s
-            ORDER BY f.created_at DESC
-        """, (request.user_id,))
-        
-        columns = [desc[0] for desc in cur.description]
-        results = [dict(zip(columns, row)) for row in cur.fetchall()]
-        
-        cur.close()
-        conn.close()
-        return jsonify(results), 200
+        with get_db_cursor() as cur:
+            cur.execute("""
+                SELECT w.id, w.level, w.topic, w.de, w.ru, w.article, w.verb_forms, w.example_de, w.example_ru, w.audio_url,
+                       w.plural, w.examples, w.synonyms, w.antonyms, w.collocations,
+                       true as is_favorite
+                FROM words w
+                JOIN user_favorites f ON w.id = f.word_id
+                WHERE f.user_id = %s
+                ORDER BY f.created_at DESC
+            """, (request.user_id,))
+            
+            columns = [desc[0] for desc in cur.description]
+            results = [dict(zip(columns, row)) for row in cur.fetchall()]
+            
+            return jsonify(results), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -342,28 +309,22 @@ def get_favorites():
 def toggle_favorite(word_id: int):
     """Добавить или удалить слово из избранного"""
     try:
-        conn = get_db_connection()
-        cur = conn.cursor()
+        with get_db_cursor() as cur:
+            # Проверяем, в избранном ли оно уже
+            cur.execute("SELECT 1 FROM user_favorites WHERE user_id = %s AND word_id = %s", (request.user_id, word_id))
+            is_fav = cur.fetchone()
 
-        # Проверяем, в избранном ли оно уже
-        cur.execute("SELECT 1 FROM user_favorites WHERE user_id = %s AND word_id = %s", (request.user_id, word_id))
-        is_fav = cur.fetchone()
+            if is_fav:
+                cur.execute("DELETE FROM user_favorites WHERE user_id = %s AND word_id = %s", (request.user_id, word_id))
+                status = "removed"
+            else:
+                cur.execute("INSERT INTO user_favorites (user_id, word_id) VALUES (%s, %s)", (request.user_id, word_id))
+                status = "added"
 
-        if is_fav:
-            cur.execute("DELETE FROM user_favorites WHERE user_id = %s AND word_id = %s", (request.user_id, word_id))
-            status = "removed"
-        else:
-            cur.execute("INSERT INTO user_favorites (user_id, word_id) VALUES (%s, %s)", (request.user_id, word_id))
-            status = "added"
-
-        conn.commit()
-        cur.close()
-        conn.close()
-        
-        # Инвалидируем пользовательский кэш
-        invalidate_user_cache(request.user_id)
-        
-        return jsonify({"status": "success", "action": status}), 200
+            # Инвалидируем пользовательский кэш
+            invalidate_user_cache(request.user_id)
+            
+            return jsonify({"status": "success", "action": status}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -386,47 +347,35 @@ def update_word(word_id: int):
         if not de or not ru:
             return jsonify({"error": "Поля 'de' и 'ru' обязательны"}), 400
 
-        conn = get_db_connection()
-        cur = conn.cursor()
+        with get_db_cursor() as cur:
+            # Проверяем, существует ли слово и принадлежит ли оно пользователю
+            cur.execute("SELECT user_id FROM words WHERE id = %s", (word_id,))
+            result = cur.fetchone()
+            
+            if not result:
+                return jsonify({"error": "Слово не найдено"}), 404
+            
+            word_user_id = result[0]
+            # Только администраторы могут изменять общие слова (где user_id IS NULL)
+            # Пользователи могут изменять только свои слова
+            if word_user_id is not None and word_user_id != request.user_id:
+                return jsonify({"error": "Нет прав для изменения этого слова"}), 403
 
-        # Проверяем, существует ли слово и принадлежит ли оно пользователю
-        cur.execute("SELECT user_id FROM words WHERE id = %s", (word_id,))
-        result = cur.fetchone()
-        
-        if not result:
-            cur.close()
-            conn.close()
-            return jsonify({"error": "Слово не найдено"}), 404
-        
-        word_user_id = result[0]
-        # Только администраторы могут изменять общие слова (где user_id IS NULL)
-        # Пользователи могут изменять только свои слова
-        if word_user_id is not None and word_user_id != request.user_id:
-            cur.close()
-            conn.close()
-            return jsonify({"error": "Нет прав для изменения этого слова"}), 403
+            # Обновляем слово
+            cur.execute("""
+                UPDATE words
+                SET de = %s, ru = %s, article = %s, level = %s, topic = %s,
+                    verb_forms = %s, example_de = %s, example_ru = %s
+                WHERE id = %s
+            """, (de, ru, article, level, topic, verb_forms, example_de, example_ru, word_id))
 
-        # Обновляем слово
-        cur.execute("""
-            UPDATE words
-            SET de = %s, ru = %s, article = %s, level = %s, topic = %s,
-                verb_forms = %s, example_de = %s, example_ru = %s
-            WHERE id = %s
-        """, (de, ru, article, level, topic, verb_forms, example_de, example_ru, word_id))
+            if cur.rowcount == 0:
+                return jsonify({"error": "Слово не найдено"}), 404
 
-        if cur.rowcount == 0:
-            cur.close()
-            conn.close()
-            return jsonify({"error": "Слово не найдено"}), 404
-
-        conn.commit()
-        cur.close()
-        conn.close()
-        
-        # Инвалидируем пользовательский кэш
-        invalidate_user_cache(request.user_id)
-        
-        return jsonify({"status": "success", "word_id": word_id}), 200
+            # Инвалидируем пользовательский кэш
+            invalidate_user_cache(request.user_id)
+            
+            return jsonify({"status": "success", "word_id": word_id}), 200
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -438,15 +387,12 @@ def update_word_admin(word_id: int):
     """Обновить слово по ID (для администраторов - любые слова)"""
     try:
         # Проверяем права администратора
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("SELECT role FROM users WHERE id = %s", (request.user_id,))
-        result = cur.fetchone()
-        cur.close()
-        conn.close()
-        
-        if not result or result[0] != 'admin':
-            return jsonify({"error": "Требуются права администратора"}), 403
+        with get_db_cursor() as cur:
+            cur.execute("SELECT role FROM users WHERE id = %s", (request.user_id,))
+            result = cur.fetchone()
+            
+            if not result or result[0] != 'admin':
+                return jsonify({"error": "Требуются права администратора"}), 403
 
         data = request.json
         de = data.get('de', '').strip()
@@ -461,30 +407,22 @@ def update_word_admin(word_id: int):
         if not de or not ru:
             return jsonify({"error": "Поля 'de' и 'ru' обязательны"}), 400
 
-        conn = get_db_connection()
-        cur = conn.cursor()
+        with get_db_cursor() as cur:
+            # Обновляем слово (администратор может обновить любое слово)
+            cur.execute("""
+                UPDATE words
+                SET de = %s, ru = %s, article = %s, level = %s, topic = %s,
+                    verb_forms = %s, example_de = %s, example_ru = %s
+                WHERE id = %s
+            """, (de, ru, article, level, topic, verb_forms, example_de, example_ru, word_id))
 
-        # Обновляем слово (администратор может обновить любое слово)
-        cur.execute("""
-            UPDATE words
-            SET de = %s, ru = %s, article = %s, level = %s, topic = %s,
-                verb_forms = %s, example_de = %s, example_ru = %s
-            WHERE id = %s
-        """, (de, ru, article, level, topic, verb_forms, example_de, example_ru, word_id))
+            if cur.rowcount == 0:
+                return jsonify({"error": "Слово не найдено"}), 404
 
-        if cur.rowcount == 0:
-            cur.close()
-            conn.close()
-            return jsonify({"error": "Слово не найдено"}), 404
-
-        conn.commit()
-        cur.close()
-        conn.close()
-        
-        # Инвалидируем пользовательский кэш
-        invalidate_user_cache(request.user_id)
-        
-        return jsonify({"status": "success", "word_id": word_id}), 200
+            # Инвалидируем пользовательский кэш
+            invalidate_user_cache(request.user_id)
+            
+            return jsonify({"status": "success", "word_id": word_id}), 200
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -509,30 +447,24 @@ def add_custom_word():
         if not de or not ru:
             return jsonify({"error": "Поля 'de' и 'ru' обязательны"}), 400
 
-        conn = get_db_connection()
-        cur = conn.cursor()
+        with get_db_cursor() as cur:
+            try:
+                cur.execute("""
+                    INSERT INTO words (de, ru, article, level, topic, verb_forms, example_de, example_ru, user_id)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id
+                """, (de, ru, article, level, topic, verb_forms, example_de, example_ru, request.user_id))
 
-        try:
-            cur.execute("""
-                INSERT INTO words (de, ru, article, level, topic, verb_forms, example_de, example_ru, user_id)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING id
-            """, (de, ru, article, level, topic, verb_forms, example_de, example_ru, request.user_id))
-
-            word_id = cur.fetchone()[0]
-            conn.commit()
-
-            cur.close()
-            conn.close()
-            
-            # Инвалидируем пользовательский кэш
-            invalidate_user_cache(request.user_id)
-            
-            return jsonify({"status": "success", "word_id": word_id}), 201
-        except Exception as e:
-            if "unique" in str(e).lower():
-                return jsonify({"error": "Такое слово уже есть в вашем списке или в общем доступе"}), 400
-            raise e
+                word_id = cur.fetchone()[0]
+                
+                # Инвалидируем пользовательский кэш
+                invalidate_user_cache(request.user_id)
+                
+                return jsonify({"status": "success", "word_id": word_id}), 201
+            except Exception as e:
+                if "unique" in str(e).lower():
+                    return jsonify({"error": "Такое слово уже есть в вашем списке или в общем доступе"}), 400
+                raise e
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500

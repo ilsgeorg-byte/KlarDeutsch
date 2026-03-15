@@ -74,34 +74,30 @@ def register():
     password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
     try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute(
-            "INSERT INTO users (username, email, password_hash) VALUES (%s, %s, %s) RETURNING id",
-            (username, email, password_hash)
-        )
-        user_id = cur.fetchone()[0]
-        conn.commit()
-        cur.close()
-        conn.close()
+        with get_db_cursor() as cur:
+            cur.execute(
+                "INSERT INTO users (username, email, password_hash) VALUES (%s, %s, %s) RETURNING id",
+                (username, email, password_hash)
+            )
+            user_id = cur.fetchone()[0]
 
-        # Автоматический вход после регистрации (генерируем токен)
-        token = jwt.encode({
-            'user_id': user_id,
-            'username': username,
-            'exp': datetime.datetime.utcnow() + datetime.timedelta(days=7)
-        }, SECRET_KEY, algorithm="HS256")
-
-        return jsonify({
-            'status': 'success', 
-            'message': 'Пользователь зарегистрирован',
-            'token': token,
-            'user': {
-                'id': user_id,
+            # Автоматический вход после регистрации (генерируем токен)
+            token = jwt.encode({
+                'user_id': user_id,
                 'username': username,
-                'email': email
-            }
-        }), 201
+                'exp': datetime.datetime.utcnow() + datetime.timedelta(days=7)
+            }, SECRET_KEY, algorithm="HS256")
+
+            return jsonify({
+                'status': 'success',
+                'message': 'Пользователь зарегистрирован',
+                'token': token,
+                'user': {
+                    'id': user_id,
+                    'username': username,
+                    'email': email
+                }
+            }), 201
     except Exception as e:
         if "unique" in str(e).lower():
             return jsonify({'error': 'Такой пользователь или email уже существует'}), 400
@@ -117,30 +113,27 @@ def login():
         return jsonify({'error': 'Введите email и пароль'}), 400
 
     try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("SELECT id, username, password_hash FROM users WHERE email = %s", (email,))
-        user = cur.fetchone()
-        cur.close()
-        conn.close()
+        with get_db_cursor() as cur:
+            cur.execute("SELECT id, username, password_hash FROM users WHERE email = %s", (email,))
+            user = cur.fetchone()
 
-        if user and bcrypt.checkpw(password.encode('utf-8'), user[2].encode('utf-8')):
-            token = jwt.encode({
-                'user_id': user[0],
-                'username': user[1],
-                'exp': datetime.datetime.utcnow() + datetime.timedelta(days=7)
-            }, SECRET_KEY, algorithm="HS256")
-
-            return jsonify({
-                'token': token,
-                'user': {
-                    'id': user[0],
+            if user and bcrypt.checkpw(password.encode('utf-8'), user[2].encode('utf-8')):
+                token = jwt.encode({
+                    'user_id': user[0],
                     'username': user[1],
-                    'email': email
-                }
-            }), 200
-        else:
-            return jsonify({'error': 'Неверный email или пароль'}), 401
+                    'exp': datetime.datetime.utcnow() + datetime.timedelta(days=7)
+                }, SECRET_KEY, algorithm="HS256")
+
+                return jsonify({
+                    'token': token,
+                    'user': {
+                        'id': user[0],
+                        'username': user[1],
+                        'email': email
+                    }
+                }), 200
+            else:
+                return jsonify({'error': 'Неверный email или пароль'}), 401
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -148,20 +141,17 @@ def login():
 @token_required
 def get_me():
     try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("SELECT id, username, email FROM users WHERE id = %s", (request.user_id,))
-        user_row = cur.fetchone()
-        cur.close()
-        conn.close()
+        with get_db_cursor() as cur:
+            cur.execute("SELECT id, username, email FROM users WHERE id = %s", (request.user_id,))
+            user_row = cur.fetchone()
 
-        if user_row:
-            return jsonify({
-                'id': user_row[0],
-                'username': user_row[1],
-                'email': user_row[2]
-            }), 200
-        else:
-            return jsonify({'error': 'Пользователь не найден'}), 404
+            if user_row:
+                return jsonify({
+                    'id': user_row[0],
+                    'username': user_row[1],
+                    'email': user_row[2]
+                }), 200
+            else:
+                return jsonify({'error': 'Пользователь не найден'}), 404
     except Exception as e:
         return jsonify({'error': str(e)}), 500

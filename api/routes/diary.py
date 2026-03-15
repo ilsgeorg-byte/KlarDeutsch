@@ -149,15 +149,11 @@ def correct_text():
     
     # СОХРАНЕНИЕ В БД
     try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("""
-            INSERT INTO diary_entries (user_id, original_text, corrected_text, explanation)
-            VALUES (%s, %s, %s, %s)
-        """, (request.user_id, text, result['corrected'], result['explanation']))
-        conn.commit()
-        cur.close()
-        conn.close()
+        with get_db_cursor() as cur:
+            cur.execute("""
+                INSERT INTO diary_entries (user_id, original_text, corrected_text, explanation)
+                VALUES (%s, %s, %s, %s)
+            """, (request.user_id, text, result['corrected'], result['explanation']))
     except Exception as db_err:
         print(f"Ошибка сохранения в БД: {db_err}")
         # Не возвращаем ошибку пользователю, так как коррекция уже получена
@@ -169,28 +165,24 @@ def correct_text():
 def get_history():
     """Получить историю записей"""
     try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT id, original_text, corrected_text, explanation, created_at
-            FROM diary_entries
-            WHERE user_id = %s
-            ORDER BY created_at DESC
-        """, (request.user_id,))
+        with get_db_cursor() as cur:
+            cur.execute("""
+                SELECT id, original_text, corrected_text, explanation, created_at
+                FROM diary_entries
+                WHERE user_id = %s
+                ORDER BY created_at DESC
+            """, (request.user_id,))
 
-        columns = [desc[0] for desc in cur.description]
-        results = []
-        for row in cur.fetchall():
-            item = dict(zip(columns, row))
-            # Форматируем дату для фронтенда
-            if item['created_at']:
-                item['created_at'] = item['created_at'].strftime("%Y-%m-%d %H:%M")
-            results.append(item)
-
-        cur.close()
-        conn.close()
-        
-        return jsonify(results), 200
+            columns = [desc[0] for desc in cur.description]
+            results = []
+            for row in cur.fetchall():
+                item = dict(zip(columns, row))
+                # Форматируем дату для фронтенда
+                if item['created_at']:
+                    item['created_at'] = item['created_at'].strftime("%Y-%m-%d %H:%M")
+                results.append(item)
+            
+            return jsonify(results), 200
     except Exception as e:
         print(f"History Error: {str(e)}")
         return jsonify({"error": str(e)}), 500
@@ -201,32 +193,26 @@ def get_history():
 def get_entry(entry_id):
     """Получить одну запись по ID"""
     try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT id, user_id, original_text, corrected_text, explanation, created_at
-            FROM diary_entries
-            WHERE id = %s AND user_id = %s
-        """, (entry_id, request.user_id))
+        with get_db_cursor() as cur:
+            cur.execute("""
+                SELECT id, user_id, original_text, corrected_text, explanation, created_at
+                FROM diary_entries
+                WHERE id = %s AND user_id = %s
+            """, (entry_id, request.user_id))
 
-        row = cur.fetchone()
-        
-        if not row:
-            cur.close()
-            conn.close()
-            return jsonify({"error": "Запись не найдена"}), 404
+            row = cur.fetchone()
+            
+            if not row:
+                return jsonify({"error": "Запись не найдена"}), 404
 
-        columns = ['id', 'user_id', 'original_text', 'corrected_text', 'explanation', 'created_at']
-        result = dict(zip(columns, row))
-        
-        # Форматируем дату
-        if result['created_at']:
-            result['created_at'] = result['created_at'].strftime("%Y-%m-%d %H:%M")
-
-        cur.close()
-        conn.close()
-        
-        return jsonify(result), 200
+            columns = ['id', 'user_id', 'original_text', 'corrected_text', 'explanation', 'created_at']
+            result = dict(zip(columns, row))
+            
+            # Форматируем дату
+            if result['created_at']:
+                result['created_at'] = result['created_at'].strftime("%Y-%m-%d %H:%M")
+            
+            return jsonify(result), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -236,13 +222,9 @@ def get_entry(entry_id):
 def delete_entry(entry_id):
     """Удалить запись"""
     try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("DELETE FROM diary_entries WHERE id = %s AND user_id = %s", (entry_id, request.user_id))
-        conn.commit()
-        cur.close()
-        conn.close()
-        return jsonify({"status": "success"}), 200
+        with get_db_cursor() as cur:
+            cur.execute("DELETE FROM diary_entries WHERE id = %s AND user_id = %s", (entry_id, request.user_id))
+            return jsonify({"status": "success"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -293,39 +275,33 @@ def add_diary_words():
         if not words:
             return jsonify({{"status": "ok"}}), 200
             
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        # Сначала убедимся, что есть индекс для ON CONFLICT
-        # cur.execute("ALTER TABLE words ADD CONSTRAINT unique_word UNIQUE (de, ru);") # Это лучше сделать в init_db
-        
-        added_count = 0
-        for w in words:
-            # 1. Добавляем в общую базу слов (через дедукцию ID)
-            cur.execute("""
-                INSERT INTO words (de, ru, article, level, topic)
-                VALUES (%s, %s, %s, %s, 'Дневник')
-                ON CONFLICT (de, ru) DO UPDATE SET de = EXCLUDED.de
-                RETURNING id
-            """, (w['de'], w['ru'], w.get('article', ''), w.get('level', 'A1')))
+        with get_db_cursor() as cur:
+            # Сначала убедимся, что есть индекс для ON CONFLICT
+            # cur.execute("ALTER TABLE words ADD CONSTRAINT unique_word UNIQUE (de, ru);") # Это лучше сделать в init_db
             
-            row = cur.fetchone()
-            word_id = row[0] if row else None
-                
-            if word_id:
-                # 2. Добавляем в список изучения пользователя
+            added_count = 0
+            for w in words:
+                # 1. Добавляем в общую базу слов (через дедукцию ID)
                 cur.execute("""
-                    INSERT INTO user_words (user_id, word_id, status, next_review)
-                    VALUES (%s, %s, 'learning', CURRENT_TIMESTAMP)
-                    ON CONFLICT (user_id, word_id) DO NOTHING
-                """, (request.user_id, word_id))
-                added_count += 1
+                    INSERT INTO words (de, ru, article, level, topic)
+                    VALUES (%s, %s, %s, %s, 'Дневник')
+                    ON CONFLICT (de, ru) DO UPDATE SET de = EXCLUDED.de
+                    RETURNING id
+                """, (w['de'], w['ru'], w.get('article', ''), w.get('level', 'A1')))
                 
-        conn.commit()
-        cur.close()
-        conn.close()
-        
-        return jsonify({"status": "success", "added_count": added_count}), 200
+                row = cur.fetchone()
+                word_id = row[0] if row else None
+                    
+                if word_id:
+                    # 2. Добавляем в список изучения пользователя
+                    cur.execute("""
+                        INSERT INTO user_words (user_id, word_id, status, next_review)
+                        VALUES (%s, %s, 'learning', CURRENT_TIMESTAMP)
+                        ON CONFLICT (user_id, word_id) DO NOTHING
+                    """, (request.user_id, word_id))
+                    added_count += 1
+                    
+            return jsonify({"status": "success", "added_count": added_count}), 200
     except Exception as e:
         print(f"Add words error: {e}")
         return jsonify({"error": str(e)}), 500

@@ -31,7 +31,7 @@ def init_connection_pool():
     try:
         # Create a thread-safe connection pool
         min_conn = int(os.environ.get("DB_MIN_CONNECTIONS", 2))
-        max_conn = int(os.environ.get("DB_MAX_CONNECTIONS", 10))
+        max_conn = int(os.environ.get("DB_MAX_CONNECTIONS", 20))  # Increased max connections
         
         connection_pool = psycopg2.pool.ThreadedConnectionPool(
             minconn=min_conn,
@@ -239,6 +239,25 @@ def init_db():
     except Exception as e:
         print(f"Error initializing DB: {e}")
         # Connection will be closed in the exception handler above
+
+def get_pool_status():
+    """Get current status of the connection pool for monitoring"""
+    global connection_pool
+    if connection_pool:
+        # Get the number of used and available connections
+        used_connections = connection_pool._used
+        available_connections = len(connection_pool._pool) if connection_pool._pool else 0
+        total_connections = len(used_connections) if used_connections else 0
+        
+        return {
+            "min_connections": connection_pool.minconn,
+            "max_connections": connection_pool.maxconn,
+            "used_connections": len(used_connections),
+            "available_connections": available_connections,
+            "total_connections": total_connections
+        }
+    return None
+
 
 def close_connection_pool():
     """Close all connections in the pool when shutting down the application"""
