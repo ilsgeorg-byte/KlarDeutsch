@@ -15,6 +15,9 @@ interface Word {
   plural?: string;
   example_de?: string;
   example_ru?: string;
+  synonyms?: string;
+  antonyms?: string;
+  collocations?: string;
   is_favorite?: boolean;
 }
 
@@ -182,9 +185,9 @@ export default function AdminWordsPage() {
       plural: word.plural || '',
       example_de: word.example_de || '',
       example_ru: word.example_ru || '',
-      synonyms: '',
-      antonyms: '',
-      collocations: '',
+      synonyms: word.synonyms || '',
+      antonyms: word.antonyms || '',
+      collocations: word.collocations || '',
     });
     setShowModal(true);
   };
