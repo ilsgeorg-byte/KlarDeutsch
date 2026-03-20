@@ -11,6 +11,10 @@ interface Word {
   de: string;
   ru: string;
   article?: string;
+  verb_forms?: string;
+  plural?: string;
+  example_de?: string;
+  example_ru?: string;
   is_favorite?: boolean;
 }
 
@@ -38,7 +42,11 @@ export default function AdminWordsPage() {
   const closeModal = () => {
     console.log('closeModal called');
     setEditingWord(null);
-    setFormData({ de: '', ru: '', article: '', level: 'A1', topic: '' });
+    setFormData({ 
+      de: '', ru: '', article: '', level: 'A1', topic: '',
+      verb_forms: '', plural: '', example_de: '', example_ru: '',
+      synonyms: '', antonyms: '', collocations: ''
+    });
     setShowModal(false);
     setAiError('');
 
@@ -77,6 +85,13 @@ export default function AdminWordsPage() {
         article: data.article || prev.article,
         level: data.level || prev.level,
         topic: data.topic || prev.topic,
+        verb_forms: data.verb_forms || prev.verb_forms,
+        plural: data.plural || prev.plural,
+        example_de: data.examples?.[0]?.de || prev.example_de,
+        example_ru: data.examples?.[0]?.ru || prev.example_ru,
+        synonyms: data.synonyms || prev.synonyms,
+        antonyms: data.antonyms || prev.antonyms,
+        collocations: data.collocations || prev.collocations,
       }));
 
       setSuccess('ИИ заполнил данные!');
@@ -97,6 +112,13 @@ export default function AdminWordsPage() {
     article: '',
     level: 'A1',
     topic: '',
+    verb_forms: '',
+    plural: '',
+    example_de: '',
+    example_ru: '',
+    synonyms: '',
+    antonyms: '',
+    collocations: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
@@ -140,7 +162,11 @@ export default function AdminWordsPage() {
 
   const openAddModal = () => {
     setEditingWord(null);
-    setFormData({ de: '', ru: '', article: '', level: 'A1', topic: '' });
+    setFormData({ 
+      de: '', ru: '', article: '', level: 'A1', topic: '',
+      verb_forms: '', plural: '', example_de: '', example_ru: '',
+      synonyms: '', antonyms: '', collocations: ''
+    });
     setShowModal(true);
   };
 
@@ -151,7 +177,14 @@ export default function AdminWordsPage() {
       ru: word.ru,
       article: word.article || '',
       level: word.level,
-      topic: word.topic,
+      topic: word.topic || '',
+      verb_forms: word.verb_forms || '',
+      plural: word.plural || '',
+      example_de: word.example_de || '',
+      example_ru: word.example_ru || '',
+      synonyms: '',
+      antonyms: '',
+      collocations: '',
     });
     setShowModal(true);
   };
@@ -520,7 +553,7 @@ export default function AdminWordsPage() {
                     <option value="C1">C1</option>
                   </select>
                 </div>
-                
+
                 <div className="adminFormGroup">
                   <label className="adminFormLabel">Тема</label>
                   <input
@@ -531,6 +564,85 @@ export default function AdminWordsPage() {
                     placeholder="Например: Еда"
                   />
                 </div>
+              </div>
+
+              <div className="adminFormGroup">
+                <label className="adminFormLabel">Формы глагола</label>
+                <input
+                  type="text"
+                  value={formData.verb_forms}
+                  onChange={(e) => setFormData({ ...formData, verb_forms: e.target.value })}
+                  className="adminFormInput"
+                  placeholder="напр. machen, machte, hat gemacht"
+                />
+              </div>
+
+              <div className="adminFormGroup">
+                <label className="adminFormLabel">Множественное число</label>
+                <input
+                  type="text"
+                  value={formData.plural}
+                  onChange={(e) => setFormData({ ...formData, plural: e.target.value })}
+                  className="adminFormInput"
+                  placeholder="напр. die Häuser"
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div className="adminFormGroup">
+                  <label className="adminFormLabel">Пример (немецкий)</label>
+                  <input
+                    type="text"
+                    value={formData.example_de}
+                    onChange={(e) => setFormData({ ...formData, example_de: e.target.value })}
+                    className="adminFormInput"
+                    placeholder="Der Apfel ist rot."
+                  />
+                </div>
+
+                <div className="adminFormGroup">
+                  <label className="adminFormLabel">Пример (русский)</label>
+                  <input
+                    type="text"
+                    value={formData.example_ru}
+                    onChange={(e) => setFormData({ ...formData, example_ru: e.target.value })}
+                    className="adminFormInput"
+                    placeholder="Яблоко красное."
+                  />
+                </div>
+              </div>
+
+              <div className="adminFormGroup">
+                <label className="adminFormLabel">Синонимы</label>
+                <input
+                  type="text"
+                  value={formData.synonyms}
+                  onChange={(e) => setFormData({ ...formData, synonyms: e.target.value })}
+                  className="adminFormInput"
+                  placeholder="напр. groß, riesig"
+                />
+              </div>
+
+              <div className="adminFormGroup">
+                <label className="adminFormLabel">Антонимы</label>
+                <input
+                  type="text"
+                  value={formData.antonyms}
+                  onChange={(e) => setFormData({ ...formData, antonyms: e.target.value })}
+                  className="adminFormInput"
+                  placeholder="напр. klein, winzig"
+                />
+              </div>
+
+              <div className="adminFormGroup">
+                <label className="adminFormLabel">Коллокации</label>
+                <input
+                  type="text"
+                  value={formData.collocations}
+                  onChange={(e) => setFormData({ ...formData, collocations: e.target.value })}
+                  className="adminFormInput"
+                  placeholder="напр. einen Apfel essen"
+                />
               </div>
               
               <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>

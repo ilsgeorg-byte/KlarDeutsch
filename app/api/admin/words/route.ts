@@ -173,7 +173,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { de, ru, article, level, topic, verb_forms, example_de, example_ru } = body;
+    const { de, ru, article, level, topic, verb_forms, plural, example_de, example_ru, synonyms, antonyms, collocations } = body;
 
     if (!de || !ru) {
       return NextResponse.json(
@@ -183,10 +183,10 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await dbPool.query(
-      `INSERT INTO words (de, ru, article, level, topic, verb_forms, example_de, example_ru)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO words (de, ru, article, level, topic, verb_forms, plural, example_de, example_ru, synonyms, antonyms, collocations)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING id`,
-      [de, ru, article || '', level || 'A1', topic || '', verb_forms || '', example_de || '', example_ru || '']
+      [de, ru, article || '', level || 'A1', topic || '', verb_forms || '', plural || '', example_de || '', example_ru || '', synonyms || '', antonyms || '', collocations || '']
     );
 
     const word_id = result.rows[0]?.id;
@@ -203,10 +203,10 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   console.log('=== PUT /api/admin/words START ===');
-  
+
   try {
     const body = await request.json();
-    const { id, de, ru, article, level, topic, verb_forms, example_de, example_ru } = body;
+    const { id, de, ru, article, level, topic, verb_forms, plural, example_de, example_ru, synonyms, antonyms, collocations } = body;
 
     console.log('PUT /api/admin/words:', { id, de, ru, level });
 
@@ -241,7 +241,7 @@ export async function PUT(request: NextRequest) {
     // Прямой доступ к базе данных
     const pool = getPool();
     console.log('DB pool created:', !!pool);
-    
+
     if (!pool) {
       console.error('Database pool not created');
       return NextResponse.json(
@@ -255,11 +255,13 @@ export async function PUT(request: NextRequest) {
     const updateResult = await pool.query(
       `UPDATE words
        SET de = $1, ru = $2, article = $3, level = $4, topic = $5,
-           verb_forms = $6, example_de = $7, example_ru = $8
-       WHERE id = $9
+           verb_forms = $6, plural = $7, example_de = $8, example_ru = $9,
+           synonyms = $10, antonyms = $11, collocations = $12
+       WHERE id = $13
        RETURNING id`,
       [de, ru, article || '', level || 'A1', topic || '',
-       verb_forms || '', example_de || '', example_ru || '', id]
+       verb_forms || '', plural || '', example_de || '', example_ru || '',
+       synonyms || '', antonyms || '', collocations || '', id]
     );
 
     console.log('UPDATE result:', { rowCount: updateResult.rowCount, rows: updateResult.rows });
