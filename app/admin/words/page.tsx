@@ -194,15 +194,15 @@ export default function AdminWordsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     console.log('=== handleSubmit called ===');
-    
+
     // Предотвращаем повторную отправку
     if (isSubmitting) {
       console.log('Already submitting, ignoring');
       return;
     }
-    
+
     console.log('Form submit:', { editingWord, formData });
     setIsSubmitting(true);
 
@@ -217,6 +217,8 @@ export default function AdminWordsPage() {
         : formData;
 
       console.log('Sending request:', { method, url, body });
+      console.log('editingWord:', editingWord);
+      console.log('formData:', formData);
 
       const res = await fetch(url, {
         method,
@@ -229,14 +231,17 @@ export default function AdminWordsPage() {
       const data = await res.json();
       console.log('Response data:', data);
 
-      if (!res.ok) throw new Error(data.error || 'Ошибка сохранения');
+      if (!res.ok) {
+        console.error('Server error:', data);
+        throw new Error(data.error || 'Ошибка сохранения');
+      }
 
       setSuccess(editingWord ? 'Слово обновлено' : 'Слово добавлено');
-      
+
       console.log('Calling closeModal...');
       closeModal();
       console.log('closeModal returned');
-      
+
       console.log('Reloading words...');
       await loadWords();
       console.log('Words reloaded');
@@ -244,6 +249,9 @@ export default function AdminWordsPage() {
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
       console.error('Form submit error:', err);
+      console.error('Error name:', err.name);
+      console.error('Error message:', err.message);
+      console.error('Error stack:', err.stack);
       setError(err.message);
       setTimeout(() => setError(''), 3000);
     } finally {
