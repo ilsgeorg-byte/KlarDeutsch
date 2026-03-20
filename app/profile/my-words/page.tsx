@@ -276,7 +276,8 @@ export default function MyWordsPage() {
                             {words.map((word) => (
                                 <div
                                     key={word.id}
-                                    className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 hover:border-blue-200 dark:hover:border-blue-600 transition-all flex items-center justify-between gap-4"
+                                    onClick={() => router.push(`/dictionary/${word.id}`)}
+                                    className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 hover:border-blue-200 dark:hover:border-blue-600 transition-all flex items-center justify-between gap-4 cursor-pointer"
                                 >
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
@@ -302,7 +303,10 @@ export default function MyWordsPage() {
                                         )}
                                     </div>
                                     <button
-                                        onClick={() => handleDelete(word.id)}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDelete(word.id);
+                                        }}
                                         disabled={deletingId === word.id}
                                         className="p-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
                                         title="Удалить слово"
