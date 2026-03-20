@@ -3,8 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import styles from "../styles/Shared.module.css";
 import WordCard from "../components/WordCard";
-import { Search, Loader2, Plus, BookOpen } from "lucide-react";
-import AddWordModal from "../components/AddWordModal";
+import { Search, Loader2, BookOpen } from "lucide-react";
 
 interface Word {
     id: number;
@@ -30,7 +29,6 @@ export default function DictionaryPage() {
     const [words, setWords] = useState<Word[]>([]);
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
-    const [isModalOpen, setIsModalOpen] = useState(false);
 
     const searchWords = useCallback(async (searchQuery: string) => {
         if (searchQuery.length < 2) {
@@ -78,57 +76,11 @@ export default function DictionaryPage() {
         audio.play().catch(e => console.error("Audio play error:", e));
     };
 
-    const toggleFavorite = async (wordId: number) => {
-        try {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                alert("Пожалуйста, войдите в систему, чтобы добавлять слова в избранное");
-                return;
-            }
-
-            const response = await fetch(`/api/words/${wordId}/favorite`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (response.ok) {
-                setWords(prevWords =>
-                    prevWords.map(w => w.id === wordId ? { ...w, is_favorite: !w.is_favorite } : w)
-                );
-            }
-        } catch (err) {
-            console.error("Favorite error:", err);
-        }
-    };
-
     return (
         <div className={`${styles.pageWrapper} bg-slate-50 dark:bg-gray-900 min-h-screen`}>
 
             <main className={styles.container} style={{ maxWidth: '800px', justifyContent: 'flex-start' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '10px' }}>
-                    <h1 className={`${styles.pageTitle} text-slate-800 dark:text-white`} style={{ margin: 0 }}>Словарь</h1>
-                    <button
-                        onClick={() => setIsModalOpen(true)}
-                        className="dark:bg-blue-600"
-                        style={{
-                            padding: '10px 20px',
-                            backgroundColor: '#3b82f6',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '12px',
-                            fontWeight: 'bold',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.3)',
-                            transition: 'all 0.2s'
-                        }}
-                    >
-                        <Plus size={20} />
-                        Добавить слово
-                    </button>
-                </div>
+                <h1 className={`${styles.pageTitle} text-slate-800 dark:text-white`} style={{ margin: 0, marginBottom: '10px' }}>Словарь</h1>
                 <p className="text-slate-600 dark:text-gray-400" style={{ textAlign: 'center', marginBottom: '30px' }}>
                     Ищи слова, изучай примеры и слушай произношение
                 </p>
@@ -172,7 +124,6 @@ export default function DictionaryPage() {
                             key={word.id}
                             word={word}
                             onPlayAudio={playAudio}
-                            onToggleFavorite={toggleFavorite}
                         />
                     ))}
                 </div>
@@ -187,14 +138,6 @@ export default function DictionaryPage() {
                         <p>Начни вводить слово выше, чтобы увидеть перевод и примеры</p>
                     </div>
                 )}
-
-                <AddWordModal
-                    isOpen={isModalOpen}
-                    onClose={() => setIsModalOpen(false)}
-                    onSuccess={(id) => {
-                        searchWords(query);
-                    }}
-                />
             </main>
         </div>
     );

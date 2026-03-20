@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import AdminLayout from '../AdminLayout';
-import { Plus, Search, Edit, Trash2, Filter, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Filter, Loader2, AlertCircle, CheckCircle, Sparkles } from 'lucide-react';
 
 interface Word {
   id: number;
@@ -40,11 +40,52 @@ export default function AdminWordsPage() {
     setEditingWord(null);
     setFormData({ de: '', ru: '', article: '', level: 'A1', topic: '' });
     setShowModal(false);
-    
+    setAiError('');
+
     // Принудительно проверяем через setTimeout
     setTimeout(() => {
       console.log('After closeModal:', { showModal: false, editingWord: null });
     }, 100);
+  };
+
+  // Заполнение с помощью ИИ
+  const handleAiEnrich = async () => {
+    if (!formData.de || !formData.ru) {
+      setAiError('Введите немецкое слово и перевод');
+      return;
+    }
+
+    setAiLoading(true);
+    setAiError('');
+
+    try {
+      const token = localStorage.getItem('token');
+      const resp = await fetch('/api/words/ai-enrich', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ de: formData.de, ru: formData.ru }),
+      });
+
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'Ошибка AI');
+
+      setFormData(prev => ({
+        ...prev,
+        article: data.article || prev.article,
+        level: data.level || prev.level,
+        topic: data.topic || prev.topic,
+      }));
+
+      setSuccess('ИИ заполнил данные!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: any) {
+      setAiError(err.message || 'Не удалось получить данные от AI');
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   // Modal
@@ -58,6 +99,8 @@ export default function AdminWordsPage() {
     topic: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
 
   useEffect(() => {
     loadWords();
@@ -396,18 +439,7 @@ export default function AdminWordsPage() {
                   required
                 />
               </div>
-              
-              <div className="adminFormGroup">
-                <label className="adminFormLabel">Артикль</label>
-                <input
-                  type="text"
-                  value={formData.article}
-                  onChange={(e) => setFormData({ ...formData, article: e.target.value })}
-                  className="adminFormInput"
-                  placeholder="der, die, das"
-                />
-              </div>
-              
+
               <div className="adminFormGroup">
                 <label className="adminFormLabel">Русский перевод *</label>
                 <input
@@ -416,6 +448,59 @@ export default function AdminWordsPage() {
                   onChange={(e) => setFormData({ ...formData, ru: e.target.value })}
                   className="adminFormInput"
                   required
+                />
+              </div>
+
+              {/* Кнопка ИИ */}
+              {!editingWord && (
+                <button
+                  type="button"
+                  onClick={handleAiEnrich}
+                  disabled={aiLoading || !formData.de || !formData.ru}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    marginBottom: '16px',
+                    background: aiLoading 
+                      ? 'linear-gradient(135deg, #6b7280, #4b5563)'
+                      : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '0.9rem',
+                    fontWeight: 600,
+                    cursor: aiLoading || !formData.de || !formData.ru ? 'not-allowed' : 'pointer',
+                    opacity: aiLoading || !formData.de || !formData.ru ? 0.6 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                  }}
+                >
+                  {aiLoading ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Sparkles size={16} />}
+                  {aiLoading ? 'ИИ анализирует...' : 'Заполнить с помощью ИИ'}
+                </button>
+              )}
+
+              {aiError && (
+                <div style={{
+                  padding: '8px 12px',
+                  background: '#fef2f2',
+                  color: '#dc2626',
+                  borderRadius: '8px',
+                  marginBottom: '16px',
+                  fontSize: '0.82rem',
+                }}>{aiError}</div>
+              )}
+
+              <div className="adminFormGroup">
+                <label className="adminFormLabel">Артикль</label>
+                <input
+                  type="text"
+                  value={formData.article}
+                  onChange={(e) => setFormData({ ...formData, article: e.target.value })}
+                  className="adminFormInput"
+                  placeholder="der, die, das"
                 />
               </div>
               
@@ -470,6 +555,8 @@ export default function AdminWordsPage() {
           </div>
         </div>
       )}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </AdminLayout>
   );
 }
