@@ -261,8 +261,7 @@ export async function PUT(request: NextRequest) {
 
     console.log('Executing UPDATE query...');
 
-    // Проверяем, существует ли слово с такими de и ru (кроме текущего)
-    // Но только если de или ru изменились
+    // Проверяем на дубликаты только если de или ru изменились
     const currentWord = await pool.query(
       `SELECT de, ru FROM words WHERE id = $1`,
       [id]
@@ -276,7 +275,7 @@ export async function PUT(request: NextRequest) {
       if (de !== oldDe || ru !== oldRu) {
         const checkResult = await pool.query(
           `SELECT id FROM words WHERE de = $1 AND ru = $2 AND id != $3`,
-          [de, ru, id]
+          [de, ru, id]  // id != $3 исключает текущее слово
         );
 
         if (checkResult.rowCount && checkResult.rowCount > 0) {
@@ -289,6 +288,7 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    // Обновляем слово
     const updateResult = await pool.query(
       `UPDATE words
        SET de = $1, ru = $2, article = $3, level = $4, topic = $5,
