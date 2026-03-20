@@ -203,7 +203,21 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { id, de, ru, article, level, topic, verb_forms, plural, example_de, example_ru, synonyms, antonyms, collocations } = body;
+    console.log('PUT request body:', body);
+    
+    const id = body.id;
+    const de = body.de;
+    const ru = body.ru;
+    const article = body.article ?? '';
+    const level = body.level ?? 'A1';
+    const topic = body.topic ?? '';
+    const verb_forms = body.verb_forms ?? '';
+    const plural = body.plural ?? '';
+    const example_de = body.example_de ?? '';
+    const example_ru = body.example_ru ?? '';
+    const synonyms = body.synonyms ?? '';
+    const antonyms = body.antonyms ?? '';
+    const collocations = body.collocations ?? '';
 
     console.log('PUT /api/admin/words:', { id, de, ru, level });
 
@@ -223,8 +237,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Пропускаем вызов Flask API, используем прямой доступ к БД
-    console.log('Using direct DB access');
+    // Прямой доступ к базе данных
     console.log('POSTGRES_URL set:', !!POSTGRES_URL);
 
     if (!POSTGRES_URL) {
@@ -235,7 +248,6 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Прямой доступ к базе данных
     const pool = getPool();
     console.log('DB pool created:', !!pool);
 
@@ -256,9 +268,7 @@ export async function PUT(request: NextRequest) {
            synonyms = $10, antonyms = $11, collocations = $12
        WHERE id = $13
        RETURNING id`,
-      [de, ru, article || '', level || 'A1', topic || '',
-       verb_forms || '', plural || '', example_de || '', example_ru || '',
-       synonyms || '', antonyms || '', collocations || '', id]
+      [de, ru, article, level, topic, verb_forms, plural, example_de, example_ru, synonyms, antonyms, collocations, id]
     );
 
     console.log('UPDATE result:', { rowCount: updateResult.rowCount, rows: updateResult.rows });
