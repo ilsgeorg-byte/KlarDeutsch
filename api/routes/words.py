@@ -2,6 +2,9 @@ from flask import Blueprint, request, jsonify
 import sys
 import os
 import logging
+import json
+import csv
+import io
 
 # Добавляем родительскую директорию в path 1
 api_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -466,5 +469,221 @@ def add_custom_word():
                     return jsonify({"error": "Такое слово уже есть в вашем списке или в общем доступе"}), 400
                 raise e
 
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@words_bp.route('/words/bulk-upload', methods=['POST'])
+@token_required
+@cache_invalidate('words:list:*', 'words:topics:*', 'words:search:*')
+def bulk_upload_words():
+    """Массовая загрузка слов из JSON или CSV"""
+    try:
+        user_id = request.user_id
+        data = None
+        
+        # Определяем формат данных
+        if request.is_json:
+            data = request.get_json()
+            words_list = data.get('words', [])
+        elif request.files.get('file'):
+            file = request.files['file']
+            filename = file.filename.lower()
+            
+            if filename.endswith('.json'):
+                content = file.read().decode('utf-8')
+                json_data = json.loads(content)
+                words_list = json_data.get('words', []) if isinstance(json_data, dict) else json_data
+            elif filename.endswith('.csv'):
+                content = file.read().decode('utf-8')
+                csv_file = io.StringIO(content)
+                reader = csv.DictReader(csv_file)
+                words_list = list(reader)
+            else:
+                return jsonify({"error": "Неподдерживаемый формат файла. Используйте JSON или CSV"}), 400
+        else:
+            return jsonify({"error": "Нет данных для загрузки"}), 400
+        
+        if not isinstance(words_list, list) or len(words_list) == 0:
+            return jsonify({"error": "Список слов пуст или имеет неверный формат"}), 400
+        
+        # Ограничиваем количество слов за раз
+        if len(words_list) > 500:
+            return jsonify({"error": "Максимум 500 слов за одну загрузку"}), 400
+        
+        added_count = 0
+        skipped_count = 0
+        errors = []
+        
+        with get_db_cursor() as cur:
+            for idx, word_data in enumerate(words_list):
+                try:
+                    # Нормализуем ключи (поддержка разных форматов)
+                    if isinstance(word_data, dict):
+                        # Поддержка разных вариантов ключей
+                        de = word_data.get('de') or word_data.get('german') or word_data.get('word') or ''
+                        ru = word_data.get('ru') or word_data.get('russian') or word_data.get('translation') or ''
+                        article = word_data.get('article') or ''
+                        level = word_data.get('level') or 'A1'
+                        topic = word_data.get('topic') or 'Импорт'
+                        verb_forms = word_data.get('verb_forms') or word_data.get('forms') or ''
+                        example_de = word_data.get('example_de') or word_data.get('example') or ''
+                        example_ru = word_data.get('example_ru') or word_data.get('example_translation') or ''
+                        
+                        # Очищаем значения
+                        de = str(de).strip()
+                        ru = str(ru).strip()
+                        article = str(article).strip()
+                        level = str(level).strip().upper()
+                        topic = str(topic).strip()
+                        verb_forms = str(verb_forms).strip()
+                        example_de = str(example_de).strip()
+                        example_ru = str(example_ru).strip()
+                        
+                        # Валидация обязательных полей
+                        if not de or not ru:
+                            skipped_count += 1
+                            errors.append(f"Слово #{idx + 1}: пропущено (нет de или ru)")
+                            continue
+                        
+                        # Валидация уровня
+                        if level not in ['A1', 'A2', 'B1', 'B2', 'C1']:
+                            level = 'A1'
+                        
+                        try:
+                            cur.execute("""
+                                INSERT INTO words (de, ru, article, level, topic, verb_forms, example_de, example_ru, user_id)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                ON CONFLICT DO NOTHING
+                                RETURNING id
+                            """, (de, ru, article, level, topic, verb_forms, example_de, example_ru, user_id))
+                            
+                            if cur.fetchone():
+                                added_count += 1
+                            else:
+                                skipped_count += 1
+                                errors.append(f"Слово #{idx + 1}: уже существует")
+                        except Exception as insert_error:
+                            if "unique" in str(insert_error).lower():
+                                skipped_count += 1
+                                errors.append(f"Слово #{idx + 1}: уже существует")
+                            else:
+                                raise insert_error
+                    else:
+                        skipped_count += 1
+                        errors.append(f"Слово #{idx + 1}: неверный формат записи")
+                
+                except Exception as word_error:
+                    skipped_count += 1
+                    errors.append(f"Слово #{idx + 1}: ошибка - {str(word_error)}")
+        
+        # Инвалидируем пользовательский кэш
+        invalidate_user_cache(user_id)
+        
+        response = {
+            "status": "success",
+            "added": added_count,
+            "skipped": skipped_count,
+            "total": len(words_list)
+        }
+        
+        if errors and len(errors) <= 10:
+            response["errors"] = errors
+        elif errors:
+            response["errors"] = errors[:10] + [f"... и ещё {len(errors) - 10} ошибок"]
+        
+        return jsonify(response), 201
+        
+    except json.JSONDecodeError:
+        return jsonify({"error": "Неверный формат JSON"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@words_bp.route('/words/my-words', methods=['GET'])
+@token_required
+@cache_response('user:my_words', ttl=300, user_specific=True)
+def get_my_words():
+    """Получить список личных слов пользователя"""
+    try:
+        user_id = request.user_id
+        skip = int(request.args.get("skip", 0))
+        limit = min(int(request.args.get("limit", 100)), 500)
+        level = request.args.get("level", "").upper()
+        
+        with get_db_cursor() as cur:
+            # Общее количество
+            if level:
+                cur.execute("SELECT COUNT(*) FROM words WHERE user_id = %s AND level = %s", (user_id, level))
+            else:
+                cur.execute("SELECT COUNT(*) FROM words WHERE user_id = %s", (user_id,))
+            
+            total = cur.fetchone()[0]
+            
+            # Получаем слова
+            if level:
+                cur.execute("""
+                    SELECT id, level, topic, de, ru, article, verb_forms, example_de, example_ru, audio_url,
+                           plural, examples, synonyms, antonyms, collocations,
+                           true as is_favorite
+                    FROM words
+                    WHERE user_id = %s AND level = %s
+                    ORDER BY id DESC
+                    LIMIT %s OFFSET %s
+                """, (user_id, level, limit, skip))
+            else:
+                cur.execute("""
+                    SELECT id, level, topic, de, ru, article, verb_forms, example_de, example_ru, audio_url,
+                           plural, examples, synonyms, antonyms, collocations,
+                           true as is_favorite
+                    FROM words
+                    WHERE user_id = %s
+                    ORDER BY id DESC
+                    LIMIT %s OFFSET %s
+                """, (user_id, limit, skip))
+            
+            columns = [desc[0] for desc in cur.description]
+            results = []
+            for row in cur.fetchall():
+                results.append(dict(zip(columns, row)))
+            
+            return jsonify({
+                "data": results,
+                "total": total,
+                "skip": skip,
+                "limit": limit
+            }), 200
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@words_bp.route('/words/my-words/<int:word_id>', methods=['DELETE'])
+@token_required
+@cache_invalidate('user:my_words:*')
+def delete_my_word(word_id: int):
+    """Удалить личное слово пользователя"""
+    try:
+        user_id = request.user_id
+        
+        with get_db_cursor() as cur:
+            # Проверяем, что слово принадлежит пользователю
+            cur.execute("SELECT user_id FROM words WHERE id = %s", (word_id,))
+            result = cur.fetchone()
+            
+            if not result:
+                return jsonify({"error": "Слово не найдено"}), 404
+            
+            if result[0] != user_id:
+                return jsonify({"error": "Нет прав для удаления этого слова"}), 403
+            
+            # Удаляем слово
+            cur.execute("DELETE FROM words WHERE id = %s AND user_id = %s", (word_id, user_id))
+            
+            # Инвалидируем пользовательский кэш
+            invalidate_user_cache(user_id)
+            
+            return jsonify({"status": "success", "word_id": word_id}), 200
+            
     except Exception as e:
         return jsonify({"error": str(e)}), 500

@@ -1,0 +1,54 @@
+{
+  "words": [
+    {
+      "de": "verstehen",
+      "ru": "понимать",
+      "article": "",
+      "level": "A1",
+      "topic": "Глаголы",
+      "verb_forms": "",
+      "example_de": "Ich verstehe das nicht.",
+      "example_ru": "Я этого не понимаю."
+    },
+    {
+      "de": "der Apfel",
+      "ru": "яблоко",
+      "article": "der",
+      "level": "A1",
+      "topic": "Еда",
+      "verb_forms": "",
+      "example_de": "Der Apfel ist rot.",
+      "example_ru": "Яблоко красное."
+    },
+    {
+      "de": "die Sonne",
+      "ru": "солнце",
+      "article": "die",
+      "level": "A1",
+      "topic": "Природа",
+      "verb_forms": "",
+      "example_de": "Die Sonne scheint hell.",
+      "example_ru": "Солнце светит ярко."
+    },
+    {
+      "de": "das Wasser",
+      "ru": "вода",
+      "article": "das",
+      "level": "A1",
+      "topic": "Природа",
+      "verb_forms": "",
+      "example_de": "Das Wasser ist kalt.",
+      "example_ru": "Вода холодная."
+    },
+    {
+      "de": "essen",
+      "ru": "есть, кушать",
+      "article": "",
+      "level": "A1",
+      "topic": "Глаголы",
+      "verb_forms": "essen, aß, hat gegessen",
+      "example_de": "Wir essen zu Abend.",
+      "example_ru": "Мы ужинаем."
+    }
+  ]
+}

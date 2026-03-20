@@ -2,7 +2,7 @@
 KlarDeutsch API - приложение для изучения немецкого языка
 Основное приложение Flask с подключением маршрутов
 """
-from flask import Flask, jsonify, g
+from flask import Flask, jsonify, g, request
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -105,8 +105,6 @@ def teardown_request(exception=None):
 
 
 # Логирование запросов
-from flask import request
-
 @app.before_request
 def log_request():
     """Логирование входящих запросов"""

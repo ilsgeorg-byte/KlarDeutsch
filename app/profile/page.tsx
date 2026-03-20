@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, CheckCircle, TrendingUp, Award, Layers, Star } from "lucide-react";
+import { BookOpen, CheckCircle, TrendingUp, Award, Layers, Star, Plus, Upload } from "lucide-react";
 import styles from "../styles/Shared.module.css";
+import UploadWordsModal from "../components/UploadWordsModal";
 
 interface Stats {
   total_words: { [key: string]: number };
@@ -46,6 +47,7 @@ export default function ProfilePage() {
   const [selectedLevel, setSelectedLevel] = useState<string | null>(null);
   const [levelWords, setLevelWords] = useState<Word[]>([]);
   const [loadingLevel, setLoadingLevel] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -186,8 +188,19 @@ export default function ProfilePage() {
     <div className={styles.pageWrapper}>
       <main className="max-w-5xl mx-auto px-6 py-12 w-full">
         <header className="mb-12">
-          <h1 className="text-4xl font-extrabold text-gray-900 mb-2">Ваш профиль</h1>
-          <p className="text-gray-500 text-lg">Статистика и избранные слова в KlarDeutsch</p>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-4xl font-extrabold text-gray-900 mb-2">Ваш профиль</h1>
+              <p className="text-gray-500 text-lg">Статистика и избранные слова в KlarDeutsch</p>
+            </div>
+            <button
+              onClick={() => router.push("/profile/my-words")}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/30"
+            >
+              <Upload size={20} />
+              Мои слова
+            </button>
+          </div>
         </header>
 
         {loading ? (
@@ -461,6 +474,16 @@ export default function ProfilePage() {
             </div>
           </div>
         )}
+
+        {/* Модальное окно загрузки слов */}
+        <UploadWordsModal
+          isOpen={isUploadModalOpen}
+          onClose={() => setIsUploadModalOpen(false)}
+          onSuccess={() => {
+            // Перезагружаем данные после успешной загрузки
+            window.location.reload();
+          }}
+        />
       </main>
     </div>
   );
