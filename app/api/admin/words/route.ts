@@ -144,10 +144,16 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    console.log('=== POST /api/admin/words START ===');
+    console.log('Request body:', body);
+    console.log('POSTGRES_URL set:', !!POSTGRES_URL);
 
     // Используем прямой доступ к БД (для Vercel)
     const dbPool = getPool();
+    console.log('DB pool created:', !!dbPool);
+    
     if (!dbPool) {
+      console.error('Database not configured');
       return NextResponse.json(
         { error: 'Database not configured' },
         { status: 500 }
@@ -157,12 +163,15 @@ export async function POST(request: NextRequest) {
     const { de, ru, article, level, topic, verb_forms, plural, example_de, example_ru, synonyms, antonyms, collocations } = body;
 
     if (!de || !ru) {
+      console.error('Missing de or ru');
       return NextResponse.json(
         { error: 'Поля de и ru обязательны' },
         { status: 400 }
       );
     }
 
+    console.log('Executing INSERT query...');
+    
     const result = await dbPool.query(
       `INSERT INTO words (de, ru, article, level, topic, verb_forms, plural, example_de, example_ru, synonyms, antonyms, collocations)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
@@ -170,13 +179,20 @@ export async function POST(request: NextRequest) {
       [de, ru, article || '', level || 'A1', topic || '', verb_forms || '', plural || '', example_de || '', example_ru || '', synonyms || '', antonyms || '', collocations || '']
     );
 
+    console.log('INSERT result:', result.rows[0]);
+    console.log('=== POST /api/admin/words SUCCESS ===');
+
     const word_id = result.rows[0]?.id;
 
     return NextResponse.json({ status: 'success', word_id });
   } catch (error) {
+    console.error('=== POST /api/admin/words ERROR ===');
     console.error('Admin words POST error:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Error message:', errorMessage);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'no stack');
     return NextResponse.json(
-      { error: 'Ошибка сервера: ' + (error instanceof Error ? error.message : String(error)) },
+      { error: 'Ошибка сервера: ' + errorMessage },
       { status: 500 }
     );
   }
