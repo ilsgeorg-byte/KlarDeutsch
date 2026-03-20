@@ -43,7 +43,6 @@ export default function AdminWordsPage() {
 
   // Функция для закрытия модального окна со сбросом состояний
   const closeModal = () => {
-    console.log('closeModal called');
     setEditingWord(null);
     setFormData({ 
       de: '', ru: '', article: '', level: 'A1', topic: '',
@@ -52,6 +51,7 @@ export default function AdminWordsPage() {
     });
     setShowModal(false);
     setAiError('');
+    // debugInfo не сбрасываем чтобы можно было прочитать ошибку
 
     // Принудительно проверяем через setTimeout
     setTimeout(() => {
@@ -126,6 +126,7 @@ export default function AdminWordsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
+  const [debugInfo, setDebugInfo] = useState('');
 
   useEffect(() => {
     loadWords();
@@ -195,30 +196,18 @@ export default function AdminWordsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    console.log('=== handleSubmit called ===');
-
-    // Предотвращаем повторную отправку
-    if (isSubmitting) {
-      console.log('Already submitting, ignoring');
-      return;
-    }
-
-    console.log('Form submit:', { editingWord, formData });
     setIsSubmitting(true);
+    setDebugInfo('');
 
     try {
-      // Определяем метод и URL
       const method = editingWord ? 'PUT' : 'POST';
-      const url = '/api/admin/words';  // Всегда один URL
+      const url = '/api/admin/words';
 
-      // Добавляем ID для обновления
       const body = editingWord
         ? { ...formData, id: editingWord.id }
         : formData;
 
-      console.log('Sending request:', { method, url, body });
-      console.log('editingWord:', editingWord);
-      console.log('formData:', formData);
+      setDebugInfo(`Отправка: ${method} ${url}\nДанные: ${JSON.stringify(body, null, 2)}`);
 
       const res = await fetch(url, {
         method,
@@ -226,37 +215,24 @@ export default function AdminWordsPage() {
         body: JSON.stringify(body),
       });
 
-      console.log('Response status:', res.status);
-
       const data = await res.json();
-      console.log('Response data:', data);
+      setDebugInfo(prev => prev + `\n\nОтвет сервера (${res.status}):\n${JSON.stringify(data, null, 2)}`);
 
       if (!res.ok) {
-        console.error('Server error:', data);
         throw new Error(data.error || 'Ошибка сохранения');
       }
 
       setSuccess(editingWord ? 'Слово обновлено' : 'Слово добавлено');
-
-      console.log('Calling closeModal...');
       closeModal();
-      console.log('closeModal returned');
-
-      console.log('Reloading words...');
       await loadWords();
-      console.log('Words reloaded');
 
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
       console.error('Form submit error:', err);
-      console.error('Error name:', err.name);
-      console.error('Error message:', err.message);
-      console.error('Error stack:', err.stack);
-      setError(err.message);
-      setTimeout(() => setError(''), 3000);
+      setDebugInfo(prev => prev + `\n\n❗ ОШИБКА:\n${err.message}\n\nStack:\n${err.stack || 'N/A'}`);
+      // НЕ закрываем ошибку автоматически
     } finally {
       setIsSubmitting(false);
-      console.log('=== handleSubmit finished ===');
     }
   };
 
@@ -674,6 +650,25 @@ export default function AdminWordsPage() {
                   Отмена
                 </button>
               </div>
+
+              {debugInfo && (
+                <div style={{
+                  marginTop: '16px',
+                  padding: '12px',
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '8px',
+                  fontSize: '0.75rem',
+                  fontFamily: 'monospace',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-all',
+                  maxHeight: '300px',
+                  overflow: 'auto',
+                  color: '#dc2626',
+                }}>
+                  {debugInfo}
+                </div>
+              )}
             </form>
           </div>
         </div>
