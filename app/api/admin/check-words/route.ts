@@ -1,18 +1,16 @@
 /**
- * API для запуска AI проверки слов
- * POST - запустить проверку
- * GET - получить статус последней проверки
+ * AI проверка слов - серверная реализация для Vercel
+ * Запускает проверку напрямую через Groq API без Python скриптов
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
-import { spawn } from 'child_process';
-import path from 'path';
+import OpenAI from 'openai';
 
 const POSTGRES_URL = process.env.POSTGRES_URL || '';
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 
-// Хранилище статуса последней проверки (в памяти)
+// Хранилище статуса проверки
 let checkStatus: {
   running: boolean;
   lastRun: Date | null;
@@ -21,6 +19,7 @@ let checkStatus: {
   translationsAdded: number;
   greetingConstructions: number;
   message: string;
+  progress: { current: number; total: number };
 } = {
   running: false,
   lastRun: null,
@@ -29,12 +28,11 @@ let checkStatus: {
   translationsAdded: 0,
   greetingConstructions: 0,
   message: 'Ожидание запуска',
+  progress: { current: 0, total: 0 },
 };
 
 function getPool() {
-  if (!POSTGRES_URL) {
-    return null;
-  }
+  if (!POSTGRES_URL) return null;
   
   const isNeon = POSTGRES_URL.includes('neon') || POSTGRES_URL.includes('supabase');
   let connectionString = POSTGRES_URL;
@@ -49,157 +47,263 @@ function getPool() {
   });
 }
 
-/**
- * Запускает Python скрипт проверки слов
- */
-async function runWordCheck(limit: number = 500): Promise<void> {
-  if (checkStatus.running) {
-    return;
+// Инициализация Groq клиента
+const groqClient = GROQ_API_KEY ? new OpenAI({
+  apiKey: GROQ_API_KEY,
+  baseURL: 'https://api.groq.com/openai/v1',
+  timeout: 30000,
+}) : null;
+
+// Паттерны приветствий
+const GREETING_PATTERNS = [
+  /^guten\s+tag$/i, /^guten\s+abend$/i, /^guten\s+morgen$/i, /^gute\s+nacht$/i,
+  /^guten\s+rutsch$/i, /^frohe\s+weihnachten$/i, /^frohe\s+ostern$/i,
+  /^herzlichen\s+glückwunsch/i, /^guten\s+appetit$/i, /^auf\s+wiedersehen$/i,
+  /^machs?\s+gut$/i, /^bis\s+bald$/i, /^bis\s+morgen$/i, /^bis\s+später$/i,
+];
+
+function isGreetingConstruction(de: string): boolean {
+  const deLower = de.toLowerCase().trim();
+  return GREETING_PATTERNS.some(pattern => pattern.test(deLower));
+}
+
+function hasMixedAlphabet(text: string): boolean {
+  if (!text) return false;
+  for (const word of text.split()) {
+    let cyrillicCount = 0;
+    let latinCount = 0;
+    for (const char of word) {
+      if (/\u0400-\u04FF/.test(char)) cyrillicCount++;
+      else if (/[a-zäöüßÄÖÜ]/i.test(char)) latinCount++;
+    }
+    if (cyrillicCount > 0 && latinCount > 0) return true;
   }
+  return false;
+}
+
+const CHECK_PROMPT = `Ты - строгий эксперт по немецкому языку. Проверь слово.
+
+Слово: {de}
+Перевод: {ru}
+Артикль: {article}
+Формы глагола: {verb_forms}
+
+Правила:
+1. Прилагательные: артикль пустой, verb_forms пустые
+2. Глаголы: артикль пустой, verb_forms: Infinitiv, Praeteritum, Partizip II
+3. Существительные: артикль der/die/das, verb_forms пустые
+4. Конструкции (Guten Tag и т.д.): помечай как "Конструкция приветствия - удалить"
+5. Несколько переводов: добавляй все значимые переводы
+
+Верни ТОЛЬКО JSON:
+{
+  "word_type": "adjective|verb|noun|phrase",
+  "valid": true/false,
+  "errors": [],
+  "corrected_de": "",
+  "corrected_ru": "",
+  "corrected_article": "",
+  "corrected_verb_forms": "",
+  "additional_translations": [],
+  "confidence": 0.0-1.0,
+  "is_greeting_construction": true/false
+}`;
+
+async function checkWordWithAI(de: string, ru: string, article: string, verb_forms: string) {
+  // Локальные проверки
+  if (hasMixedAlphabet(ru)) {
+    return {
+      valid: false,
+      errors: ['Смешение алфавитов (кириллица + латиница)'],
+      corrected_ru: ru,
+      confidence: 1.0,
+      additional_translations: []
+    };
+  }
+
+  if (hasMixedAlphabet(de)) {
+    return {
+      valid: false,
+      errors: ['Смешение алфавитов в немецком слове'],
+      corrected_de: de,
+      confidence: 1.0,
+      additional_translations: []
+    };
+  }
+
+  if (isGreetingConstruction(de)) {
+    return {
+      valid: false,
+      errors: ['Конструкция приветствия - удалить'],
+      is_greeting_construction: true,
+      confidence: 1.0,
+      additional_translations: []
+    };
+  }
+
+  // Проверка через Groq AI
+  if (!groqClient) {
+    return { valid: true, errors: [], confidence: 0.5, additional_translations: [] };
+  }
+
+  try {
+    const prompt = CHECK_PROMPT
+      .replace('{de}', de)
+      .replace('{ru}', ru)
+      .replace('{article}', article || 'пусто')
+      .replace('{verb_forms}', verb_forms || 'пусто');
+
+    const response = await groqClient.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: 'Ты проверяешь немецкие слова. Возвращай ТОЛЬКО JSON, без markdown.' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.1,
+      max_tokens: 600,
+    });
+
+    let content = response.choices[0]?.message?.content?.trim() || '';
+    
+    // Убираем markdown
+    content = content.replace(/```json/g, '').replace(/```/g, '').trim();
+    
+    // Извлекаем JSON
+    const jsonMatch = content.match(/\{.*\}/s);
+    if (jsonMatch) content = jsonMatch[0];
+
+    const result = JSON.parse(content);
+    if (!result.additional_translations) result.additional_translations = [];
+    
+    return result;
+  } catch (error) {
+    console.error('AI check error:', error);
+    return { valid: true, errors: [], confidence: 0.5, additional_translations: [] };
+  }
+}
+
+async function runWordCheck(limit: number = 500): Promise<void> {
+  if (checkStatus.running) return;
 
   checkStatus.running = true;
   checkStatus.message = 'Запуск проверки...';
+  checkStatus.progress = { current: 0, total: 0 };
 
-  return new Promise((resolve) => {
-    // Путь к скрипту - используем абсолютный путь для Windows
-    const scriptPath = path.join(process.cwd(), 'tools', 'check_words_ai.py');
-    
-    console.log('[check-words] Script path:', scriptPath);
-    console.log('[check-words] CWD:', process.cwd());
+  const pool = getPool();
+  if (!pool) {
+    checkStatus.message = 'Ошибка: БД не подключена';
+    checkStatus.running = false;
+    return;
+  }
 
-    // Проверяем существование скрипта
-    const fs = require('fs');
-    if (!fs.existsSync(scriptPath)) {
-      checkStatus.message = `Ошибка: скрипт не найден: ${scriptPath}`;
+  try {
+    // Получаем слова для проверки
+    const result = await pool.query(`
+      SELECT id, de, ru, article, verb_forms, level
+      FROM words
+      WHERE ai_checked_at IS NULL
+      ORDER BY id
+      LIMIT $1
+    `, [limit]);
+
+    const words = result.rows;
+    checkStatus.progress.total = words.length;
+    checkStatus.progress.current = 0;
+
+    if (words.length === 0) {
+      checkStatus.message = 'Нет непроверенных слов';
       checkStatus.running = false;
-      console.error('[check-words] Script not found:', scriptPath);
-      resolve();
       return;
     }
 
-    // Пробуем разные команды для Python
-    const pythonCommands = ['python', 'python3', 'py'];
-    let selectedCommand = pythonCommands[0];
-    
-    // Проверяем, какая команда доступна
-    const { execSync } = require('child_process');
-    for (const cmd of pythonCommands) {
-      try {
-        execSync(`${cmd} --version`, { stdio: 'pipe' });
-        selectedCommand = cmd;
-        console.log('[check-words] Using Python command:', cmd);
-        break;
-      } catch (e) {
-        continue;
+    let stats = { total: 0, valid: 0, invalid: 0, translationsAdded: 0, greetings: 0 };
+
+    for (const word of words) {
+      const aiResult = await checkWordWithAI(word.de, word.ru, word.article, word.verb_forms);
+      stats.total++;
+      checkStatus.progress.current = stats.total;
+
+      if (aiResult.valid) {
+        stats.valid++;
+        // Добавляем дополнительные переводы если есть
+        if (aiResult.additional_translations?.length > 0) {
+          const currentRu = word.ru;
+          const newTranslations = aiResult.additional_translations.filter(
+            (t: string) => !currentRu.toLowerCase().includes(t.toLowerCase())
+          );
+          if (newTranslations.length > 0) {
+            await pool.query(
+              `UPDATE words SET ru = $1, ai_checked_at = NOW() WHERE id = $2`,
+              [currentRu + ', ' + newTranslations.join(', '), word.id]
+            );
+            stats.translationsAdded += newTranslations.length;
+          } else {
+            await pool.query(
+              `UPDATE words SET ai_checked_at = NOW() WHERE id = $1`,
+              [word.id]
+            );
+          }
+        } else {
+          await pool.query(
+            `UPDATE words SET ai_checked_at = NOW() WHERE id = $1`,
+            [word.id]
+          );
+        }
+      } else {
+        stats.invalid++;
+        
+        if (aiResult.is_greeting_construction) {
+          stats.greetings++;
+          checkStatus.message = `Проверка: ${stats.total}/${words.length}. Найдено конструкций: ${stats.greetings}`;
+        } else {
+          // Исправляем ошибки
+          const newDe = aiResult.corrected_de || word.de;
+          const newRu = aiResult.corrected_ru || word.ru;
+          const newArticle = aiResult.corrected_article ?? word.article;
+          const newVerbForms = aiResult.corrected_verb_forms ?? word.verb_forms;
+          
+          await pool.query(
+            `UPDATE words SET de = $1, ru = $2, article = $3, verb_forms = $4, ai_checked_at = NOW() WHERE id = $5`,
+            [newDe, newRu, newArticle || '', newVerbForms || '', word.id]
+          );
+          checkStatus.message = `Проверка: ${stats.total}/${words.length}. Ошибок: ${stats.invalid}`;
+        }
       }
+
+      // Небольшая задержка чтобы не превысить лимиты API
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    // Создаём процесс Python для Windows
-    // Используем cmd.exe /c для корректного запуска
-    const pythonProcess = spawn('cmd.exe', ['/c', selectedCommand, scriptPath], {
-      env: {
-        ...process.env,
-        POSTGRES_URL: POSTGRES_URL || '',
-        GROQ_API_KEY: GROQ_API_KEY || '',
-        PYTHONIOENCODING: 'utf-8',
-        PYTHONUTF8: '1',
-      },
-      cwd: process.cwd(),
-      detached: false,
-      windowsHide: true,
-    });
+    // Сохраняем статистику
+    checkStatus.totalChecked = stats.total;
+    checkStatus.errorsFound = stats.invalid;
+    checkStatus.translationsAdded = stats.translationsAdded;
+    checkStatus.greetingConstructions = stats.greetings;
+    checkStatus.message = `Проверка завершена. Найдено ошибок: ${stats.invalid}, добавлено переводов: ${stats.translationsAdded}`;
+    checkStatus.lastRun = new Date();
 
-    let output = '';
-    let errorOutput = '';
-
-    pythonProcess.stdout?.on('data', (data) => {
-      const text = data.toString();
-      output += text;
-      console.log('[check-words]', text.trim());
-
-      // Парсим прогресс из вывода
-      const progressMatch = text.match(/Проверено: (\d+)\/(\d+)/);
-      if (progressMatch) {
-        const current = parseInt(progressMatch[1]);
-        checkStatus.message = `Проверка: ${current} слов...`;
-      }
-    });
-
-    pythonProcess.stderr?.on('data', (data) => {
-      const text = data.toString();
-      errorOutput += text;
-      console.error('[check-words error]', text.trim());
-    });
-
-    pythonProcess.on('error', (err) => {
-      checkStatus.running = false;
-      checkStatus.message = `Ошибка запуска Python: ${err.message}`;
-      console.error('[check-words] Process error:', err);
-      resolve();
-    });
-
-    pythonProcess.on('close', (code) => {
-      checkStatus.running = false;
-      checkStatus.lastRun = new Date();
-      
-      console.log('[check-words] Process closed with code:', code);
-      console.log('[check-words] Error output:', errorOutput);
-
-      if (code === 0) {
-        // Парсим итоги из вывода
-        const totalMatch = output.match(/Всего проверено: (\d+)/);
-        const errorsMatch = output.match(/Ошибки: (\d+)/);
-        const translationsMatch = output.match(/Добавлено переводов: (\d+)/);
-        const greetingMatch = output.match(/Конструкции приветствий: (\d+)/);
-
-        checkStatus.totalChecked = totalMatch ? parseInt(totalMatch[1]) : 0;
-        checkStatus.errorsFound = errorsMatch ? parseInt(errorsMatch[1]) : 0;
-        checkStatus.translationsAdded = translationsMatch ? parseInt(translationsMatch[1]) : 0;
-        checkStatus.greetingConstructions = greetingMatch ? parseInt(greetingMatch[1]) : 0;
-        checkStatus.message = `Проверка завершена. Найдено ошибок: ${checkStatus.errorsFound}`;
-      } else {
-        checkStatus.message = `Ошибка проверки (код ${code}): ${errorOutput.slice(0, 500)}`;
-      }
-
-      resolve();
-    });
-
-    // Таймаут на случай зависания
-    setTimeout(() => {
-      if (checkStatus.running) {
-        pythonProcess.kill();
-        checkStatus.running = false;
-        checkStatus.message = 'Таймаут проверки (5 минут)';
-        resolve();
-      }
-    }, 5 * 60 * 1000); // 5 минут
-  });
+  } catch (error) {
+    console.error('Word check error:', error);
+    checkStatus.message = `Ошибка: ${error instanceof Error ? error.message : String(error)}`;
+  } finally {
+    checkStatus.running = false;
+    await pool.end();
+  }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { limit = 500, dry_run = false } = body || {};
+    const { limit = 500 } = body || {};
 
-    console.log('=== POST /api/admin/check-words ===');
-    console.log('Params:', { limit, dry_run });
-
-    // Проверяем переменные окружения
     if (!POSTGRES_URL) {
-      return NextResponse.json(
-        { error: 'POSTGRES_URL не настроен' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'POSTGRES_URL не настроен' }, { status: 500 });
     }
 
     if (!GROQ_API_KEY) {
-      return NextResponse.json(
-        { error: 'GROQ_API_KEY не настроен' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'GROQ_API_KEY не настроен' }, { status: 500 });
     }
 
-    // Проверяем, не запущена ли уже проверка
     if (checkStatus.running) {
       return NextResponse.json({
         status: 'already_running',
@@ -208,14 +312,12 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Запускаем проверку (асинхронно, не ожидая завершения)
-    // В реальном приложении лучше использовать очередь задач
+    // Запускаем проверку (асинхронно)
     runWordCheck(limit).catch(console.error);
 
     return NextResponse.json({
       status: 'started',
       message: `Запущена проверка ${limit} слов`,
-      dry_run,
     });
   } catch (error) {
     console.error('Check words error:', error);
@@ -227,68 +329,37 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
-  try {
-    // Возвращаем текущий статус проверки
-    return NextResponse.json({
-      running: checkStatus.running,
-      lastRun: checkStatus.lastRun,
-      totalChecked: checkStatus.totalChecked,
-      errorsFound: checkStatus.errorsFound,
-      translationsAdded: checkStatus.translationsAdded,
-      greetingConstructions: checkStatus.greetingConstructions,
-      message: checkStatus.message,
-    });
-  } catch (error) {
-    console.error('Check words status error:', error);
-    return NextResponse.json(
-      { error: 'Ошибка сервера' },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json({
+    running: checkStatus.running,
+    lastRun: checkStatus.lastRun,
+    totalChecked: checkStatus.totalChecked,
+    errorsFound: checkStatus.errorsFound,
+    translationsAdded: checkStatus.translationsAdded,
+    greetingConstructions: checkStatus.greetingConstructions,
+    message: checkStatus.message,
+    progress: checkStatus.progress,
+  });
 }
 
-/**
- * Сбрасывает статус проверки слов (ai_checked_at = NULL)
- */
 export async function DELETE(request: NextRequest) {
   try {
     const body = await request.json();
     const { all = false } = body || {};
 
-    console.log('=== DELETE /api/admin/check-words ===');
-    console.log('Params:', { all });
-
     if (!POSTGRES_URL) {
-      return NextResponse.json(
-        { error: 'POSTGRES_URL не настроен' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'POSTGRES_URL не настроен' }, { status: 500 });
     }
 
     const pool = getPool();
     if (!pool) {
-      return NextResponse.json(
-        { error: 'Не удалось подключиться к БД' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Не удалось подключиться к БД' }, { status: 500 });
     }
 
-    let result;
-    
-    if (all) {
-      // Сбросить ВСЕ проверенные слова
-      result = await pool.query(`
-        UPDATE words SET ai_checked_at = NULL
-      `);
-    } else {
-      // Сбросить только последние проверенные (500 шт)
-      result = await pool.query(`
-        UPDATE words SET ai_checked_at = NULL
-        WHERE ai_checked_at IS NOT NULL
-        ORDER BY ai_checked_at DESC
-        LIMIT 500
-      `);
-    }
+    const result = await pool.query(
+      all 
+        ? `UPDATE words SET ai_checked_at = NULL`
+        : `UPDATE words SET ai_checked_at = NULL WHERE ai_checked_at IS NOT NULL ORDER BY ai_checked_at DESC LIMIT 500`
+    );
 
     const resetCount = result?.rowCount || 0;
 
@@ -298,6 +369,9 @@ export async function DELETE(request: NextRequest) {
     checkStatus.translationsAdded = 0;
     checkStatus.greetingConstructions = 0;
     checkStatus.message = 'Статус сброшен';
+    checkStatus.progress = { current: 0, total: 0 };
+
+    await pool.end();
 
     return NextResponse.json({
       status: 'success',
