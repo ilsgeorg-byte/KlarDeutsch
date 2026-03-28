@@ -238,9 +238,12 @@ async function runWordCheck(limit: number = 500): Promise<void> {
 
     for (const word of words) {
       try {
+        console.log(`[check-words] Processing word ${word.id}: ${word.de} = ${word.ru}`);
+        
         const aiResult = await checkWordWithAI(word.de, word.ru, word.article, word.verb_forms);
         stats.total++;
         checkStatus.progress.current = stats.total;
+        console.log(`[check-words] Word ${word.id} result:`, JSON.stringify(aiResult).slice(0, 200));
 
         if (aiResult.valid) {
           stats.valid++;
@@ -257,6 +260,7 @@ async function runWordCheck(limit: number = 500): Promise<void> {
                   [currentRu + ', ' + newTranslations.join(', '), word.id]
                 );
                 stats.translationsAdded += newTranslations.length;
+                console.log(`[check-words] Word ${word.id}: added ${newTranslations.length} translations`);
               } catch (updateError: any) {
                 console.error(`Update error for word ${word.id}:`, updateError.message);
                 // Пропускаем ошибку обновления
@@ -266,12 +270,14 @@ async function runWordCheck(limit: number = 500): Promise<void> {
                 `UPDATE words SET ai_checked_at = NOW() WHERE id = $1`,
                 [word.id]
               );
+              console.log(`[check-words] Word ${word.id}: marked as checked (valid, no new translations)`);
             }
           } else {
             await pool.query(
               `UPDATE words SET ai_checked_at = NOW() WHERE id = $1`,
               [word.id]
             );
+            console.log(`[check-words] Word ${word.id}: marked as checked (valid)`);
           }
         } else {
           stats.invalid++;
@@ -284,6 +290,7 @@ async function runWordCheck(limit: number = 500): Promise<void> {
                 `UPDATE words SET ai_checked_at = NOW() WHERE id = $1`,
                 [word.id]
               );
+              console.log(`[check-words] Word ${word.id}: greeting construction, marked as checked`);
             } catch (updateError: any) {
               console.error(`Update error for greeting ${word.id}:`, updateError.message);
             }
@@ -300,6 +307,7 @@ async function runWordCheck(limit: number = 500): Promise<void> {
                 `UPDATE words SET de = $1, ru = $2, article = $3, verb_forms = $4, ai_checked_at = NOW() WHERE id = $5`,
                 [newDe, newRu, newArticle || '', newVerbForms || '', word.id]
               );
+              console.log(`[check-words] Word ${word.id}: corrected and updated`);
               checkStatus.message = `Проверка: ${stats.total}/${words.length}. Ошибок: ${stats.invalid}`;
             } catch (updateError: any) {
               console.error(`Update error for word ${word.id}:`, updateError.message);
@@ -309,6 +317,7 @@ async function runWordCheck(limit: number = 500): Promise<void> {
         }
       } catch (wordError: any) {
         console.error(`Error processing word ${word.id}:`, wordError.message);
+        console.error(`Stack:`, wordError.stack?.slice(0, 500));
         // Продолжаем проверку следующих слов
       }
 
