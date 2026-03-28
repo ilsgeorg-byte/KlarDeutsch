@@ -61,36 +61,62 @@ async function runWordCheck(limit: number = 500): Promise<void> {
   checkStatus.message = 'Запуск проверки...';
 
   return new Promise((resolve) => {
-    // Путь к скрипту
+    // Путь к скрипту - используем абсолютный путь для Windows
     const scriptPath = path.join(process.cwd(), 'tools', 'check_words_ai.py');
     
+    console.log('[check-words] Script path:', scriptPath);
+    console.log('[check-words] CWD:', process.cwd());
+
     // Проверяем существование скрипта
     const fs = require('fs');
     if (!fs.existsSync(scriptPath)) {
       checkStatus.message = `Ошибка: скрипт не найден: ${scriptPath}`;
       checkStatus.running = false;
+      console.error('[check-words] Script not found:', scriptPath);
       resolve();
       return;
     }
 
-    // Создаём процесс Python
-    const pythonProcess = spawn('python', [scriptPath], {
+    // Пробуем разные команды для Python
+    const pythonCommands = ['python', 'python3', 'py'];
+    let selectedCommand = pythonCommands[0];
+    
+    // Проверяем, какая команда доступна
+    const { execSync } = require('child_process');
+    for (const cmd of pythonCommands) {
+      try {
+        execSync(`${cmd} --version`, { stdio: 'pipe' });
+        selectedCommand = cmd;
+        console.log('[check-words] Using Python command:', cmd);
+        break;
+      } catch (e) {
+        continue;
+      }
+    }
+
+    // Создаём процесс Python для Windows
+    // Используем cmd.exe /c для корректного запуска
+    const pythonProcess = spawn('cmd.exe', ['/c', selectedCommand, scriptPath], {
       env: {
         ...process.env,
         POSTGRES_URL: POSTGRES_URL || '',
         GROQ_API_KEY: GROQ_API_KEY || '',
+        PYTHONIOENCODING: 'utf-8',
+        PYTHONUTF8: '1',
       },
       cwd: process.cwd(),
+      detached: false,
+      windowsHide: true,
     });
 
     let output = '';
     let errorOutput = '';
 
-    pythonProcess.stdout.on('data', (data) => {
+    pythonProcess.stdout?.on('data', (data) => {
       const text = data.toString();
       output += text;
       console.log('[check-words]', text.trim());
-      
+
       // Парсим прогресс из вывода
       const progressMatch = text.match(/Проверено: (\d+)\/(\d+)/);
       if (progressMatch) {
@@ -99,15 +125,25 @@ async function runWordCheck(limit: number = 500): Promise<void> {
       }
     });
 
-    pythonProcess.stderr.on('data', (data) => {
+    pythonProcess.stderr?.on('data', (data) => {
       const text = data.toString();
       errorOutput += text;
       console.error('[check-words error]', text.trim());
     });
 
+    pythonProcess.on('error', (err) => {
+      checkStatus.running = false;
+      checkStatus.message = `Ошибка запуска Python: ${err.message}`;
+      console.error('[check-words] Process error:', err);
+      resolve();
+    });
+
     pythonProcess.on('close', (code) => {
       checkStatus.running = false;
       checkStatus.lastRun = new Date();
+      
+      console.log('[check-words] Process closed with code:', code);
+      console.log('[check-words] Error output:', errorOutput);
 
       if (code === 0) {
         // Парсим итоги из вывода
@@ -122,17 +158,21 @@ async function runWordCheck(limit: number = 500): Promise<void> {
         checkStatus.greetingConstructions = greetingMatch ? parseInt(greetingMatch[1]) : 0;
         checkStatus.message = `Проверка завершена. Найдено ошибок: ${checkStatus.errorsFound}`;
       } else {
-        checkStatus.message = `Ошибка проверки (код ${code}): ${errorOutput.slice(0, 200)}`;
+        checkStatus.message = `Ошибка проверки (код ${code}): ${errorOutput.slice(0, 500)}`;
       }
 
       resolve();
     });
 
-    pythonProcess.on('error', (err) => {
-      checkStatus.running = false;
-      checkStatus.message = `Ошибка запуска Python: ${err.message}`;
-      resolve();
-    });
+    // Таймаут на случай зависания
+    setTimeout(() => {
+      if (checkStatus.running) {
+        pythonProcess.kill();
+        checkStatus.running = false;
+        checkStatus.message = 'Таймаут проверки (5 минут)';
+        resolve();
+      }
+    }, 5 * 60 * 1000); // 5 минут
   });
 }
 

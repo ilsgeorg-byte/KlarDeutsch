@@ -24,7 +24,9 @@ if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 # Загружаем переменные окружения
-load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env.local'))
+# Путь от файла скрипта к .env.local в корне проекта
+env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.env.local'))
+load_dotenv(env_path)
 
 import psycopg2
 from openai import OpenAI
