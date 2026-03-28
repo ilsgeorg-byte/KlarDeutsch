@@ -44,6 +44,9 @@ function getPool() {
   return new Pool({
     connectionString,
     ssl: isNeon ? { rejectUnauthorized: false } : undefined,
+    max: 10, // Максимум подключений
+    idleTimeoutMillis: 30000, // Таймаут бездействия 30 сек
+    connectionTimeoutMillis: 5000, // Таймаут подключения 5 сек
   });
 }
 
@@ -189,7 +192,7 @@ async function runWordCheck(limit: number = 500): Promise<void> {
   checkStatus.message = 'Запуск проверки...';
   checkStatus.progress = { current: 0, total: 0 };
 
-  const pool = getPool();
+  let pool = getPool();
   if (!pool) {
     checkStatus.message = 'Ошибка: БД не подключена';
     checkStatus.running = false;
@@ -198,13 +201,28 @@ async function runWordCheck(limit: number = 500): Promise<void> {
 
   try {
     // Получаем слова для проверки
-    const result = await pool.query(`
-      SELECT id, de, ru, article, verb_forms, level
-      FROM words
-      WHERE ai_checked_at IS NULL
-      ORDER BY id
-      LIMIT $1
-    `, [limit]);
+    let result;
+    try {
+      result = await pool.query(`
+        SELECT id, de, ru, article, verb_forms, level
+        FROM words
+        WHERE ai_checked_at IS NULL
+        ORDER BY id
+        LIMIT $1
+      `, [limit]);
+    } catch (dbError: any) {
+      console.error('DB query error:', dbError.message);
+      // Пробуем переподключиться
+      await pool.end().catch(() => {});
+      pool = getPool()!;
+      result = await pool.query(`
+        SELECT id, de, ru, article, verb_forms, level
+        FROM words
+        WHERE ai_checked_at IS NULL
+        ORDER BY id
+        LIMIT $1
+      `, [limit]);
+    }
 
     const words = result.rows;
     checkStatus.progress.total = words.length;
@@ -219,24 +237,36 @@ async function runWordCheck(limit: number = 500): Promise<void> {
     let stats = { total: 0, valid: 0, invalid: 0, translationsAdded: 0, greetings: 0 };
 
     for (const word of words) {
-      const aiResult = await checkWordWithAI(word.de, word.ru, word.article, word.verb_forms);
-      stats.total++;
-      checkStatus.progress.current = stats.total;
+      try {
+        const aiResult = await checkWordWithAI(word.de, word.ru, word.article, word.verb_forms);
+        stats.total++;
+        checkStatus.progress.current = stats.total;
 
-      if (aiResult.valid) {
-        stats.valid++;
-        // Добавляем дополнительные переводы если есть
-        if (aiResult.additional_translations?.length > 0) {
-          const currentRu = word.ru;
-          const newTranslations = aiResult.additional_translations.filter(
-            (t: string) => !currentRu.toLowerCase().includes(t.toLowerCase())
-          );
-          if (newTranslations.length > 0) {
-            await pool.query(
-              `UPDATE words SET ru = $1, ai_checked_at = NOW() WHERE id = $2`,
-              [currentRu + ', ' + newTranslations.join(', '), word.id]
+        if (aiResult.valid) {
+          stats.valid++;
+          // Добавляем дополнительные переводы если есть
+          if (aiResult.additional_translations?.length > 0) {
+            const currentRu = word.ru;
+            const newTranslations = aiResult.additional_translations.filter(
+              (t: string) => !currentRu.toLowerCase().includes(t.toLowerCase())
             );
-            stats.translationsAdded += newTranslations.length;
+            if (newTranslations.length > 0) {
+              try {
+                await pool.query(
+                  `UPDATE words SET ru = $1, ai_checked_at = NOW() WHERE id = $2`,
+                  [currentRu + ', ' + newTranslations.join(', '), word.id]
+                );
+                stats.translationsAdded += newTranslations.length;
+              } catch (updateError: any) {
+                console.error(`Update error for word ${word.id}:`, updateError.message);
+                // Пропускаем ошибку обновления
+              }
+            } else {
+              await pool.query(
+                `UPDATE words SET ai_checked_at = NOW() WHERE id = $1`,
+                [word.id]
+              );
+            }
           } else {
             await pool.query(
               `UPDATE words SET ai_checked_at = NOW() WHERE id = $1`,
@@ -244,30 +274,33 @@ async function runWordCheck(limit: number = 500): Promise<void> {
             );
           }
         } else {
-          await pool.query(
-            `UPDATE words SET ai_checked_at = NOW() WHERE id = $1`,
-            [word.id]
-          );
+          stats.invalid++;
+
+          if (aiResult.is_greeting_construction) {
+            stats.greetings++;
+            checkStatus.message = `Проверка: ${stats.total}/${words.length}. Найдено конструкций: ${stats.greetings}`;
+          } else {
+            // Исправляем ошибки
+            const newDe = aiResult.corrected_de || word.de;
+            const newRu = aiResult.corrected_ru || word.ru;
+            const newArticle = aiResult.corrected_article ?? word.article;
+            const newVerbForms = aiResult.corrected_verb_forms ?? word.verb_forms;
+
+            try {
+              await pool.query(
+                `UPDATE words SET de = $1, ru = $2, article = $3, verb_forms = $4, ai_checked_at = NOW() WHERE id = $5`,
+                [newDe, newRu, newArticle || '', newVerbForms || '', word.id]
+              );
+              checkStatus.message = `Проверка: ${stats.total}/${words.length}. Ошибок: ${stats.invalid}`;
+            } catch (updateError: any) {
+              console.error(`Update error for word ${word.id}:`, updateError.message);
+              // Пропускаем ошибку обновления
+            }
+          }
         }
-      } else {
-        stats.invalid++;
-        
-        if (aiResult.is_greeting_construction) {
-          stats.greetings++;
-          checkStatus.message = `Проверка: ${stats.total}/${words.length}. Найдено конструкций: ${stats.greetings}`;
-        } else {
-          // Исправляем ошибки
-          const newDe = aiResult.corrected_de || word.de;
-          const newRu = aiResult.corrected_ru || word.ru;
-          const newArticle = aiResult.corrected_article ?? word.article;
-          const newVerbForms = aiResult.corrected_verb_forms ?? word.verb_forms;
-          
-          await pool.query(
-            `UPDATE words SET de = $1, ru = $2, article = $3, verb_forms = $4, ai_checked_at = NOW() WHERE id = $5`,
-            [newDe, newRu, newArticle || '', newVerbForms || '', word.id]
-          );
-          checkStatus.message = `Проверка: ${stats.total}/${words.length}. Ошибок: ${stats.invalid}`;
-        }
+      } catch (wordError: any) {
+        console.error(`Error processing word ${word.id}:`, wordError.message);
+        // Продолжаем проверку следующих слов
       }
 
       // Небольшая задержка чтобы не превысить лимиты API
