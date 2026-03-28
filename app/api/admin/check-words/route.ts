@@ -44,9 +44,11 @@ function getPool() {
   return new Pool({
     connectionString,
     ssl: isNeon ? { rejectUnauthorized: false } : undefined,
-    max: 10, // Максимум подключений
-    idleTimeoutMillis: 30000, // Таймаут бездействия 30 сек
-    connectionTimeoutMillis: 5000, // Таймаут подключения 5 сек
+    max: 10,
+    idleTimeoutMillis: 60000, // 60 сек
+    connectionTimeoutMillis: 10000, // 10 сек
+    keepAlive: true, // Поддерживать соединение
+    statement_timeout: 30000, // Таймаут запроса 30 сек
   });
 }
 
@@ -191,6 +193,11 @@ async function runWordCheck(limit: number = 500): Promise<void> {
   checkStatus.running = true;
   checkStatus.message = 'Запуск проверки...';
   checkStatus.progress = { current: 0, total: 0 };
+  // Сбрасываем статистику перед запуском
+  checkStatus.totalChecked = 0;
+  checkStatus.errorsFound = 0;
+  checkStatus.translationsAdded = 0;
+  checkStatus.greetingConstructions = 0;
 
   let pool = getPool();
   if (!pool) {
@@ -199,146 +206,150 @@ async function runWordCheck(limit: number = 500): Promise<void> {
     return;
   }
 
+  const BATCH_SIZE = 50; // Обрабатываем по 50 слов с переподключением
+  let processedCount = 0;
+  let shouldStop = false;
+
   try {
-    // Получаем слова для проверки
-    let result;
-    try {
-      result = await pool.query(`
-        SELECT id, de, ru, article, verb_forms, level
-        FROM words
-        WHERE ai_checked_at IS NULL
-        ORDER BY id
-        LIMIT $1
-      `, [limit]);
-    } catch (dbError: any) {
-      console.error('DB query error:', dbError.message);
-      // Пробуем переподключиться
-      await pool.end().catch(() => {});
-      pool = getPool()!;
-      result = await pool.query(`
-        SELECT id, de, ru, article, verb_forms, level
-        FROM words
-        WHERE ai_checked_at IS NULL
-        ORDER BY id
-        LIMIT $1
-      `, [limit]);
-    }
-
-    const words = result.rows;
-    checkStatus.progress.total = words.length;
-    checkStatus.progress.current = 0;
-
-    if (words.length === 0) {
-      checkStatus.message = 'Нет непроверенных слов';
-      checkStatus.running = false;
-      return;
-    }
-
-    let stats = { total: 0, valid: 0, invalid: 0, translationsAdded: 0, greetings: 0 };
-
-    for (const word of words) {
-      try {
-        console.log(`[check-words] Processing word ${word.id}: ${word.de} = ${word.ru}`);
-        
-        const aiResult = await checkWordWithAI(word.de, word.ru, word.article, word.verb_forms);
-        stats.total++;
-        checkStatus.progress.current = stats.total;
-        console.log(`[check-words] Word ${word.id} result:`, JSON.stringify(aiResult).slice(0, 200));
-
-        if (aiResult.valid) {
-          stats.valid++;
-          // Добавляем дополнительные переводы если есть
-          if (aiResult.additional_translations?.length > 0) {
-            const currentRu = word.ru;
-            const newTranslations = aiResult.additional_translations.filter(
-              (t: string) => !currentRu.toLowerCase().includes(t.toLowerCase())
-            );
-            if (newTranslations.length > 0) {
-              try {
-                await pool.query(
-                  `UPDATE words SET ru = $1, ai_checked_at = NOW() WHERE id = $2`,
-                  [currentRu + ', ' + newTranslations.join(', '), word.id]
-                );
-                stats.translationsAdded += newTranslations.length;
-                console.log(`[check-words] Word ${word.id}: added ${newTranslations.length} translations`);
-              } catch (updateError: any) {
-                console.error(`Update error for word ${word.id}:`, updateError.message);
-                // Пропускаем ошибку обновления
-              }
-            } else {
-              await pool.query(
-                `UPDATE words SET ai_checked_at = NOW() WHERE id = $1`,
-                [word.id]
-              );
-              console.log(`[check-words] Word ${word.id}: marked as checked (valid, no new translations)`);
-            }
-          } else {
-            await pool.query(
-              `UPDATE words SET ai_checked_at = NOW() WHERE id = $1`,
-              [word.id]
-            );
-            console.log(`[check-words] Word ${word.id}: marked as checked (valid)`);
-          }
-        } else {
-          stats.invalid++;
-
-          if (aiResult.is_greeting_construction) {
-            stats.greetings++;
-            // Помечаем как проверенное (чтобы не проверять снова)
-            try {
-              await pool.query(
-                `UPDATE words SET ai_checked_at = NOW() WHERE id = $1`,
-                [word.id]
-              );
-              console.log(`[check-words] Word ${word.id}: greeting construction, marked as checked`);
-            } catch (updateError: any) {
-              console.error(`Update error for greeting ${word.id}:`, updateError.message);
-            }
-            checkStatus.message = `Проверка: ${stats.total}/${words.length}. Найдено конструкций: ${stats.greetings}`;
-          } else {
-            // Исправляем ошибки
-            const newDe = aiResult.corrected_de || word.de;
-            const newRu = aiResult.corrected_ru || word.ru;
-            const newArticle = aiResult.corrected_article ?? word.article;
-            const newVerbForms = aiResult.corrected_verb_forms ?? word.verb_forms;
-
-            try {
-              await pool.query(
-                `UPDATE words SET de = $1, ru = $2, article = $3, verb_forms = $4, ai_checked_at = NOW() WHERE id = $5`,
-                [newDe, newRu, newArticle || '', newVerbForms || '', word.id]
-              );
-              console.log(`[check-words] Word ${word.id}: corrected and updated`);
-              checkStatus.message = `Проверка: ${stats.total}/${words.length}. Ошибок: ${stats.invalid}`;
-            } catch (updateError: any) {
-              console.error(`Update error for word ${word.id}:`, updateError.message);
-              // Пропускаем ошибку обновления
-            }
-          }
-        }
-      } catch (wordError: any) {
-        console.error(`Error processing word ${word.id}:`, wordError.message);
-        console.error(`Stack:`, wordError.stack?.slice(0, 500));
-        // Продолжаем проверку следующих слов
+    while (!shouldStop && processedCount < limit) {
+      // Переподключаемся для каждого пакета
+      if (processedCount > 0) {
+        await pool.end().catch(() => {});
+        pool = getPool()!;
+        await new Promise(resolve => setTimeout(resolve, 500)); // Пауза между пакетами
       }
 
-      // Небольшая задержка чтобы не превысить лимиты API
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Получаем пакет слов
+      let result;
+      try {
+        result = await pool.query(`
+          SELECT id, de, ru, article, verb_forms, level
+          FROM words
+          WHERE ai_checked_at IS NULL
+          ORDER BY id
+          LIMIT $1
+        `, [BATCH_SIZE]);
+      } catch (dbError: any) {
+        console.error('DB query error:', dbError.message);
+        await pool.end().catch(() => {});
+        pool = getPool()!;
+        result = await pool.query(`
+          SELECT id, de, ru, article, verb_forms, level
+          FROM words
+          WHERE ai_checked_at IS NULL
+          ORDER BY id
+          LIMIT $1
+        `, [BATCH_SIZE]);
+      }
+
+      const words = result.rows;
+      if (words.length === 0) {
+        checkStatus.message = 'Нет непроверенных слов';
+        shouldStop = true;
+        break;
+      }
+
+      checkStatus.progress.total = Math.min(limit, processedCount + words.length);
+      
+      let batchStats = { total: 0, valid: 0, invalid: 0, translationsAdded: 0, greetings: 0 };
+
+      for (const word of words) {
+        if (shouldStop || processedCount + batchStats.total >= limit) break;
+
+        try {
+          console.log(`[check-words] Processing word ${word.id}: ${word.de} = ${word.ru}`);
+          
+          const aiResult = await checkWordWithAI(word.de, word.ru, word.article, word.verb_forms);
+          batchStats.total++;
+          processedCount++;
+          checkStatus.progress.current = processedCount;
+          console.log(`[check-words] Word ${word.id} result:`, JSON.stringify(aiResult).slice(0, 200));
+
+          if (aiResult.valid) {
+            batchStats.valid++;
+            if (aiResult.additional_translations?.length > 0) {
+              const currentRu = word.ru;
+              const newTranslations = aiResult.additional_translations.filter(
+                (t: string) => !currentRu.toLowerCase().includes(t.toLowerCase())
+              );
+              if (newTranslations.length > 0) {
+                try {
+                  await pool.query(
+                    `UPDATE words SET ru = $1, ai_checked_at = NOW() WHERE id = $2`,
+                    [currentRu + ', ' + newTranslations.join(', '), word.id]
+                  );
+                  batchStats.translationsAdded += newTranslations.length;
+                  console.log(`[check-words] Word ${word.id}: added ${newTranslations.length} translations`);
+                } catch (updateError: any) {
+                  console.error(`Update error for word ${word.id}:`, updateError.message);
+                }
+              } else {
+                await pool.query(`UPDATE words SET ai_checked_at = NOW() WHERE id = $1`, [word.id]);
+                console.log(`[check-words] Word ${word.id}: marked as checked (valid)`);
+              }
+            } else {
+              await pool.query(`UPDATE words SET ai_checked_at = NOW() WHERE id = $1`, [word.id]);
+              console.log(`[check-words] Word ${word.id}: marked as checked (valid)`);
+            }
+          } else {
+            batchStats.invalid++;
+
+            if (aiResult.is_greeting_construction) {
+              batchStats.greetings++;
+              try {
+                await pool.query(`UPDATE words SET ai_checked_at = NOW() WHERE id = $1`, [word.id]);
+                console.log(`[check-words] Word ${word.id}: greeting construction, marked as checked`);
+              } catch (updateError: any) {
+                console.error(`Update error for greeting ${word.id}:`, updateError.message);
+              }
+              checkStatus.message = `Проверка: ${processedCount}/${checkStatus.progress.total}. Найдено конструкций: ${batchStats.greetings}`;
+            } else {
+              const newDe = aiResult.corrected_de || word.de;
+              const newRu = aiResult.corrected_ru || word.ru;
+              const newArticle = aiResult.corrected_article ?? word.article;
+              const newVerbForms = aiResult.corrected_verb_forms ?? word.verb_forms;
+
+              try {
+                await pool.query(
+                  `UPDATE words SET de = $1, ru = $2, article = $3, verb_forms = $4, ai_checked_at = NOW() WHERE id = $5`,
+                  [newDe, newRu, newArticle || '', newVerbForms || '', word.id]
+                );
+                console.log(`[check-words] Word ${word.id}: corrected and updated`);
+                checkStatus.message = `Проверка: ${processedCount}/${checkStatus.progress.total}. Ошибок: ${batchStats.invalid}`;
+              } catch (updateError: any) {
+                console.error(`Update error for word ${word.id}:`, updateError.message);
+              }
+            }
+          }
+        } catch (wordError: any) {
+          console.error(`Error processing word ${word.id}:`, wordError.message);
+          console.error(`Stack:`, wordError.stack?.slice(0, 500));
+          processedCount++;
+        }
+
+        // Задержка между запросами к API
+        await new Promise(resolve => setTimeout(resolve, 150));
+      }
+
+      // Обновляем общую статистику
+      checkStatus.totalChecked = processedCount;
+      checkStatus.errorsFound = checkStatus.errorsFound + batchStats.invalid;
+      checkStatus.translationsAdded = checkStatus.translationsAdded + batchStats.translationsAdded;
+      checkStatus.greetingConstructions = checkStatus.greetingConstructions + batchStats.greetings;
+
+      console.log(`[check-words] Batch complete: ${batchStats.total} words, ${batchStats.invalid} errors`);
     }
 
-    // Сохраняем статистику
-    checkStatus.totalChecked = stats.total;
-    checkStatus.errorsFound = stats.invalid;
-    checkStatus.translationsAdded = stats.translationsAdded;
-    checkStatus.greetingConstructions = stats.greetings;
-    checkStatus.message = `Проверка завершена. Найдено ошибок: ${stats.invalid}, добавлено переводов: ${stats.translationsAdded}`;
+    checkStatus.message = `Проверка завершена. Проверено: ${processedCount}, ошибок: ${checkStatus.errorsFound}, переводов: ${checkStatus.translationsAdded}`;
     checkStatus.lastRun = new Date();
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Word check error:', error);
-    checkStatus.message = `Ошибка: ${error instanceof Error ? error.message : String(error)}`;
+    checkStatus.message = `Ошибка: ${error.message || String(error)}`;
+    checkStatus.lastRun = new Date();
   } finally {
     checkStatus.running = false;
-    await pool.end();
+    await pool.end().catch(() => {});
   }
 }
 
