@@ -28,18 +28,23 @@ export default function AdminDashboardPage() {
   const [checkStatus, setCheckStatus] = useState<CheckStatus | null>(null);
   const [checking, setChecking] = useState(false);
   const [checkLimit, setCheckLimit] = useState(500);
+  
+  // Состояние для конструкций приветствий
+  const [greetings, setGreetings] = useState<any[]>([]);
+  const [loadingGreetings, setLoadingGreetings] = useState(false);
 
   useEffect(() => {
     loadStats();
     loadCheckStatus();
-    
+    loadGreetings();
+
     // Обновляем статус проверки каждые 2 секунды если запущена
     const interval = setInterval(() => {
       if (checkStatus?.running) {
         loadCheckStatus();
       }
     }, 2000);
-    
+
     return () => clearInterval(interval);
   }, [checkStatus?.running]);
 
@@ -64,6 +69,43 @@ export default function AdminDashboardPage() {
       setCheckStatus(data);
     } catch (err: any) {
       console.error('Load check status error:', err);
+    }
+  };
+
+  const loadGreetings = async () => {
+    try {
+      setLoadingGreetings(true);
+      const res = await fetch('/api/admin/greetings');
+      if (!res.ok) throw new Error('Ошибка загрузки конструкций');
+      const data = await res.json();
+      setGreetings(data.words || []);
+    } catch (err: any) {
+      console.error('Load greetings error:', err);
+    } finally {
+      setLoadingGreetings(false);
+    }
+  };
+
+  const deleteGreetings = async () => {
+    if (!confirm(`Удалить ${greetings.length} конструкций приветствий? Это действие необратимо!`)) {
+      return;
+    }
+    
+    try {
+      const res = await fetch('/api/admin/greetings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deleteAll: true }),
+      });
+      
+      if (!res.ok) throw new Error('Ошибка удаления');
+      
+      const data = await res.json();
+      alert(`Удалено ${data.deletedCount} конструкций`);
+      setGreetings([]);
+      loadGreetings(); // Обновить список
+    } catch (err: any) {
+      setError(err.message);
     }
   };
 
@@ -412,6 +454,95 @@ export default function AdminDashboardPage() {
                   Последняя проверка: {new Date(checkStatus.lastRun).toLocaleString('ru-RU')}
                 </div>
               )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Конструкции приветствий */}
+      <div className="adminCard">
+        <div className="adminCardHeader">
+          <h3 className="adminCardTitle">⚠️ Конструкции приветствий</h3>
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: 12 }}>
+            Эти фразы не являются отдельными словами и должны быть удалены из базы
+          </p>
+
+          {loadingGreetings ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#64748b' }}>
+              <RefreshCw size={16} className="animate-spin" />
+              Загрузка...
+            </div>
+          ) : greetings.length > 0 ? (
+            <>
+              <div style={{ 
+                padding: 12, 
+                background: '#fef3c7', 
+                borderRadius: 8, 
+                border: '1px solid #fcd34d',
+                marginBottom: 12,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#92400e' }}>
+                  <AlertCircle size={20} />
+                  <span style={{ fontWeight: 600 }}>Найдено {greetings.length} конструкций для удаления</span>
+                </div>
+              </div>
+
+              <div style={{ 
+                maxHeight: 300, 
+                overflow: 'auto', 
+                marginBottom: 12,
+                border: '1px solid #e2e8f0',
+                borderRadius: 8,
+              }}>
+                <table className="adminTable" style={{ marginBottom: 0 }}>
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Немецкий</th>
+                      <th>Русский</th>
+                      <th>Уровень</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {greetings.slice(0, 10).map((word) => (
+                      <tr key={word.id}>
+                        <td>#{word.id}</td>
+                        <td style={{ fontWeight: 600, color: '#dc2626' }}>{word.de}</td>
+                        <td>{word.ru}</td>
+                        <td><span className="adminBadge adminBadgeBlue">{word.level}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {greetings.length > 10 && (
+                  <div style={{ padding: 8, textAlign: 'center', color: '#64748b', fontSize: '0.75rem' }}>
+                    Показано 10 из {greetings.length}
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={deleteGreetings}
+                className="adminBtn adminBtnDanger"
+              >
+                <Trash2 size={18} />
+                Удалить все {greetings.length} конструкций
+              </button>
+            </>
+          ) : (
+            <div style={{ 
+              padding: 16, 
+              background: '#f0fdf4', 
+              borderRadius: 8, 
+              border: '1px solid #86efac',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}>
+              <CheckCircle size={20} style={{ color: '#16a34a' }} />
+              <span style={{ fontWeight: 600, color: '#16a34a' }}>Конструкции не найдены</span>
             </div>
           )}
         </div>

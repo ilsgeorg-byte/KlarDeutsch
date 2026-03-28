@@ -275,7 +275,7 @@ async function runWordCheck(limit: number = 500): Promise<void> {
 
         try {
           console.log(`[check-words] Processing word ${word.id}: ${word.de} = ${word.ru}`);
-          
+
           const aiResult = await checkWordWithAI(word.de, word.ru, word.article, word.verb_forms);
           batchStats.total++;
           processedCount++;
@@ -299,9 +299,10 @@ async function runWordCheck(limit: number = 500): Promise<void> {
                   console.log(`[check-words] Word ${word.id}: added ${newTranslations.length} translations`);
                 } catch (updateError: any) {
                   console.error(`Update error for word ${word.id}:`, updateError.message);
-                  // Проверяем на таймаут - если он, пробуем переподключиться
-                  if (updateError.message.includes('timeout') || updateError.message.includes('terminated')) {
-                    console.log(`[check-words] Connection timeout on update, will reconnect in next batch`);
+                  // Если соединение оборвалось - прекращаем пакет и переподключаемся
+                  if (updateError.message.includes('ECONNRESET') || updateError.message.includes('terminated')) {
+                    console.log(`[check-words] Connection lost, will reconnect for next batch`);
+                    break; // Выходим из цикла for, while переподключится
                   }
                 }
               } else {
@@ -310,6 +311,9 @@ async function runWordCheck(limit: number = 500): Promise<void> {
                   console.log(`[check-words] Word ${word.id}: marked as checked (valid)`);
                 } catch (updateError: any) {
                   console.error(`Update error for word ${word.id}:`, updateError.message);
+                  if (updateError.message.includes('ECONNRESET') || updateError.message.includes('terminated')) {
+                    break;
+                  }
                 }
               }
             } else {
@@ -318,6 +322,9 @@ async function runWordCheck(limit: number = 500): Promise<void> {
                 console.log(`[check-words] Word ${word.id}: marked as checked (valid)`);
               } catch (updateError: any) {
                 console.error(`Update error for word ${word.id}:`, updateError.message);
+                if (updateError.message.includes('ECONNRESET') || updateError.message.includes('terminated')) {
+                  break;
+                }
               }
             }
           } else {
@@ -330,6 +337,9 @@ async function runWordCheck(limit: number = 500): Promise<void> {
                 console.log(`[check-words] Word ${word.id}: greeting construction, marked as checked`);
               } catch (updateError: any) {
                 console.error(`Update error for greeting ${word.id}:`, updateError.message);
+                if (updateError.message.includes('ECONNRESET') || updateError.message.includes('terminated')) {
+                  break;
+                }
               }
               checkStatus.message = `Проверка: ${processedCount}/${checkStatus.progress.total}. Найдено конструкций: ${batchStats.greetings}`;
             } else {
@@ -347,6 +357,9 @@ async function runWordCheck(limit: number = 500): Promise<void> {
                 checkStatus.message = `Проверка: ${processedCount}/${checkStatus.progress.total}. Ошибок: ${batchStats.invalid}`;
               } catch (updateError: any) {
                 console.error(`Update error for word ${word.id}:`, updateError.message);
+                if (updateError.message.includes('ECONNRESET') || updateError.message.includes('terminated')) {
+                  break;
+                }
               }
             }
           }
@@ -357,7 +370,7 @@ async function runWordCheck(limit: number = 500): Promise<void> {
         }
 
         // Задержка между запросами к API
-        await new Promise(resolve => setTimeout(resolve, 200)); // Увеличил до 200мс
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
 
       // Обновляем общую статистику
