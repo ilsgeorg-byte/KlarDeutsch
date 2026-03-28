@@ -193,7 +193,8 @@ async function runWordCheck(limit: number = 500): Promise<void> {
 
   checkStatus.running = true;
   checkStatus.message = 'Запуск проверки...';
-  checkStatus.progress = { current: 0, total: 0 };
+  // Устанавливаем прогресс сразу на весь лимит
+  checkStatus.progress = { current: 0, total: limit };
   // Сбрасываем статистику перед запуском
   checkStatus.totalChecked = 0;
   checkStatus.errorsFound = 0;
@@ -232,10 +233,10 @@ async function runWordCheck(limit: number = 500): Promise<void> {
         console.log(`[check-words] Empty batch ${emptyBatchCount}/${MAX_EMPTY_BATCHES}`);
         
         if (emptyBatchCount >= MAX_EMPTY_BATCHES) {
-          checkStatus.message = 'Нет непроверенных слов';
+          checkStatus.message = `Нет непроверенных слов. Проверено: ${processedCount} из ${limit}`;
           shouldStop = true;
         } else {
-          // Ждём и пробуем снова (вдруг слова добавляются)
+          // Ждём и пробуем снова
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
         await pool.end().catch(() => {});
@@ -245,16 +246,13 @@ async function runWordCheck(limit: number = 500): Promise<void> {
       // Сбрасываем счётчик пустых пакетов
       emptyBatchCount = 0;
       
-      checkStatus.progress.total = Math.min(limit, processedCount + words.length);
+      console.log(`[check-words] Processing batch of ${words.length} words (total processed: ${processedCount}/${limit})`);
       
       let batchStats = { total: 0, valid: 0, invalid: 0, translationsAdded: 0, greetings: 0 };
       let connectionLost = false;
 
-      console.log(`[check-words] Processing batch of ${words.length} words`);
-
       for (const word of words) {
         if (shouldStop || processedCount >= limit) {
-          connectionLost = true; // Завершили пакет нормально
           break;
         }
 
@@ -265,7 +263,7 @@ async function runWordCheck(limit: number = 500): Promise<void> {
           batchStats.total++;
           processedCount++;
           checkStatus.progress.current = processedCount;
-          console.log(`[check-words] Word ${word.id} result:`, JSON.stringify(aiResult).slice(0, 200));
+          console.log(`[check-words] Progress: ${processedCount}/${limit}`);
 
           if (aiResult.valid) {
             batchStats.valid++;
@@ -281,7 +279,6 @@ async function runWordCheck(limit: number = 500): Promise<void> {
                     [currentRu + ', ' + newTranslations.join(', '), word.id]
                   );
                   batchStats.translationsAdded += newTranslations.length;
-                  console.log(`[check-words] Word ${word.id}: added ${newTranslations.length} translations`);
                 } catch (updateError: any) {
                   console.error(`Update error for word ${word.id}:`, updateError.message);
                   if (updateError.message.includes('ECONNRESET') || updateError.message.includes('terminated')) {
@@ -292,7 +289,6 @@ async function runWordCheck(limit: number = 500): Promise<void> {
               } else {
                 try {
                   await pool.query(`UPDATE words SET ai_checked_at = NOW() WHERE id = $1`, [word.id]);
-                  console.log(`[check-words] Word ${word.id}: marked as checked (valid)`);
                 } catch (updateError: any) {
                   console.error(`Update error for word ${word.id}:`, updateError.message);
                   if (updateError.message.includes('ECONNRESET') || updateError.message.includes('terminated')) {
@@ -304,7 +300,6 @@ async function runWordCheck(limit: number = 500): Promise<void> {
             } else {
               try {
                 await pool.query(`UPDATE words SET ai_checked_at = NOW() WHERE id = $1`, [word.id]);
-                console.log(`[check-words] Word ${word.id}: marked as checked (valid)`);
               } catch (updateError: any) {
                 console.error(`Update error for word ${word.id}:`, updateError.message);
                 if (updateError.message.includes('ECONNRESET') || updateError.message.includes('terminated')) {
@@ -320,7 +315,6 @@ async function runWordCheck(limit: number = 500): Promise<void> {
               batchStats.greetings++;
               try {
                 await pool.query(`UPDATE words SET ai_checked_at = NOW() WHERE id = $1`, [word.id]);
-                console.log(`[check-words] Word ${word.id}: greeting construction, marked as checked`);
               } catch (updateError: any) {
                 console.error(`Update error for greeting ${word.id}:`, updateError.message);
                 if (updateError.message.includes('ECONNRESET') || updateError.message.includes('terminated')) {
@@ -328,7 +322,7 @@ async function runWordCheck(limit: number = 500): Promise<void> {
                   break;
                 }
               }
-              checkStatus.message = `Проверка: ${processedCount}/${checkStatus.progress.total}. Найдено конструкций: ${batchStats.greetings}`;
+              checkStatus.message = `Проверка: ${processedCount}/${limit}. Найдено конструкций: ${batchStats.greetings}`;
             } else {
               const newDe = aiResult.corrected_de || word.de;
               const newRu = aiResult.corrected_ru || word.ru;
@@ -340,8 +334,7 @@ async function runWordCheck(limit: number = 500): Promise<void> {
                   `UPDATE words SET de = $1, ru = $2, article = $3, verb_forms = $4, ai_checked_at = NOW() WHERE id = $5`,
                   [newDe, newRu, newArticle || '', newVerbForms || '', word.id]
                 );
-                console.log(`[check-words] Word ${word.id}: corrected and updated`);
-                checkStatus.message = `Проверка: ${processedCount}/${checkStatus.progress.total}. Ошибок: ${batchStats.invalid}`;
+                checkStatus.message = `Проверка: ${processedCount}/${limit}. Ошибок: ${batchStats.invalid}`;
               } catch (updateError: any) {
                 console.error(`Update error for word ${word.id}:`, updateError.message);
                 if (updateError.message.includes('ECONNRESET') || updateError.message.includes('terminated')) {
@@ -353,7 +346,6 @@ async function runWordCheck(limit: number = 500): Promise<void> {
           }
         } catch (wordError: any) {
           console.error(`Error processing word ${word.id}:`, wordError.message);
-          console.error(`Stack:`, wordError.stack?.slice(0, 500));
           processedCount++;
         }
 
@@ -367,10 +359,8 @@ async function runWordCheck(limit: number = 500): Promise<void> {
       checkStatus.translationsAdded = checkStatus.translationsAdded + batchStats.translationsAdded;
       checkStatus.greetingConstructions = checkStatus.greetingConstructions + batchStats.greetings;
 
-      console.log(`[check-words] Batch complete: ${batchStats.total} words, connectionLost=${connectionLost}`);
+      console.log(`[check-words] Batch complete: ${batchStats.total} words, total: ${processedCount}/${limit}`);
 
-      // Если соединение не оборвалось и обработали все слова в пакете - продолжаем
-      // Если оборвалось - переподключаемся в следующем цикле while
       await pool.end().catch(() => {});
       
       // Пауза между пакетами
@@ -382,11 +372,9 @@ async function runWordCheck(limit: number = 500): Promise<void> {
       console.error('Batch error:', error.message);
       await pool.end().catch(() => {});
       
-      // Проверяем, не таймаут ли это
       if (error.message.includes('timeout') || error.message.includes('terminated') || error.message.includes('ECONNRESET')) {
         console.log(`[check-words] Connection error, will retry...`);
         await new Promise(resolve => setTimeout(resolve, 2000));
-        // Продолжаем цикл while - он создаст новое подключение
       } else {
         checkStatus.message = `Ошибка: ${error.message}`;
         checkStatus.running = false;
@@ -395,7 +383,7 @@ async function runWordCheck(limit: number = 500): Promise<void> {
     }
   }
 
-  checkStatus.message = `Проверка завершена. Проверено: ${processedCount}, ошибок: ${checkStatus.errorsFound}, переводов: ${checkStatus.translationsAdded}`;
+  checkStatus.message = `Проверка завершена. Проверено: ${processedCount} из ${limit}, ошибок: ${checkStatus.errorsFound}, переводов: ${checkStatus.translationsAdded}`;
   checkStatus.lastRun = new Date();
   checkStatus.running = false;
 }
