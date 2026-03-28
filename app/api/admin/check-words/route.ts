@@ -278,6 +278,15 @@ async function runWordCheck(limit: number = 500): Promise<void> {
 
           if (aiResult.is_greeting_construction) {
             stats.greetings++;
+            // Помечаем как проверенное (чтобы не проверять снова)
+            try {
+              await pool.query(
+                `UPDATE words SET ai_checked_at = NOW() WHERE id = $1`,
+                [word.id]
+              );
+            } catch (updateError: any) {
+              console.error(`Update error for greeting ${word.id}:`, updateError.message);
+            }
             checkStatus.message = `Проверка: ${stats.total}/${words.length}. Найдено конструкций: ${stats.greetings}`;
           } else {
             // Исправляем ошибки
