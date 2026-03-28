@@ -456,6 +456,10 @@
   to { transform: rotate(360deg); }
 }
 
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
 /* Alerts */
 .adminAlert {
   padding: 16px 20px;

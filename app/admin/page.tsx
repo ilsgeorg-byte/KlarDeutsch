@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import AdminLayout from './AdminLayout';
-import { BookOpen, Users, FileText, TrendingUp, Loader2, AlertCircle } from 'lucide-react';
+import { BookOpen, Users, FileText, TrendingUp, Loader2, AlertCircle, CheckCircle, XCircle, RefreshCw, Trash2 } from 'lucide-react';
 
 interface StatsData {
   words: { total: number; by_level: Record<string, number> };
@@ -11,14 +11,37 @@ interface StatsData {
   timestamp?: string;
 }
 
+interface CheckStatus {
+  running: boolean;
+  lastRun: string | null;
+  totalChecked: number;
+  errorsFound: number;
+  translationsAdded: number;
+  greetingConstructions: number;
+  message: string;
+}
+
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [checkStatus, setCheckStatus] = useState<CheckStatus | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [checkLimit, setCheckLimit] = useState(500);
 
   useEffect(() => {
     loadStats();
-  }, []);
+    loadCheckStatus();
+    
+    // Обновляем статус проверки каждые 2 секунды если запущена
+    const interval = setInterval(() => {
+      if (checkStatus?.running) {
+        loadCheckStatus();
+      }
+    }, 2000);
+    
+    return () => clearInterval(interval);
+  }, [checkStatus?.running]);
 
   const loadStats = async () => {
     try {
@@ -30,6 +53,69 @@ export default function AdminDashboardPage() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadCheckStatus = async () => {
+    try {
+      const res = await fetch('/api/admin/check-words');
+      if (!res.ok) throw new Error('Ошибка загрузки статуса проверки');
+      const data = await res.json();
+      setCheckStatus(data);
+    } catch (err: any) {
+      console.error('Load check status error:', err);
+    }
+  };
+
+  const startCheck = async () => {
+    setChecking(true);
+    try {
+      const res = await fetch('/api/admin/check-words', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: checkLimit }),
+      });
+      
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Ошибка запуска проверки');
+      }
+      
+      const data = await res.json();
+      if (data.status === 'already_running') {
+        setError('Проверка уже запущена');
+      } else {
+        setChecking(false);
+        loadCheckStatus();
+      }
+    } catch (err: any) {
+      setError(err.message);
+      setChecking(false);
+    }
+  };
+
+  const resetCheck = async (all = false) => {
+    if (!confirm(all ? 'Сбросить ВСЕ проверенные слова?' : 'Сбросить последние 500 проверенных слов?')) {
+      return;
+    }
+    
+    try {
+      const res = await fetch('/api/admin/check-words', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ all }),
+      });
+      
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Ошибка сброса');
+      }
+      
+      const data = await res.json();
+      setCheckStatus(data);
+      loadCheckStatus();
+    } catch (err: any) {
+      setError(err.message);
     }
   };
 
@@ -203,6 +289,131 @@ export default function AdminDashboardPage() {
             <TrendingUp size={18} />
             Статистика
           </a>
+        </div>
+      </div>
+
+      {/* AI Проверка слов */}
+      <div className="adminCard">
+        <div className="adminCardHeader">
+          <h3 className="adminCardTitle">🤖 AI проверка слов</h3>
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: 12 }}>
+            Проверка слов через ИИ: поиск ошибок, добавление переводов, удаление конструкций приветствий
+          </p>
+          
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
+            <select
+              value={checkLimit}
+              onChange={(e) => setCheckLimit(Number(e.target.value))}
+              className="adminInput"
+              style={{ width: 'auto', minWidth: 150 }}
+              disabled={checking || checkStatus?.running}
+            >
+              <option value={100}>100 слов</option>
+              <option value={500}>500 слов</option>
+              <option value={1000}>1000 слов</option>
+              <option value={5000}>5000 слов</option>
+            </select>
+
+            <button
+              onClick={startCheck}
+              disabled={checking || checkStatus?.running}
+              className="adminBtn adminBtnPrimary"
+              style={{ opacity: (checking || checkStatus?.running) ? 0.6 : 1 }}
+            >
+              {checking || checkStatus?.running ? (
+                <>
+                  <RefreshCw size={18} className="animate-spin" />
+                  Проверка...
+                </>
+              ) : (
+                <>
+                  <CheckCircle size={18} />
+                  Запустить проверку
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={() => resetCheck(false)}
+              disabled={checking || checkStatus?.running}
+              className="adminBtn adminBtnSecondary"
+              style={{ opacity: (checking || checkStatus?.running) ? 0.6 : 1 }}
+            >
+              <Trash2 size={18} />
+              Сбросить 500
+            </button>
+
+            <button
+              onClick={() => resetCheck(true)}
+              disabled={checking || checkStatus?.running}
+              className="adminBtn adminBtnDanger"
+              style={{ opacity: (checking || checkStatus?.running) ? 0.6 : 1 }}
+            >
+              <Trash2 size={18} />
+              Сбросить все
+            </button>
+          </div>
+
+          {checkStatus && (
+            <div style={{
+              padding: 16,
+              background: checkStatus.running ? '#eff6ff' : '#f8fafc',
+              borderRadius: 8,
+              border: `1px solid ${checkStatus.running ? '#3b82f6' : '#e2e8f0'}`,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                {checkStatus.running ? (
+                  <RefreshCw size={20} className="animate-spin" style={{ color: '#3b82f6' }} />
+                ) : checkStatus.errorsFound > 0 ? (
+                  <AlertCircle size={20} style={{ color: '#f59e0b' }} />
+                ) : (
+                  <CheckCircle size={20} style={{ color: '#22c55e' }} />
+                )}
+                <span style={{ fontWeight: 600, color: '#1e293b' }}>{checkStatus.message}</span>
+              </div>
+
+              {checkStatus.lastRun && (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                  gap: 12,
+                }}>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Проверено</div>
+                    <div style={{ fontSize: '1.125rem', fontWeight: 700, color: '#1e293b' }}>
+                      {checkStatus.totalChecked}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Ошибки</div>
+                    <div style={{ fontSize: '1.125rem', fontWeight: 700, color: checkStatus.errorsFound > 0 ? '#dc2626' : '#22c55e' }}>
+                      {checkStatus.errorsFound}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Переводов</div>
+                    <div style={{ fontSize: '1.125rem', fontWeight: 700, color: '#2563eb' }}>
+                      +{checkStatus.translationsAdded}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Приветствия</div>
+                    <div style={{ fontSize: '1.125rem', fontWeight: 700, color: '#f59e0b' }}>
+                      {checkStatus.greetingConstructions}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {checkStatus.lastRun && (
+                <div style={{ marginTop: 12, fontSize: '0.75rem', color: '#64748b' }}>
+                  Последняя проверка: {new Date(checkStatus.lastRun).toLocaleString('ru-RU')}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
