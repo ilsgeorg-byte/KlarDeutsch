@@ -44,11 +44,12 @@ function getPool() {
   return new Pool({
     connectionString,
     ssl: isNeon ? { rejectUnauthorized: false } : undefined,
-    max: 10,
-    idleTimeoutMillis: 60000, // 60 сек
-    connectionTimeoutMillis: 10000, // 10 сек
-    keepAlive: true, // Поддерживать соединение
-    statement_timeout: 30000, // Таймаут запроса 30 сек
+    max: 20, // Больше подключений
+    idleTimeoutMillis: 120000, // 2 минуты
+    connectionTimeoutMillis: 15000, // 15 сек
+    keepAlive: true,
+    statement_timeout: 60000, // 60 сек
+    query_timeout: 60000, // 60 сек на запрос
   });
 }
 
@@ -206,9 +207,11 @@ async function runWordCheck(limit: number = 500): Promise<void> {
     return;
   }
 
-  const BATCH_SIZE = 50; // Обрабатываем по 50 слов с переподключением
+  const BATCH_SIZE = 100; // Обрабатываем по 100 слов за раз
   let processedCount = 0;
   let shouldStop = false;
+  let reconnectAttempts = 0;
+  const MAX_RECONNECT_ATTEMPTS = 5;
 
   try {
     while (!shouldStop && processedCount < limit) {
@@ -216,7 +219,7 @@ async function runWordCheck(limit: number = 500): Promise<void> {
       if (processedCount > 0) {
         await pool.end().catch(() => {});
         pool = getPool()!;
-        await new Promise(resolve => setTimeout(resolve, 500)); // Пауза между пакетами
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Пауза 1 сек между пакетами
       }
 
       // Получаем пакет слов
@@ -231,15 +234,29 @@ async function runWordCheck(limit: number = 500): Promise<void> {
         `, [BATCH_SIZE]);
       } catch (dbError: any) {
         console.error('DB query error:', dbError.message);
-        await pool.end().catch(() => {});
-        pool = getPool()!;
-        result = await pool.query(`
-          SELECT id, de, ru, article, verb_forms, level
-          FROM words
-          WHERE ai_checked_at IS NULL
-          ORDER BY id
-          LIMIT $1
-        `, [BATCH_SIZE]);
+        
+        // Проверяем, не таймаут ли это
+        if (dbError.message.includes('timeout') || dbError.message.includes('terminated')) {
+          reconnectAttempts++;
+          if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+            checkStatus.message = `Превышено количество переподключений (${MAX_RECONNECT_ATTEMPTS}). Проверено: ${processedCount}`;
+            shouldStop = true;
+            break;
+          }
+          console.log(`Reconnect attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}`);
+          await pool.end().catch(() => {});
+          pool = getPool()!;
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Ждём 2 сек
+          result = await pool.query(`
+            SELECT id, de, ru, article, verb_forms, level
+            FROM words
+            WHERE ai_checked_at IS NULL
+            ORDER BY id
+            LIMIT $1
+          `, [BATCH_SIZE]);
+        } else {
+          throw dbError; // Другая ошибка - пробрасываем дальше
+        }
       }
 
       const words = result.rows;
@@ -282,14 +299,26 @@ async function runWordCheck(limit: number = 500): Promise<void> {
                   console.log(`[check-words] Word ${word.id}: added ${newTranslations.length} translations`);
                 } catch (updateError: any) {
                   console.error(`Update error for word ${word.id}:`, updateError.message);
+                  // Проверяем на таймаут - если он, пробуем переподключиться
+                  if (updateError.message.includes('timeout') || updateError.message.includes('terminated')) {
+                    console.log(`[check-words] Connection timeout on update, will reconnect in next batch`);
+                  }
                 }
               } else {
-                await pool.query(`UPDATE words SET ai_checked_at = NOW() WHERE id = $1`, [word.id]);
-                console.log(`[check-words] Word ${word.id}: marked as checked (valid)`);
+                try {
+                  await pool.query(`UPDATE words SET ai_checked_at = NOW() WHERE id = $1`, [word.id]);
+                  console.log(`[check-words] Word ${word.id}: marked as checked (valid)`);
+                } catch (updateError: any) {
+                  console.error(`Update error for word ${word.id}:`, updateError.message);
+                }
               }
             } else {
-              await pool.query(`UPDATE words SET ai_checked_at = NOW() WHERE id = $1`, [word.id]);
-              console.log(`[check-words] Word ${word.id}: marked as checked (valid)`);
+              try {
+                await pool.query(`UPDATE words SET ai_checked_at = NOW() WHERE id = $1`, [word.id]);
+                console.log(`[check-words] Word ${word.id}: marked as checked (valid)`);
+              } catch (updateError: any) {
+                console.error(`Update error for word ${word.id}:`, updateError.message);
+              }
             }
           } else {
             batchStats.invalid++;
@@ -328,7 +357,7 @@ async function runWordCheck(limit: number = 500): Promise<void> {
         }
 
         // Задержка между запросами к API
-        await new Promise(resolve => setTimeout(resolve, 150));
+        await new Promise(resolve => setTimeout(resolve, 200)); // Увеличил до 200мс
       }
 
       // Обновляем общую статистику
