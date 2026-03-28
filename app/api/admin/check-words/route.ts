@@ -200,82 +200,67 @@ async function runWordCheck(limit: number = 500): Promise<void> {
   checkStatus.translationsAdded = 0;
   checkStatus.greetingConstructions = 0;
 
-  let pool = getPool();
-  if (!pool) {
-    checkStatus.message = 'Ошибка: БД не подключена';
-    checkStatus.running = false;
-    return;
-  }
-
   const BATCH_SIZE = 100; // Обрабатываем по 100 слов за раз
   let processedCount = 0;
   let shouldStop = false;
-  let reconnectAttempts = 0;
-  const MAX_RECONNECT_ATTEMPTS = 5;
+  let emptyBatchCount = 0; // Счётчик пустых пакетов
+  const MAX_EMPTY_BATCHES = 3; // Если 3 раза подряд нет слов - останавливаемся
 
-  try {
-    while (!shouldStop && processedCount < limit) {
-      // Переподключаемся для каждого пакета
-      if (processedCount > 0) {
-        await pool.end().catch(() => {});
-        pool = getPool()!;
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Пауза 1 сек между пакетами
-      }
+  while (!shouldStop && processedCount < limit) {
+    let pool = getPool();
+    if (!pool) {
+      checkStatus.message = 'Ошибка: БД не подключена';
+      checkStatus.running = false;
+      return;
+    }
 
+    try {
       // Получаем пакет слов
-      let result;
-      try {
-        result = await pool.query(`
-          SELECT id, de, ru, article, verb_forms, level
-          FROM words
-          WHERE ai_checked_at IS NULL
-          ORDER BY id
-          LIMIT $1
-        `, [BATCH_SIZE]);
-      } catch (dbError: any) {
-        console.error('DB query error:', dbError.message);
-        
-        // Проверяем, не таймаут ли это
-        if (dbError.message.includes('timeout') || dbError.message.includes('terminated')) {
-          reconnectAttempts++;
-          if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            checkStatus.message = `Превышено количество переподключений (${MAX_RECONNECT_ATTEMPTS}). Проверено: ${processedCount}`;
-            shouldStop = true;
-            break;
-          }
-          console.log(`Reconnect attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}`);
-          await pool.end().catch(() => {});
-          pool = getPool()!;
-          await new Promise(resolve => setTimeout(resolve, 2000)); // Ждём 2 сек
-          result = await pool.query(`
-            SELECT id, de, ru, article, verb_forms, level
-            FROM words
-            WHERE ai_checked_at IS NULL
-            ORDER BY id
-            LIMIT $1
-          `, [BATCH_SIZE]);
-        } else {
-          throw dbError; // Другая ошибка - пробрасываем дальше
-        }
-      }
+      const result = await pool.query(`
+        SELECT id, de, ru, article, verb_forms, level
+        FROM words
+        WHERE ai_checked_at IS NULL
+        ORDER BY id
+        LIMIT $1
+      `, [BATCH_SIZE]);
 
       const words = result.rows;
+      
+      // Если слов нет - проверяем, не закончились ли они
       if (words.length === 0) {
-        checkStatus.message = 'Нет непроверенных слов';
-        shouldStop = true;
-        break;
+        emptyBatchCount++;
+        console.log(`[check-words] Empty batch ${emptyBatchCount}/${MAX_EMPTY_BATCHES}`);
+        
+        if (emptyBatchCount >= MAX_EMPTY_BATCHES) {
+          checkStatus.message = 'Нет непроверенных слов';
+          shouldStop = true;
+        } else {
+          // Ждём и пробуем снова (вдруг слова добавляются)
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        await pool.end().catch(() => {});
+        continue;
       }
 
+      // Сбрасываем счётчик пустых пакетов
+      emptyBatchCount = 0;
+      
       checkStatus.progress.total = Math.min(limit, processedCount + words.length);
       
       let batchStats = { total: 0, valid: 0, invalid: 0, translationsAdded: 0, greetings: 0 };
+      let connectionLost = false;
+
+      console.log(`[check-words] Processing batch of ${words.length} words`);
 
       for (const word of words) {
-        if (shouldStop || processedCount + batchStats.total >= limit) break;
+        if (shouldStop || processedCount >= limit) {
+          connectionLost = true; // Завершили пакет нормально
+          break;
+        }
 
         try {
           console.log(`[check-words] Processing word ${word.id}: ${word.de} = ${word.ru}`);
-
+          
           const aiResult = await checkWordWithAI(word.de, word.ru, word.article, word.verb_forms);
           batchStats.total++;
           processedCount++;
@@ -299,10 +284,9 @@ async function runWordCheck(limit: number = 500): Promise<void> {
                   console.log(`[check-words] Word ${word.id}: added ${newTranslations.length} translations`);
                 } catch (updateError: any) {
                   console.error(`Update error for word ${word.id}:`, updateError.message);
-                  // Если соединение оборвалось - прекращаем пакет и переподключаемся
                   if (updateError.message.includes('ECONNRESET') || updateError.message.includes('terminated')) {
-                    console.log(`[check-words] Connection lost, will reconnect for next batch`);
-                    break; // Выходим из цикла for, while переподключится
+                    connectionLost = true;
+                    break;
                   }
                 }
               } else {
@@ -312,6 +296,7 @@ async function runWordCheck(limit: number = 500): Promise<void> {
                 } catch (updateError: any) {
                   console.error(`Update error for word ${word.id}:`, updateError.message);
                   if (updateError.message.includes('ECONNRESET') || updateError.message.includes('terminated')) {
+                    connectionLost = true;
                     break;
                   }
                 }
@@ -323,6 +308,7 @@ async function runWordCheck(limit: number = 500): Promise<void> {
               } catch (updateError: any) {
                 console.error(`Update error for word ${word.id}:`, updateError.message);
                 if (updateError.message.includes('ECONNRESET') || updateError.message.includes('terminated')) {
+                  connectionLost = true;
                   break;
                 }
               }
@@ -338,6 +324,7 @@ async function runWordCheck(limit: number = 500): Promise<void> {
               } catch (updateError: any) {
                 console.error(`Update error for greeting ${word.id}:`, updateError.message);
                 if (updateError.message.includes('ECONNRESET') || updateError.message.includes('terminated')) {
+                  connectionLost = true;
                   break;
                 }
               }
@@ -358,6 +345,7 @@ async function runWordCheck(limit: number = 500): Promise<void> {
               } catch (updateError: any) {
                 console.error(`Update error for word ${word.id}:`, updateError.message);
                 if (updateError.message.includes('ECONNRESET') || updateError.message.includes('terminated')) {
+                  connectionLost = true;
                   break;
                 }
               }
@@ -379,20 +367,37 @@ async function runWordCheck(limit: number = 500): Promise<void> {
       checkStatus.translationsAdded = checkStatus.translationsAdded + batchStats.translationsAdded;
       checkStatus.greetingConstructions = checkStatus.greetingConstructions + batchStats.greetings;
 
-      console.log(`[check-words] Batch complete: ${batchStats.total} words, ${batchStats.invalid} errors`);
+      console.log(`[check-words] Batch complete: ${batchStats.total} words, connectionLost=${connectionLost}`);
+
+      // Если соединение не оборвалось и обработали все слова в пакете - продолжаем
+      // Если оборвалось - переподключаемся в следующем цикле while
+      await pool.end().catch(() => {});
+      
+      // Пауза между пакетами
+      if (!shouldStop && processedCount < limit) {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+
+    } catch (error: any) {
+      console.error('Batch error:', error.message);
+      await pool.end().catch(() => {});
+      
+      // Проверяем, не таймаут ли это
+      if (error.message.includes('timeout') || error.message.includes('terminated') || error.message.includes('ECONNRESET')) {
+        console.log(`[check-words] Connection error, will retry...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Продолжаем цикл while - он создаст новое подключение
+      } else {
+        checkStatus.message = `Ошибка: ${error.message}`;
+        checkStatus.running = false;
+        return;
+      }
     }
-
-    checkStatus.message = `Проверка завершена. Проверено: ${processedCount}, ошибок: ${checkStatus.errorsFound}, переводов: ${checkStatus.translationsAdded}`;
-    checkStatus.lastRun = new Date();
-
-  } catch (error: any) {
-    console.error('Word check error:', error);
-    checkStatus.message = `Ошибка: ${error.message || String(error)}`;
-    checkStatus.lastRun = new Date();
-  } finally {
-    checkStatus.running = false;
-    await pool.end().catch(() => {});
   }
+
+  checkStatus.message = `Проверка завершена. Проверено: ${processedCount}, ошибок: ${checkStatus.errorsFound}, переводов: ${checkStatus.translationsAdded}`;
+  checkStatus.lastRun = new Date();
+  checkStatus.running = false;
 }
 
 export async function POST(request: NextRequest) {
