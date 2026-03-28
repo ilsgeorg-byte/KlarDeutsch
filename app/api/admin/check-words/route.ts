@@ -69,11 +69,11 @@ function isGreetingConstruction(de: string): boolean {
 
 function hasMixedAlphabet(text: string): boolean {
   if (!text) return false;
-  for (const word of text.split()) {
+  for (const word of text.split(' ')) {
     let cyrillicCount = 0;
     let latinCount = 0;
     for (const char of word) {
-      if (/\u0400-\u04FF/.test(char)) cyrillicCount++;
+      if (/[\u0400-\u04FF]/.test(char)) cyrillicCount++;
       else if (/[a-zäöüßÄÖÜ]/i.test(char)) latinCount++;
     }
     if (cyrillicCount > 0 && latinCount > 0) return true;
