@@ -220,6 +220,12 @@ export const wordsApi = {
     apiClient.get<any[]>('/favorites'),
 
   /**
+   * Получение слов по теме
+   */
+  getWordsByTopic: (topic: string, params?: { skip?: number; limit?: number }) =>
+    apiClient.get<PaginatedResponse<any>>(`/words/by-topic/${encodeURIComponent(topic)}`, { params }),
+
+  /**
    * Добавление пользовательского слова
    */
   addCustomWord: (data: {

@@ -2,74 +2,69 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Тёмная тема для карточек слов (как на /dictionary/[id]) */
+:root {
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --bg-main: #f8fafc;
+  --card-bg: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-main: #020617;
+    --card-bg: #0f172a;
+  }
+}
+
+body {
+  @apply antialiased text-slate-900 dark:text-slate-100;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* Красивый скроллбар */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-200 dark:bg-slate-800 rounded-full hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors;
+}
+
+/* Кастомные утилиты для дизайна */
+@layer components {
+  .glass-card {
+    @apply bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-white/20 dark:border-slate-800/50 shadow-xl;
+  }
+  
+  .modern-shadow {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.04), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+  }
+
+  .modern-shadow-hover {
+    @apply hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-300;
+  }
+}
+
+/* Анимации */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Тёмная тема для карточек (совместимость со старым кодом) */
 .word-card-dark {
-  background: #1f2937 !important;
-  border-color: #374151 !important;
-  color: #f3f4f6 !important;
+  @apply bg-slate-900 border-slate-800 text-slate-100 !important;
 }
 
-.word-card-dark:hover {
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3) !important;
-  border-color: #4b5563 !important;
-}
-
-/* Заголовки и текст */
-.word-card-dark h3,
-.word-card-dark p,
-.word-card-dark span {
-  color: #f3f4f6 !important;
-}
-
-/* Сохраняем цвета для артиклей */
-.word-card-dark .text-blue-500,
-.word-card-dark [class*="text-blue"] {
-  color: #60a5fa !important;
-}
-
-.word-card-dark .text-red-500,
-.word-card-dark [class*="text-red"] {
-  color: #f87171 !important;
-}
-
-.word-card-dark .text-green-500,
-.word-card-dark [class*="text-green"] {
-  color: #34d399 !important;
-}
-
-/* Бейджи */
-.word-card-dark [class*="bg-blue"] {
-  background: #1e3a5f !important;
-  border-color: #1e3a5f !important;
-}
-
-.word-card-dark [class*="bg-slate"] {
-  background: #334155 !important;
-  border-color: #475569 !important;
-}
-
-.word-card-dark [class*="bg-gray"] {
-  background: #374151 !important;
-}
-
-/* Примеры */
-.word-card-dark [class*="border-blue"] {
-  border-color: #1e40af !important;
-}
-
-.word-card-dark [style*="background: #f8fafc"],
-.word-card-dark [style*="background:#f8fafc"] {
-  background: #1e293b !important;
-}
-
-.word-card-dark [style*="background: #f0f9ff"],
-.word-card-dark [style*="background:#f0f9ff"] {
-  background: #0c4a6e !important;
-}
-
-
-
-
-
-
-
+/* Стили для артиклей */
+.article-der { @apply text-indigo-500 dark:text-indigo-400 font-bold; }
+.article-die { @apply text-rose-500 dark:text-rose-400 font-bold; }
+.article-das { @apply text-emerald-500 dark:text-emerald-400 font-bold; }

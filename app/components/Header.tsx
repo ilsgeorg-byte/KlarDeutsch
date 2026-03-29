@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpen, Menu, X, LogOut, User, Moon, Sun } from "lucide-react";
+import { BookOpen, Menu, X, LogOut, User, Moon, Sun, Sparkles } from "lucide-react";
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "../context/ThemeContext";
@@ -13,35 +13,31 @@ export default function Header() {
     const { theme, toggleTheme } = useTheme();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isMounted, setIsMounted] = useState(false);
-   
-
-    // Функция выхода
-    const handleLogout = () => {
-        localStorage.removeItem("token"); // Удаляем токен
-        setIsMenuOpen(false); // Закрываем мобильное меню (на всякий случай)
-        router.push("/login"); // Перекидываем на страницу логина
-    };
-  
+    const [scrolled, setScrolled] = useState(false);
 
     useEffect(() => {
         setIsMounted(true);
+        const handleScroll = () => setScrolled(window.scrollY > 20);
+        window.addEventListener("scroll", handleScroll);
+        return () => window.removeEventListener("scroll", handleScroll);
     }, []);
 
-    // Закрываем меню при смене страницы
+    const handleLogout = () => {
+        localStorage.removeItem("token");
+        setIsMenuOpen(false);
+        router.push("/login");
+    };
+
     useEffect(() => {
         setIsMenuOpen(false);
     }, [pathname]);
 
-    // Блокируем скролл страницы, когда открыто мобильное меню
     useEffect(() => {
         if (isMenuOpen) {
             document.body.style.overflow = 'hidden';
         } else {
             document.body.style.overflow = 'unset';
         }
-        return () => {
-            document.body.style.overflow = 'unset';
-        };
     }, [isMenuOpen]);
 
     const navLinks = [
@@ -59,138 +55,121 @@ export default function Header() {
     if (!isMounted) return null;
 
     return (
-        <header className="w-full bg-white dark:bg-gray-800 border-b border-slate-200 dark:border-gray-700 sticky top-0 z-50 shadow-sm transition-colors duration-300">
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between overflow-x-hidden w-full gap-2">
-
+        <header className={`w-full sticky top-0 z-[100] transition-all duration-300 ${
+            scrolled 
+            ? "bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl border-b border-slate-200/60 dark:border-slate-800/60 shadow-lg shadow-slate-200/20 dark:shadow-none py-2" 
+            : "bg-transparent py-4"
+        }`}>
+            <div className="max-w-7xl mx-auto px-6 flex items-center justify-between gap-4">
 
                 {/* Логотип */}
-                <Link href="/" className="flex items-center gap-2 z-50">
-                    <div className="bg-blue-600 text-white p-1.5 rounded-lg">
-                        <BookOpen size={20} />
+                <Link href="/" className="flex items-center gap-2.5 group transition-transform active:scale-95">
+                    <div className="bg-indigo-600 dark:bg-indigo-500 text-white p-2 rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none group-hover:rotate-6 transition-transform">
+                        <Sparkles size={20} />
                     </div>
-                    <span className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">
-                        Klar<span className="text-blue-600 dark:text-blue-400">Deutsch</span>
+                    <span className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
+                        Klar<span className="text-indigo-600 dark:text-indigo-400">Deutsch</span>
                     </span>
                 </Link>
 
                 {/* Десктопная навигация */}
-                <nav className="hidden md:flex items-center gap-8">
+                <nav className="hidden md:flex items-center bg-slate-100/50 dark:bg-slate-800/50 p-1.5 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 backdrop-blur-sm">
                     {navLinks.map((link) => (
                         <Link
                             key={link.href}
                             href={link.href}
-                            className={`text-sm font-semibold transition-colors py-2 ${isActive(link.href)
-                                ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
-                                : "text-slate-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
-                                }`}
+                            className={`px-5 py-2 text-sm font-bold rounded-xl transition-all duration-200 ${
+                                isActive(link.href)
+                                ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                                : "text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400"
+                            }`}
                         >
                             {link.label}
                         </Link>
                     ))}
                 </nav>
 
-                {/* Десктопный профиль + тема */}
-                <div className="hidden md:flex items-center gap-4">
-                    {/* Переключатель темы */}
+                {/* Действия */}
+                <div className="hidden md:flex items-center gap-3">
                     <button
                         onClick={toggleTheme}
-                        className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-700 transition-colors"
-                        title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
+                        className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 transition-all active:scale-90"
                     >
-                        {theme === 'dark' ? (
-                            <Sun className="w-5 h-5 text-yellow-500" />
-                        ) : (
-                            <Moon className="w-5 h-5 text-slate-600 dark:text-gray-300" />
-                        )}
+                        {theme === 'dark' ? <Sun size={20} className="text-amber-400" /> : <Moon size={20} />}
                     </button>
                     
+                    <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-800 mx-1" />
+
                     <Link
                         href="/profile"
-                        className="flex items-center gap-2 text-sm font-semibold text-slate-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
                     >
-                        <User size={18} />
+                        <User size={18} className="text-slate-400" />
                         Профиль
                     </Link>
 
-                     <button
+                    <button
                         onClick={handleLogout}
-                        className="flex items-center gap-2 text-sm font-semibold text-red-500 hover:text-red-600 transition-colors bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg"
+                        className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-900/20 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-all active:scale-90"
+                        title="Выйти"
                     >
-                        <LogOut size={16} />
-                        Выйти
+                        <LogOut size={20} />
                     </button>
                 </div>
 
+                {/* Мобильное меню */}
+                <div className="flex md:hidden items-center gap-2">
+                     <button
+                        onClick={toggleTheme}
+                        className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 transition-all"
+                    >
+                        {theme === 'dark' ? <Sun size={18} className="text-amber-400" /> : <Moon size={18} />}
+                    </button>
+                    <button
+                        className="p-2 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-200"
+                        onClick={() => setIsMenuOpen(!isMenuOpen)}
+                    >
+                        {isMenuOpen ? <X size={22} /> : <Menu size={22} />}
+                    </button>
+                </div>
 
-                {/* Мобильная кнопка меню */}
-
-                <button
-                    className="md:hidden p-2 text-slate-600 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-gray-700 rounded-lg z-50 flex-shrink-0 ml-auto"
-
-                    onClick={() => setIsMenuOpen(!isMenuOpen)}
-                    aria-label="Toggle menu"
-                >
-                    {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
-                </button>
-
-                {/* Мобильное выпадающее меню */}
+                {/* Выпадающее мобильное меню */}
                 <div className={`
-                    fixed inset-0 bg-white dark:bg-gray-900 z-40 transform transition-transform duration-300 ease-in-out pt-20 flex flex-col md:hidden
-                    ${isMenuOpen ? "translate-x-0" : "translate-x-full"}
+                    fixed inset-0 bg-white/95 dark:bg-slate-950/95 backdrop-blur-2xl z-[90] transform transition-all duration-500 flex flex-col pt-24 px-6
+                    ${isMenuOpen ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-full pointer-events-none"}
                 `}>
-                    <nav className="flex flex-col px-6 gap-2">
+                    <div className="flex flex-col gap-2">
                         {navLinks.map((link) => (
                             <Link
                                 key={link.href}
                                 href={link.href}
-                                className={`text-lg font-semibold py-4 border-b border-slate-100 dark:border-gray-700 flex items-center ${isActive(link.href)
-                                    ? "text-blue-600 dark:text-blue-400"
-                                    : "text-slate-700 dark:text-gray-200"
-                                    }`}
+                                className={`text-2xl font-black py-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between ${
+                                    isActive(link.href) ? "text-indigo-600" : "text-slate-400"
+                                }`}
                             >
                                 {link.label}
+                                {isActive(link.href) && <Sparkles size={20} />}
                             </Link>
                         ))}
-                    </nav>
+                    </div>
 
-                    <div className="mt-auto px-6 py-8 flex flex-col gap-4 bg-slate-50 dark:bg-gray-800 border-t border-slate-200 dark:border-gray-700">
-                        {/* Переключатель темы (мобильный) */}
-                        <button
-                            onClick={toggleTheme}
-                            className="flex items-center justify-center gap-2 w-full py-3 bg-white dark:bg-gray-700 border border-slate-200 dark:border-gray-600 text-slate-700 dark:text-gray-200 rounded-xl font-semibold shadow-sm transition-colors"
-                        >
-                            {theme === 'dark' ? (
-                                <>
-                                    <Sun className="w-5 h-5 text-yellow-500" />
-                                    Светлая тема
-                                </>
-                            ) : (
-                                <>
-                                    <Moon className="w-5 h-5 text-slate-600 dark:text-gray-300" />
-                                    Тёмная тема
-                                </>
-                            )}
-                        </button>
-                        
+                    <div className="mt-auto mb-10 grid grid-cols-2 gap-4">
                         <Link
                             href="/profile"
-                            onClick={() => setIsMenuOpen(false)}
-                            className="flex items-center justify-center gap-2 w-full py-3 bg-white border border-slate-200 text-slate-700 hover:text-blue-600 hover:border-blue-200 rounded-xl font-semibold shadow-sm transition-colors"
+                            className="flex items-center justify-center gap-2 py-4 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-2xl font-bold"
                         >
-                            <User size={18} />
+                            <User size={20} />
                             Профиль
                         </Link>
-
                         <button
                             onClick={handleLogout}
-                            className="flex items-center justify-center gap-2 w-full py-3 bg-red-50 hover:bg-red-100 transition-colors text-red-600 rounded-xl font-semibold"
-                    >
-                            <LogOut size={18} />
+                            className="flex items-center justify-center gap-2 py-4 bg-rose-50 text-rose-600 rounded-2xl font-bold"
+                        >
+                            <LogOut size={20} />
                             Выйти
                         </button>
                     </div>
                 </div>
-
             </div>
         </header>
     );

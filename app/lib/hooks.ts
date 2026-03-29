@@ -60,6 +60,38 @@ export function useWords(
 }
 
 /**
+ * Получение слов по теме
+ */
+export function useWordsByTopic(
+  topic: string,
+  skip: number = 0,
+  limit: number = 20
+) {
+  const key = topic ? `/words/by-topic/${topic}?skip=${skip}&limit=${limit}` : null;
+  
+  const { data, error, isLoading, mutate } = useSWR(
+    key,
+    async () => {
+      const result = await apiCall(() => wordsApi.getWordsByTopic(topic, { skip, limit }));
+      if (result.error) throw new Error(result.error.error);
+      return result.data;
+    },
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 5000,
+    }
+  );
+
+  return {
+    words: data?.data || [],
+    total: data?.total || 0,
+    isLoading,
+    isError: error,
+    mutate,
+  };
+}
+
+/**
  * Поиск слов
  */
 export function useWordSearch(query: string, limit: number = 20) {

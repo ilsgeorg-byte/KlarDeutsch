@@ -1,8 +1,7 @@
 "use client";
 
 import React from "react";
-import styles from "../styles/Shared.module.css";
-import { Volume2, BookOpen, Tag, Star, ArrowRightLeft, Layers } from "lucide-react";
+import { Volume2, BookOpen, Tag, Star, ArrowRightLeft, Layers, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
 interface WordCardProps {
@@ -29,30 +28,18 @@ interface WordCardProps {
 }
 
 export default function WordCard({ word, onPlayAudio, onToggleFavorite }: WordCardProps) {
-    const getArticleColor = (article: string | undefined) => {
-        if (!article) return '#3b82f6';
-        const lower = article.toLowerCase().trim();
-        if (lower === 'der') return '#2563eb';
-        if (lower === 'die') return '#ef4444';
-        if (lower === 'das') return '#10b981';
-        return '#3b82f6';
-    };
-
-    // УМНАЯ ФУНКЦИЯ ПОКРАСКИ (Использует и базу, и старые данные)
-       const renderWordWithArticle = (wordObj: any) => {
+    const renderWordWithArticle = (wordObj: any) => {
         let text = wordObj.de || "";
         
-        // Если ИИ заполнил колонку article в базе
         if (wordObj.article) {
             const articleLower = wordObj.article.toLowerCase().trim();
             let colorClass = "";
             
-            if (articleLower === "der") colorClass = "text-blue-500 font-bold";
-            else if (articleLower === "die") colorClass = "text-red-500 font-bold";
-            else if (articleLower === "das") colorClass = "text-green-500 font-bold";
+            if (articleLower === "der") colorClass = "article-der";
+            else if (articleLower === "die") colorClass = "article-die";
+            else if (articleLower === "das") colorClass = "article-das";
 
             if (colorClass) {
-                // Если в колонке de тоже есть этот артикль в начале, отрезаем его, чтобы не было "der der Baum"
                 if (text.toLowerCase().startsWith(articleLower + " ")) {
                     text = text.slice(articleLower.length + 1).trim();
                 }
@@ -60,134 +47,95 @@ export default function WordCard({ word, onPlayAudio, onToggleFavorite }: WordCa
             }
         }
 
-        // Если колонки article нет (старые слова), ищем артикль прямо внутри слова de
-        if (text.toLowerCase().startsWith("der ")) {
-            return <><span className="text-blue-500 font-bold">der</span> {text.slice(4)}</>;
-        }
-        if (text.toLowerCase().startsWith("die ")) {
-            return <><span className="text-red-500 font-bold">die</span> {text.slice(4)}</>;
-        }
-        if (text.toLowerCase().startsWith("das ")) {
-            return <><span className="text-green-500 font-bold">das</span> {text.slice(4)}</>;
-        }
+        // Fallback для старых слов
+        const lowerText = text.toLowerCase();
+        if (lowerText.startsWith("der ")) return <><span className="article-der">der</span> {text.slice(4)}</>;
+        if (lowerText.startsWith("die ")) return <><span className="article-die">die</span> {text.slice(4)}</>;
+        if (lowerText.startsWith("das ")) return <><span className="article-das">das</span> {text.slice(4)}</>;
 
-        // Если артикля вообще нет (глаголы, прилагательные, или не заполнен)
         return <span className="font-bold">{text}</span>;
     };
 
-
     return (
-        <div className={`${styles.card} word-card-dark`} style={{
-            width: '100%',
-            marginBottom: '16px',
-            position: 'relative',
-            textAlign: 'left',
-            alignItems: 'flex-start',
-            minHeight: 'auto',
-            padding: '24px',
-            overflow: 'hidden',
-            border: '1px solid #e2e8f0',
-            borderRadius: '16px',
-            transition: 'box-shadow 0.2s',
-        }}
-            onMouseOver={(e) => e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.05)'}
-            onMouseOut={(e) => e.currentTarget.style.boxShadow = 'none'}
-        >
-            <div style={{ position: 'absolute', top: '16px', right: '52px', display: 'flex', gap: '8px', zIndex: 5 }}>
-                <span style={{
-                    fontSize: '0.76rem', padding: '3px 10px', borderRadius: '12px',
-                    background: '#e0f2fe', color: '#0369a1', fontWeight: 'bold', border: '1px solid #bae6fd'
-                }} className="dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800">
-                    {word.level}
-                </span>
+        <div className="relative group overflow-hidden rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-300 animate-fade-in p-7 md:p-8">
+            
+            {/* Декоративный фон для уровня */}
+            <div className="absolute -top-6 -right-6 w-24 h-24 bg-indigo-500/5 rounded-full blur-2xl group-hover:bg-indigo-500/10 transition-colors" />
+
+            {/* Заголовок и уровень */}
+            <div className="flex justify-between items-start mb-4 relative z-10">
+                <div className="flex items-center gap-2">
+                    <span className="px-3 py-1 text-[11px] font-black uppercase tracking-widest rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800">
+                        {word.level}
+                    </span>
+                </div>
+                
+                <button
+                    onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onToggleFavorite?.(word.id);
+                    }}
+                    className={`p-2 rounded-full transition-all duration-200 ${word.is_favorite ? 'text-amber-500 bg-amber-50 dark:bg-amber-900/20' : 'text-slate-300 hover:text-amber-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                >
+                    <Star size={22} fill={word.is_favorite ? "currentColor" : "none"} />
+                </button>
             </div>
 
-            <button
-                onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onToggleFavorite?.(word.id);
-                }}
-                style={{
-                    position: 'absolute', top: '10px', right: '10px', background: 'none', border: 'none',
-                    cursor: 'pointer', color: word.is_favorite ? '#f59e0b' : '#cbd5e1', padding: '8px',
-                    zIndex: 10, transition: 'transform 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.15)'}
-                onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
-            >
-                <Star size={24} fill={word.is_favorite ? '#f59e0b' : 'none'} />
-            </button>
+            {/* Основная часть ссылки */}
+            <Link href={`/dictionary/${word.id}`} className="block group/link">
+                <h3 className="text-2xl md:text-3xl font-extrabold text-slate-800 dark:text-white mb-2 group-hover/link:text-indigo-600 transition-colors tracking-tight">
+                    {renderWordWithArticle(word)}
+                </h3>
 
-            <Link
-                href={`/dictionary/${word.id}`}
-                style={{ textDecoration: 'none', color: 'inherit', width: '100%', padding: '24px', display: 'block' }}
-            >
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '8px', width: '100%' }}>
-                    <div style={{ flex: 1 }}>
-                        <h3 className="text-slate-800 dark:text-white" style={{ margin: 0, fontSize: '1.75rem', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', fontWeight: '800' }}>
-                            {/* Здесь мы вызываем умную функцию, передавая весь объект word */}
-                            <span>{renderWordWithArticle(word)}</span>
-                        </h3>
-                    </div>
-                </div>
+                <p className="text-xl text-slate-500 dark:text-slate-400 font-medium mb-6">
+                    {word.ru}
+                </p>
 
+                {/* Грамматические формы */}
                 {(word.plural || word.verb_forms) && (
-                    <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                    <div className="flex flex-wrap gap-2 mb-6">
                         {word.plural && (
-                            <span className="dark:bg-gray-700 dark:border-gray-600" style={{ fontSize: '0.85rem', color: '#64748b', background: '#f1f5f9', padding: '2px 8px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                                Pl: <span className="dark:text-gray-300" style={{ fontWeight: '600', color: '#475569' }}>{word.plural}</span>
+                            <span className="text-xs px-2.5 py-1 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-500">
+                                Pl: <span className="font-bold text-slate-700 dark:text-slate-300">{word.plural}</span>
                             </span>
                         )}
                         {word.verb_forms && (
-                            <span className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300" style={{ fontSize: '0.85rem', color: '#64748b', background: '#f1f5f9', padding: '2px 8px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                            <span className="text-xs px-2.5 py-1 rounded-lg bg-indigo-50/50 dark:bg-indigo-900/20 border border-indigo-100/50 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 italic">
                                 {word.verb_forms}
                             </span>
                         )}
                     </div>
                 )}
 
-                <p className="text-slate-600 dark:text-gray-300" style={{ fontSize: '1.25rem', color: '#334155', marginBottom: '20px', fontWeight: '500' }}>
-                    {word.ru}
-                </p>
-
-                {/* БЛОК ЛИНГВИСТИКИ */}
-                {(word.synonyms || word.antonyms || word.collocations) && (
-                    <div className="dark:bg-gray-700 dark:border-gray-600" style={{
-                        background: '#f8fafc', padding: '12px 16px', borderRadius: '10px',
-                        marginBottom: '20px', border: '1px solid #f1f5f9', fontSize: '0.9rem',
-                        display: 'flex', flexDirection: 'column', gap: '8px'
-                    }}>
+                {/* Лингвистический блок */}
+                {(word.synonyms || word.antonyms) && (
+                    <div className="grid grid-cols-1 gap-3 p-4 bg-slate-50/50 dark:bg-slate-800/40 rounded-2xl border border-slate-100/50 dark:border-slate-800/50 mb-6 text-[13px]">
                         {word.synonyms && (
-                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                                <span style={{ color: '#94a3b8', fontWeight: '600', whiteSpace: 'nowrap' }}>Синонимы:</span>
-                                <span style={{ color: '#475569', lineHeight: '1.4' }}>{word.synonyms}</span>
+                            <div className="flex gap-3">
+                                <span className="text-slate-400 font-bold shrink-0">SYN:</span>
+                                <span className="text-slate-600 dark:text-slate-300">{word.synonyms}</span>
                             </div>
                         )}
                         {word.antonyms && (
-                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                                <span style={{ color: '#94a3b8', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
-                                    <ArrowRightLeft size={12} /> Антонимы:
-                                </span>
-                                <span style={{ color: '#475569', lineHeight: '1.4' }}>{word.antonyms}</span>
-                            </div>
-                        )}
-                        {word.collocations && (
-                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                                <span style={{ color: '#94a3b8', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
-                                    <Layers size={12} /> Связки:
-                                </span>
-                                <span style={{ color: '#0369a1', fontWeight: '500', lineHeight: '1.4' }}>{word.collocations}</span>
+                            <div className="flex gap-3">
+                                <span className="text-slate-400 font-bold shrink-0">ANT:</span>
+                                <span className="text-slate-600 dark:text-slate-300">{word.antonyms}</span>
                             </div>
                         )}
                     </div>
                 )}
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '500' }}>
-                        <Tag size={16} color="#cbd5e1" />
-                        <span>{word.topic}</span>
-                    </div>
+                {/* Тема и Аудио */}
+                <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-100 dark:border-slate-800/50">
+                    <Link 
+                        href={`/topics/${encodeURIComponent(word.topic)}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-indigo-500 hover:text-white dark:hover:bg-indigo-600 transition-all duration-200"
+                    >
+                        <Tag size={14} />
+                        {word.topic}
+                    </Link>
 
                     {word.audio_url && (
                         <button
@@ -196,42 +144,38 @@ export default function WordCard({ word, onPlayAudio, onToggleFavorite }: WordCa
                                 e.stopPropagation();
                                 onPlayAudio?.(word.audio_url!);
                             }}
-                            style={{
-                                background: '#f0f9ff', border: '1px solid #bae6fd', cursor: 'pointer',
-                                color: '#0284c7', display: 'flex', alignItems: 'center', gap: '8px',
-                                padding: '8px 16px', borderRadius: '24px', transition: 'all 0.2s',
-                                fontWeight: '600', fontSize: '0.9rem'
-                            }}
-                            onMouseOver={(e) => { e.currentTarget.style.background = '#e0f2fe'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-                            onMouseOut={(e) => { e.currentTarget.style.background = '#f0f9ff'; e.currentTarget.style.transform = 'translateY(0)'; }}
+                            className="flex items-center gap-2 p-2 px-4 rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-200 dark:shadow-none hover:bg-indigo-700 hover:-translate-y-0.5 transition-all duration-200 active:scale-95"
                         >
-                            <Volume2 size={20} />
-                            <span>Прослушать</span>
+                            <Volume2 size={18} />
+                            <span className="text-xs font-bold hidden sm:inline">Play</span>
                         </button>
                     )}
                 </div>
 
+                {/* Пример (один самый яркий) */}
                 {((word.examples && word.examples.length > 0) || word.example_de) && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
-                        {(word.examples && word.examples.length > 0) ? (
-                            word.examples.map((ex, idx) => (
-                                <div key={idx} className="dark:bg-gray-600" style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '12px', borderLeft: '4px solid #3b82f6', width: '100%' }}>
-                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '4px' }}>
-                                        <BookOpen size={16} style={{ marginTop: '2px', color: '#94a3b8', minWidth: '16px' }} />
-                                        <p className="text-slate-700 dark:text-gray-200" style={{ margin: 0, fontStyle: 'italic', color: '#1e293b', fontSize: '0.95rem', lineHeight: '1.4', fontWeight: '500' }}>{ex.de}</p>
-                                    </div>
-                                    <p className="text-slate-500 dark:text-gray-400" style={{ margin: '4px 0 0 24px', color: '#64748b', fontSize: '0.85rem' }}>{ex.ru}</p>
-                                </div>
-                            ))
-                        ) : (
-                            <div className="dark:bg-gray-600" style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '12px', borderLeft: '4px solid #3b82f6', width: '100%' }}>
-                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '4px' }}>
-                                    <BookOpen size={16} style={{ marginTop: '2px', color: '#94a3b8', minWidth: '16px' }} />
-                                    <p style={{ margin: 0, fontStyle: 'italic', color: '#1e293b', fontSize: '0.95rem', lineHeight: '1.4', fontWeight: '500' }}>{word.example_de}</p>
-                                </div>
-                                {word.example_ru && <p style={{ margin: '4px 0 0 24px', color: '#64748b', fontSize: '0.85rem' }}>{word.example_ru}</p>}
-                            </div>
-                        )}
+                    <div className="mt-6">
+                        <div className="p-4 rounded-2xl bg-indigo-50/30 dark:bg-indigo-900/10 border-l-4 border-indigo-500">
+                            {word.examples && word.examples.length > 0 ? (
+                                <>
+                                    <p className="text-sm font-semibold italic text-slate-700 dark:text-slate-200 leading-relaxed mb-1">
+                                        "{word.examples[0].de}"
+                                    </p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                                        {word.examples[0].ru}
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <p className="text-sm font-semibold italic text-slate-700 dark:text-slate-200 leading-relaxed mb-1">
+                                        "{word.example_de}"
+                                    </p>
+                                    {word.example_ru && (
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">{word.example_ru}</p>
+                                    )}
+                                </>
+                            )}
+                        </div>
                     </div>
                 )}
             </Link>
