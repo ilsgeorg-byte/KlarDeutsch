@@ -15,6 +15,7 @@ interface CheckStatus {
   running: boolean;
   lastRun: string | null;
   totalChecked: number;
+  totalCheckedInDb: number;
   errorsFound: number;
   translationsAdded: number;
   examplesAdded: number;
@@ -420,6 +421,46 @@ export default function AdminDashboardPage() {
                   <CheckCircle size={20} style={{ color: '#22c55e' }} />
                 )}
                 <span style={{ fontWeight: 600, color: '#1e293b' }}>{checkStatus.message}</span>
+              </div>
+
+              {/* Прогресс проверки */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: 4 }}>
+                  Прогресс текущей проверки
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ flex: 1, height: 8, background: '#e2e8f0', borderRadius: 4, overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${checkStatus.progress.total > 0 ? (checkStatus.progress.current / checkStatus.progress.total) * 100 : 0}%`,
+                      height: '100%',
+                      background: '#3b82f6',
+                      borderRadius: 4,
+                      transition: 'width 0.3s',
+                    }} />
+                  </div>
+                  <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1e293b', minWidth: 80 }}>
+                    {checkStatus.progress.current} / {checkStatus.progress.total}
+                  </span>
+                </div>
+              </div>
+
+              {/* Общее количество проверенных слов */}
+              <div style={{
+                padding: 12,
+                background: '#f0fdf4',
+                borderRadius: 8,
+                border: '1px solid #86efac',
+                marginBottom: 16,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}>
+                <span style={{ fontSize: '0.875rem', color: '#166534', fontWeight: 500 }}>
+                  Всего проверено слов в базе:
+                </span>
+                <span style={{ fontSize: '1.25rem', fontWeight: 700, color: '#16a34a' }}>
+                  {checkStatus.totalCheckedInDb}
+                </span>
               </div>
 
               {checkStatus.lastRun && (

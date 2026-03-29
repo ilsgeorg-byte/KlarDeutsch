@@ -106,7 +106,7 @@ const ENRICH_PROMPT = `Ты - эксперт по немецкому языку.
 
 ЗАДАЧА:
 1. Проверь и исправь ошибки (артикль, формы глагола)
-2. Если нет примера - создай предложение с этим словом + перевод
+2. Если нет примеров - создай МИНИМУМ 3 разных предложения с этим словом + перевод
 3. Если нет множественного числа (для существительных) - добавь
 4. Найди 2-3 синонима (если есть)
 5. Найди 1-2 антонима (если есть)
@@ -122,8 +122,11 @@ const ENRICH_PROMPT = `Ты - эксперт по немецкому языку.
   "corrected_article": "",
   "corrected_verb_forms": "",
   "additional_translations": [],
-  "example_de": "",
-  "example_ru": "",
+  "examples": [
+    {"de": "Ich esse einen Apfel.", "ru": "Я ем яблоко."},
+    {"de": "Der Apfel ist rot.", "ru": "Яблоко красное."},
+    {"de": "Sie kauft einen Apfel.", "ru": "Она покупает яблоко."}
+  ],
   "plural": "",
   "synonyms": [],
   "antonyms": [],
@@ -180,8 +183,8 @@ async function enrichWord(de: string, ru: string, article: string, verb_forms: s
         { role: 'system', content: 'Ты обогащаешь немецкие слова. Возвращай ТОЛЬКО JSON, без markdown.' },
         { role: 'user', content: prompt }
       ],
-      temperature: 0.3,
-      max_tokens: 800,
+      temperature: 0.5, // Чуть выше для разнообразия примеров
+      max_tokens: 1200, // Больше токенов для 3 примеров
     });
 
     let content = response.choices[0]?.message?.content?.trim() || '';
@@ -194,6 +197,7 @@ async function enrichWord(de: string, ru: string, article: string, verb_forms: s
     
     // Инициализируем пустые массивы
     if (!result.additional_translations) result.additional_translations = [];
+    if (!result.examples) result.examples = [];
     if (!result.synonyms) result.synonyms = [];
     if (!result.antonyms) result.antonyms = [];
     if (!result.collocations) result.collocations = [];
@@ -237,7 +241,7 @@ async function runWordCheck(limit: number = 500): Promise<void> {
 
     try {
       const result = await pool.query(`
-        SELECT id, de, ru, article, verb_forms, level, example_de, example_ru, plural, synonyms, antonyms, collocations
+        SELECT id, de, ru, article, verb_forms, level, example_de, example_ru, plural, synonyms, antonyms, collocations, examples
         FROM words
         WHERE ai_checked_at IS NULL
         ORDER BY id
@@ -300,10 +304,17 @@ async function runWordCheck(limit: number = 500): Promise<void> {
             }
             
             // Примеры (только если пусто)
-            if (!word.example_de && aiResult.example_de) {
-              updates.example_de = aiResult.example_de;
-              updates.example_ru = aiResult.example_ru || '';
-              batchStats.examplesAdded++;
+            if (!word.example_de && aiResult.examples?.length > 0) {
+              // Берём первый пример для полей example_de/example_ru
+              updates.example_de = aiResult.examples[0].de;
+              updates.example_ru = aiResult.examples[0].ru || '';
+              
+              // Если примеров больше 1, сохраняем все в JSONB поле examples
+              if (aiResult.examples.length > 1) {
+                updates.examples = JSON.stringify(aiResult.examples);
+              }
+              
+              batchStats.examplesAdded += aiResult.examples.length;
             }
             
             // Множественное число (только если пусто)
@@ -465,21 +476,45 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
-  return NextResponse.json({
-    running: checkStatus.running,
-    lastRun: checkStatus.lastRun,
-    totalChecked: checkStatus.totalChecked,
-    errorsFound: checkStatus.errorsFound,
-    translationsAdded: checkStatus.translationsAdded,
-    examplesAdded: checkStatus.examplesAdded,
-    pluralAdded: checkStatus.pluralAdded,
-    synonymsAdded: checkStatus.synonymsAdded,
-    antonymsAdded: checkStatus.antonymsAdded,
-    collocationsAdded: checkStatus.collocationsAdded,
-    greetingConstructions: checkStatus.greetingConstructions,
-    message: checkStatus.message,
-    progress: checkStatus.progress,
-  });
+  try {
+    // Получаем общее количество проверенных слов из БД
+    let totalCheckedInDb = 0;
+    try {
+      const pool = getPool();
+      if (pool) {
+        const result = await pool.query(`
+          SELECT COUNT(*) FROM words WHERE ai_checked_at IS NOT NULL
+        `);
+        totalCheckedInDb = parseInt(result.rows[0]?.count || '0');
+        await pool.end().catch(() => {});
+      }
+    } catch (e) {
+      console.error('Error getting total checked:', e);
+    }
+
+    return NextResponse.json({
+      running: checkStatus.running,
+      lastRun: checkStatus.lastRun,
+      totalChecked: checkStatus.totalChecked,
+      totalCheckedInDb, // ← Общее количество в базе
+      errorsFound: checkStatus.errorsFound,
+      translationsAdded: checkStatus.translationsAdded,
+      examplesAdded: checkStatus.examplesAdded,
+      pluralAdded: checkStatus.pluralAdded,
+      synonymsAdded: checkStatus.synonymsAdded,
+      antonymsAdded: checkStatus.antonymsAdded,
+      collocationsAdded: checkStatus.collocationsAdded,
+      greetingConstructions: checkStatus.greetingConstructions,
+      message: checkStatus.message,
+      progress: checkStatus.progress,
+    });
+  } catch (error) {
+    console.error('Check words status error:', error);
+    return NextResponse.json(
+      { error: 'Ошибка сервера' },
+      { status: 500 }
+    );
+  }
 }
 
 export async function DELETE(request: NextRequest) {
