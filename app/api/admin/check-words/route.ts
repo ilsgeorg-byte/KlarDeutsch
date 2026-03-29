@@ -1,6 +1,8 @@
 /**
- * AI проверка слов - серверная реализация для Vercel
- * Запускает проверку напрямую через Groq API без Python скриптов
+ * AI проверка и обогащение слов
+ * - Проверка ошибок (артикль, формы, смешение алфавитов)
+ * - Добавление примеров, множественного числа, синонимов, антонимов, коллокаций
+ * - Удаление конструкций приветствий
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -10,13 +12,17 @@ import OpenAI from 'openai';
 const POSTGRES_URL = process.env.POSTGRES_URL || '';
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 
-// Хранилище статуса проверки
 let checkStatus: {
   running: boolean;
   lastRun: Date | null;
   totalChecked: number;
   errorsFound: number;
   translationsAdded: number;
+  examplesAdded: number;
+  pluralAdded: number;
+  synonymsAdded: number;
+  antonymsAdded: number;
+  collocationsAdded: number;
   greetingConstructions: number;
   message: string;
   progress: { current: number; total: number };
@@ -26,6 +32,11 @@ let checkStatus: {
   totalChecked: 0,
   errorsFound: 0,
   translationsAdded: 0,
+  examplesAdded: 0,
+  pluralAdded: 0,
+  synonymsAdded: 0,
+  antonymsAdded: 0,
+  collocationsAdded: 0,
   greetingConstructions: 0,
   message: 'Ожидание запуска',
   progress: { current: 0, total: 0 },
@@ -44,23 +55,21 @@ function getPool() {
   return new Pool({
     connectionString,
     ssl: isNeon ? { rejectUnauthorized: false } : undefined,
-    max: 20, // Больше подключений
-    idleTimeoutMillis: 120000, // 2 минуты
-    connectionTimeoutMillis: 15000, // 15 сек
+    max: 20,
+    idleTimeoutMillis: 120000,
+    connectionTimeoutMillis: 15000,
     keepAlive: true,
-    statement_timeout: 60000, // 60 сек
-    query_timeout: 60000, // 60 сек на запрос
+    statement_timeout: 60000,
+    query_timeout: 60000,
   });
 }
 
-// Инициализация Groq клиента
 const groqClient = GROQ_API_KEY ? new OpenAI({
   apiKey: GROQ_API_KEY,
   baseURL: 'https://api.groq.com/openai/v1',
   timeout: 30000,
 }) : null;
 
-// Паттерны приветствий
 const GREETING_PATTERNS = [
   /^guten\s+tag$/i, /^guten\s+abend$/i, /^guten\s+morgen$/i, /^gute\s+nacht$/i,
   /^guten\s+rutsch$/i, /^frohe\s+weihnachten$/i, /^frohe\s+ostern$/i,
@@ -69,8 +78,7 @@ const GREETING_PATTERNS = [
 ];
 
 function isGreetingConstruction(de: string): boolean {
-  const deLower = de.toLowerCase().trim();
-  return GREETING_PATTERNS.some(pattern => pattern.test(deLower));
+  return GREETING_PATTERNS.some(pattern => pattern.test(de.toLowerCase().trim()));
 }
 
 function hasMixedAlphabet(text: string): boolean {
@@ -87,23 +95,26 @@ function hasMixedAlphabet(text: string): boolean {
   return false;
 }
 
-const CHECK_PROMPT = `Ты - строгий эксперт по немецкому языку. Проверь слово.
+const ENRICH_PROMPT = `Ты - эксперт по немецкому языку. Обогати слово данными.
 
 Слово: {de}
 Перевод: {ru}
 Артикль: {article}
 Формы глагола: {verb_forms}
+Пример: {example}
+Множественное число: {plural}
 
-Правила:
-1. Прилагательные: артикль пустой, verb_forms пустые
-2. Глаголы: артикль пустой, verb_forms: Infinitiv, Praeteritum, Partizip II
-3. Существительные: артикль der/die/das, verb_forms пустые
-4. Конструкции (Guten Tag и т.д.): помечай как "Конструкция приветствия - удалить"
-5. Несколько переводов: добавляй все значимые переводы
+ЗАДАЧА:
+1. Проверь и исправь ошибки (артикль, формы глагола)
+2. Если нет примера - создай предложение с этим словом + перевод
+3. Если нет множественного числа (для существительных) - добавь
+4. Найди 2-3 синонима (если есть)
+5. Найди 1-2 антонима (если есть)
+6. Найди 2-3 коллокации (устойчивые сочетания)
 
 Верни ТОЛЬКО JSON:
 {
-  "word_type": "adjective|verb|noun|phrase",
+  "word_type": "noun|verb|adjective|phrase",
   "valid": true/false,
   "errors": [],
   "corrected_de": "",
@@ -111,29 +122,33 @@ const CHECK_PROMPT = `Ты - строгий эксперт по немецком
   "corrected_article": "",
   "corrected_verb_forms": "",
   "additional_translations": [],
+  "example_de": "",
+  "example_ru": "",
+  "plural": "",
+  "synonyms": [],
+  "antonyms": [],
+  "collocations": [],
   "confidence": 0.0-1.0,
   "is_greeting_construction": true/false
 }`;
 
-async function checkWordWithAI(de: string, ru: string, article: string, verb_forms: string) {
+async function enrichWord(de: string, ru: string, article: string, verb_forms: string, example: string, plural: string) {
   // Локальные проверки
   if (hasMixedAlphabet(ru)) {
     return {
       valid: false,
-      errors: ['Смешение алфавитов (кириллица + латиница)'],
+      errors: ['Смешение алфавитов'],
       corrected_ru: ru,
       confidence: 1.0,
-      additional_translations: []
     };
   }
 
   if (hasMixedAlphabet(de)) {
     return {
       valid: false,
-      errors: ['Смешение алфавитов в немецком слове'],
+      errors: ['Смешение алфавитов в немецком'],
       corrected_de: de,
       confidence: 1.0,
-      additional_translations: []
     };
   }
 
@@ -143,48 +158,50 @@ async function checkWordWithAI(de: string, ru: string, article: string, verb_for
       errors: ['Конструкция приветствия - удалить'],
       is_greeting_construction: true,
       confidence: 1.0,
-      additional_translations: []
     };
   }
 
-  // Проверка через Groq AI
   if (!groqClient) {
-    return { valid: true, errors: [], confidence: 0.5, additional_translations: [] };
+    return { valid: true, errors: [], confidence: 0.5 };
   }
 
   try {
-    const prompt = CHECK_PROMPT
+    const prompt = ENRICH_PROMPT
       .replace('{de}', de)
       .replace('{ru}', ru)
       .replace('{article}', article || 'пусто')
-      .replace('{verb_forms}', verb_forms || 'пусто');
+      .replace('{verb_forms}', verb_forms || 'пусто')
+      .replace('{example}', example || 'пусто')
+      .replace('{plural}', plural || 'пусто');
 
     const response = await groqClient.chat.completions.create({
       model: 'llama-3.3-70b-versatile',
       messages: [
-        { role: 'system', content: 'Ты проверяешь немецкие слова. Возвращай ТОЛЬКО JSON, без markdown.' },
+        { role: 'system', content: 'Ты обогащаешь немецкие слова. Возвращай ТОЛЬКО JSON, без markdown.' },
         { role: 'user', content: prompt }
       ],
-      temperature: 0.1,
-      max_tokens: 600,
+      temperature: 0.3,
+      max_tokens: 800,
     });
 
     let content = response.choices[0]?.message?.content?.trim() || '';
-    
-    // Убираем markdown
     content = content.replace(/```json/g, '').replace(/```/g, '').trim();
     
-    // Извлекаем JSON
     const jsonMatch = content.match(/\{.*\}/s);
     if (jsonMatch) content = jsonMatch[0];
 
     const result = JSON.parse(content);
+    
+    // Инициализируем пустые массивы
     if (!result.additional_translations) result.additional_translations = [];
+    if (!result.synonyms) result.synonyms = [];
+    if (!result.antonyms) result.antonyms = [];
+    if (!result.collocations) result.collocations = [];
     
     return result;
   } catch (error) {
-    console.error('AI check error:', error);
-    return { valid: true, errors: [], confidence: 0.5, additional_translations: [] };
+    console.error('AI enrich error:', error);
+    return { valid: true, errors: [], confidence: 0.5 };
   }
 }
 
@@ -192,20 +209,23 @@ async function runWordCheck(limit: number = 500): Promise<void> {
   if (checkStatus.running) return;
 
   checkStatus.running = true;
-  checkStatus.message = 'Запуск проверки...';
-  // Устанавливаем прогресс сразу на весь лимит
+  checkStatus.message = 'Запуск проверки и обогащения...';
   checkStatus.progress = { current: 0, total: limit };
-  // Сбрасываем статистику перед запуском
   checkStatus.totalChecked = 0;
   checkStatus.errorsFound = 0;
   checkStatus.translationsAdded = 0;
+  checkStatus.examplesAdded = 0;
+  checkStatus.pluralAdded = 0;
+  checkStatus.synonymsAdded = 0;
+  checkStatus.antonymsAdded = 0;
+  checkStatus.collocationsAdded = 0;
   checkStatus.greetingConstructions = 0;
 
-  const BATCH_SIZE = 100; // Обрабатываем по 100 слов за раз
+  const BATCH_SIZE = 20; // Уменьшил до 20 (богаче данные = дольше обработка)
   let processedCount = 0;
   let shouldStop = false;
-  let emptyBatchCount = 0; // Счётчик пустых пакетов
-  const MAX_EMPTY_BATCHES = 3; // Если 3 раза подряд нет слов - останавливаемся
+  let emptyBatchCount = 0;
+  const MAX_EMPTY_BATCHES = 3;
 
   while (!shouldStop && processedCount < limit) {
     let pool = getPool();
@@ -216,9 +236,8 @@ async function runWordCheck(limit: number = 500): Promise<void> {
     }
 
     try {
-      // Получаем пакет слов
       const result = await pool.query(`
-        SELECT id, de, ru, article, verb_forms, level
+        SELECT id, de, ru, article, verb_forms, level, example_de, example_ru, plural, synonyms, antonyms, collocations
         FROM words
         WHERE ai_checked_at IS NULL
         ORDER BY id
@@ -227,145 +246,157 @@ async function runWordCheck(limit: number = 500): Promise<void> {
 
       const words = result.rows;
       
-      // Если слов нет - проверяем, не закончились ли они
       if (words.length === 0) {
         emptyBatchCount++;
-        console.log(`[check-words] Empty batch ${emptyBatchCount}/${MAX_EMPTY_BATCHES}`);
-        
         if (emptyBatchCount >= MAX_EMPTY_BATCHES) {
           checkStatus.message = `Нет непроверенных слов. Проверено: ${processedCount} из ${limit}`;
           shouldStop = true;
         } else {
-          // Ждём и пробуем снова
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
         await pool.end().catch(() => {});
         continue;
       }
 
-      // Сбрасываем счётчик пустых пакетов
       emptyBatchCount = 0;
+      console.log(`[check-words] Batch ${Math.floor(processedCount/BATCH_SIZE)+1}: ${words.length} words`);
       
-      console.log(`[check-words] Processing batch of ${words.length} words (total processed: ${processedCount}/${limit})`);
-      
-      let batchStats = { total: 0, valid: 0, invalid: 0, translationsAdded: 0, greetings: 0 };
-      let connectionLost = false;
+      let batchStats = { 
+        total: 0, valid: 0, invalid: 0, 
+        translationsAdded: 0, examplesAdded: 0, pluralAdded: 0,
+        synonymsAdded: 0, antonymsAdded: 0, collocationsAdded: 0,
+        greetings: 0 
+      };
 
       for (const word of words) {
-        if (shouldStop || processedCount >= limit) {
-          break;
-        }
+        if (shouldStop || processedCount >= limit) break;
 
         try {
-          console.log(`[check-words] Processing word ${word.id}: ${word.de} = ${word.ru}`);
+          const aiResult = await enrichWord(
+            word.de, word.ru, word.article, word.verb_forms,
+            word.example_de || '', word.plural || ''
+          );
           
-          const aiResult = await checkWordWithAI(word.de, word.ru, word.article, word.verb_forms);
           batchStats.total++;
           processedCount++;
           checkStatus.progress.current = processedCount;
-          console.log(`[check-words] Progress: ${processedCount}/${limit}`);
 
           if (aiResult.valid) {
             batchStats.valid++;
+            
+            // Собираем все обновления
+            const updates: any = {};
+            
+            // Дополнительные переводы
             if (aiResult.additional_translations?.length > 0) {
               const currentRu = word.ru;
               const newTranslations = aiResult.additional_translations.filter(
                 (t: string) => !currentRu.toLowerCase().includes(t.toLowerCase())
               );
               if (newTranslations.length > 0) {
-                try {
-                  await pool.query(
-                    `UPDATE words SET ru = $1, ai_checked_at = NOW() WHERE id = $2`,
-                    [currentRu + ', ' + newTranslations.join(', '), word.id]
-                  );
-                  batchStats.translationsAdded += newTranslations.length;
-                } catch (updateError: any) {
-                  console.error(`Update error for word ${word.id}:`, updateError.message);
-                  if (updateError.message.includes('ECONNRESET') || updateError.message.includes('terminated')) {
-                    connectionLost = true;
-                    break;
-                  }
-                }
-              } else {
-                try {
-                  await pool.query(`UPDATE words SET ai_checked_at = NOW() WHERE id = $1`, [word.id]);
-                } catch (updateError: any) {
-                  console.error(`Update error for word ${word.id}:`, updateError.message);
-                  if (updateError.message.includes('ECONNRESET') || updateError.message.includes('terminated')) {
-                    connectionLost = true;
-                    break;
-                  }
-                }
-              }
-            } else {
-              try {
-                await pool.query(`UPDATE words SET ai_checked_at = NOW() WHERE id = $1`, [word.id]);
-              } catch (updateError: any) {
-                console.error(`Update error for word ${word.id}:`, updateError.message);
-                if (updateError.message.includes('ECONNRESET') || updateError.message.includes('terminated')) {
-                  connectionLost = true;
-                  break;
-                }
+                updates.ru = currentRu + ', ' + newTranslations.join(', ');
+                batchStats.translationsAdded += newTranslations.length;
               }
             }
+            
+            // Примеры (только если пусто)
+            if (!word.example_de && aiResult.example_de) {
+              updates.example_de = aiResult.example_de;
+              updates.example_ru = aiResult.example_ru || '';
+              batchStats.examplesAdded++;
+            }
+            
+            // Множественное число (только если пусто)
+            if (!word.plural && aiResult.plural) {
+              updates.plural = aiResult.plural;
+              batchStats.pluralAdded++;
+            }
+            
+            // Синонимы (только если пусто)
+            if (!word.synonyms && aiResult.synonyms?.length > 0) {
+              updates.synonyms = aiResult.synonyms.join(', ');
+              batchStats.synonymsAdded += aiResult.synonyms.length;
+            }
+            
+            // Антонимы (только если пусто)
+            if (!word.antonyms && aiResult.antonyms?.length > 0) {
+              updates.antonyms = aiResult.antonyms.join(', ');
+              batchStats.antonymsAdded += aiResult.antonyms.length;
+            }
+            
+            // Коллокации (только если пусто)
+            if (!word.collocations && aiResult.collocations?.length > 0) {
+              updates.collocations = aiResult.collocations.join(', ');
+              batchStats.collocationsAdded += aiResult.collocations.length;
+            }
+            
+            // Исправления
+            if (aiResult.corrected_de && aiResult.corrected_de !== word.de) updates.de = aiResult.corrected_de;
+            if (aiResult.corrected_ru && aiResult.corrected_ru !== word.ru) updates.ru = aiResult.corrected_ru;
+            if (aiResult.corrected_article && aiResult.corrected_article !== word.article) updates.article = aiResult.corrected_article;
+            if (aiResult.corrected_verb_forms && aiResult.corrected_verb_forms !== word.verb_forms) updates.verb_forms = aiResult.corrected_verb_forms;
+            
+            // Обновляем если есть изменения
+            if (Object.keys(updates).length > 0) {
+              const fields = Object.keys(updates).map((f, i) => `${f} = $${i + 1}`).join(', ');
+              const values = Object.values(updates);
+              await pool.query(
+                `UPDATE words SET ${fields}, ai_checked_at = NOW() WHERE id = $${Object.keys(updates).length + 1}`,
+                [...values, word.id]
+              );
+            } else {
+              await pool.query(`UPDATE words SET ai_checked_at = NOW() WHERE id = $1`, [word.id]);
+            }
+            
           } else {
             batchStats.invalid++;
-
+            
             if (aiResult.is_greeting_construction) {
               batchStats.greetings++;
-              try {
-                await pool.query(`UPDATE words SET ai_checked_at = NOW() WHERE id = $1`, [word.id]);
-              } catch (updateError: any) {
-                console.error(`Update error for greeting ${word.id}:`, updateError.message);
-                if (updateError.message.includes('ECONNRESET') || updateError.message.includes('terminated')) {
-                  connectionLost = true;
-                  break;
-                }
-              }
-              checkStatus.message = `Проверка: ${processedCount}/${limit}. Найдено конструкций: ${batchStats.greetings}`;
+              await pool.query(`UPDATE words SET ai_checked_at = NOW() WHERE id = $1`, [word.id]);
+              checkStatus.message = `Проверка: ${processedCount}/${limit}. Конструкций: ${batchStats.greetings}`;
             } else {
-              const newDe = aiResult.corrected_de || word.de;
-              const newRu = aiResult.corrected_ru || word.ru;
-              const newArticle = aiResult.corrected_article ?? word.article;
-              const newVerbForms = aiResult.corrected_verb_forms ?? word.verb_forms;
-
-              try {
+              // Исправляем ошибки
+              const updates: any = {};
+              if (aiResult.corrected_de) updates.de = aiResult.corrected_de;
+              if (aiResult.corrected_ru) updates.ru = aiResult.corrected_ru;
+              if (aiResult.corrected_article) updates.article = aiResult.corrected_article;
+              if (aiResult.corrected_verb_forms) updates.verb_forms = aiResult.corrected_verb_forms;
+              
+              if (Object.keys(updates).length > 0) {
+                const fields = Object.keys(updates).map((f, i) => `${f} = $${i + 1}`).join(', ');
+                const values = Object.values(updates);
                 await pool.query(
-                  `UPDATE words SET de = $1, ru = $2, article = $3, verb_forms = $4, ai_checked_at = NOW() WHERE id = $5`,
-                  [newDe, newRu, newArticle || '', newVerbForms || '', word.id]
+                  `UPDATE words SET ${fields}, ai_checked_at = NOW() WHERE id = $${Object.keys(updates).length + 1}`,
+                  [...values, word.id]
                 );
-                checkStatus.message = `Проверка: ${processedCount}/${limit}. Ошибок: ${batchStats.invalid}`;
-              } catch (updateError: any) {
-                console.error(`Update error for word ${word.id}:`, updateError.message);
-                if (updateError.message.includes('ECONNRESET') || updateError.message.includes('terminated')) {
-                  connectionLost = true;
-                  break;
-                }
               }
+              checkStatus.message = `Проверка: ${processedCount}/${limit}. Ошибок: ${batchStats.invalid}`;
             }
           }
         } catch (wordError: any) {
-          console.error(`Error processing word ${word.id}:`, wordError.message);
+          console.error(`Error word ${word.id}:`, wordError.message);
           processedCount++;
         }
 
-        // Задержка между запросами к API
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise(resolve => setTimeout(resolve, 500)); // 500мс на слово (богаче обработка)
       }
 
-      // Обновляем общую статистику
       checkStatus.totalChecked = processedCount;
       checkStatus.errorsFound = checkStatus.errorsFound + batchStats.invalid;
       checkStatus.translationsAdded = checkStatus.translationsAdded + batchStats.translationsAdded;
+      checkStatus.examplesAdded = checkStatus.examplesAdded + batchStats.examplesAdded;
+      checkStatus.pluralAdded = checkStatus.pluralAdded + batchStats.pluralAdded;
+      checkStatus.synonymsAdded = checkStatus.synonymsAdded + batchStats.synonymsAdded;
+      checkStatus.antonymsAdded = checkStatus.antonymsAdded + batchStats.antonymsAdded;
+      checkStatus.collocationsAdded = checkStatus.collocationsAdded + batchStats.collocationsAdded;
       checkStatus.greetingConstructions = checkStatus.greetingConstructions + batchStats.greetings;
 
-      console.log(`[check-words] Batch complete: ${batchStats.total} words, total: ${processedCount}/${limit}`);
-
+      console.log(`[check-words] Batch done: ${processedCount}/${limit}`);
       await pool.end().catch(() => {});
       
-      // Пауза между пакетами
       if (!shouldStop && processedCount < limit) {
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
 
     } catch (error: any) {
@@ -373,7 +404,7 @@ async function runWordCheck(limit: number = 500): Promise<void> {
       await pool.end().catch(() => {});
       
       if (error.message.includes('timeout') || error.message.includes('terminated') || error.message.includes('ECONNRESET')) {
-        console.log(`[check-words] Connection error, will retry...`);
+        console.log(`[check-words] Connection error, retrying...`);
         await new Promise(resolve => setTimeout(resolve, 2000));
       } else {
         checkStatus.message = `Ошибка: ${error.message}`;
@@ -383,7 +414,15 @@ async function runWordCheck(limit: number = 500): Promise<void> {
     }
   }
 
-  checkStatus.message = `Проверка завершена. Проверено: ${processedCount} из ${limit}, ошибок: ${checkStatus.errorsFound}, переводов: ${checkStatus.translationsAdded}`;
+  checkStatus.message = `Готово! Проверено: ${processedCount} из ${limit}
+    Ошибок: ${checkStatus.errorsFound}
+    Переводов: +${checkStatus.translationsAdded}
+    Примеров: +${checkStatus.examplesAdded}
+    Множественное число: +${checkStatus.pluralAdded}
+    Синонимы: +${checkStatus.synonymsAdded}
+    Антонимы: +${checkStatus.antonymsAdded}
+    Коллокации: +${checkStatus.collocationsAdded}
+    Конструкций: ${checkStatus.greetingConstructions}`;
   checkStatus.lastRun = new Date();
   checkStatus.running = false;
 }
@@ -432,6 +471,11 @@ export async function GET() {
     totalChecked: checkStatus.totalChecked,
     errorsFound: checkStatus.errorsFound,
     translationsAdded: checkStatus.translationsAdded,
+    examplesAdded: checkStatus.examplesAdded,
+    pluralAdded: checkStatus.pluralAdded,
+    synonymsAdded: checkStatus.synonymsAdded,
+    antonymsAdded: checkStatus.antonymsAdded,
+    collocationsAdded: checkStatus.collocationsAdded,
     greetingConstructions: checkStatus.greetingConstructions,
     message: checkStatus.message,
     progress: checkStatus.progress,
@@ -453,7 +497,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const result = await pool.query(
-      all 
+      all
         ? `UPDATE words SET ai_checked_at = NULL`
         : `UPDATE words SET ai_checked_at = NULL WHERE ai_checked_at IS NOT NULL ORDER BY ai_checked_at DESC LIMIT 500`
     );
@@ -464,6 +508,11 @@ export async function DELETE(request: NextRequest) {
     checkStatus.totalChecked = 0;
     checkStatus.errorsFound = 0;
     checkStatus.translationsAdded = 0;
+    checkStatus.examplesAdded = 0;
+    checkStatus.pluralAdded = 0;
+    checkStatus.synonymsAdded = 0;
+    checkStatus.antonymsAdded = 0;
+    checkStatus.collocationsAdded = 0;
     checkStatus.greetingConstructions = 0;
     checkStatus.message = 'Статус сброшен';
     checkStatus.progress = { current: 0, total: 0 };

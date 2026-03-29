@@ -17,8 +17,14 @@ interface CheckStatus {
   totalChecked: number;
   errorsFound: number;
   translationsAdded: number;
+  examplesAdded: number;
+  pluralAdded: number;
+  synonymsAdded: number;
+  antonymsAdded: number;
+  collocationsAdded: number;
   greetingConstructions: number;
   message: string;
+  progress: { current: number; total: number };
 }
 
 export default function AdminDashboardPage() {
@@ -419,7 +425,7 @@ export default function AdminDashboardPage() {
               {checkStatus.lastRun && (
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
                   gap: 12,
                 }}>
                   <div>
@@ -438,6 +444,36 @@ export default function AdminDashboardPage() {
                     <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Переводов</div>
                     <div style={{ fontSize: '1.125rem', fontWeight: 700, color: '#2563eb' }}>
                       +{checkStatus.translationsAdded}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Примеров</div>
+                    <div style={{ fontSize: '1.125rem', fontWeight: 700, color: '#16a34a' }}>
+                      +{checkStatus.examplesAdded}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Мн.число</div>
+                    <div style={{ fontSize: '1.125rem', fontWeight: 700, color: '#ea580c' }}>
+                      +{checkStatus.pluralAdded}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Синонимы</div>
+                    <div style={{ fontSize: '1.125rem', fontWeight: 700, color: '#9333ea' }}>
+                      +{checkStatus.synonymsAdded}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Антонимы</div>
+                    <div style={{ fontSize: '1.125rem', fontWeight: 700, color: '#0891b2' }}>
+                      +{checkStatus.antonymsAdded}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Коллокации</div>
+                    <div style={{ fontSize: '1.125rem', fontWeight: 700, color: '#db2777' }}>
+                      +{checkStatus.collocationsAdded}
                     </div>
                   </div>
                   <div>
