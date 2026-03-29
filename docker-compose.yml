@@ -1,42 +1,89 @@
-# Docker Compose для KlarDeutsch
-# Запуск Redis и PostgreSQL для локальной разработки
-
 version: '3.8'
 
 services:
+  # Бэкенд (Flask)
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: klardeutsch-api
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/klardeutsch
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=${JWT_SECRET:-super-secret-key}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      - api_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - klardeutsch-network
+
+  # Фронтенд (Next.js)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: klardeutsch-frontend
+    restart: always
+    environment:
+      - NEXT_PUBLIC_API_URL=/api
+      - NODE_ENV=production
+    depends_on:
+      - api
+    networks:
+      - klardeutsch-network
+
+  # Реверс-прокси (Nginx)
+  nginx:
+    image: nginx:stable-alpine
+    container_name: klardeutsch-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - api_uploads:/usr/share/nginx/html/uploads:ro
+    depends_on:
+      - frontend
+      - api
+    networks:
+      - klardeutsch-network
+
   # Redis для кэширования
   redis:
     image: redis:7-alpine
     container_name: klardeutsch-redis
-    ports:
-      - "6379:6379"
+    restart: always
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
+      interval: 5s
+      timeout: 3s
       retries: 5
     networks:
       - klardeutsch-network
 
-  # PostgreSQL для основных данных
+  # PostgreSQL для данных
   postgres:
     image: postgres:15-alpine
     container_name: klardeutsch-postgres
+    restart: always
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: klardeutsch
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
+      interval: 5s
+      timeout: 3s
       retries: 5
     networks:
       - klardeutsch-network
@@ -45,6 +92,8 @@ volumes:
   redis_data:
     driver: local
   postgres_data:
+    driver: local
+  api_uploads:
     driver: local
 
 networks:

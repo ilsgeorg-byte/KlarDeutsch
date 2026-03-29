@@ -188,6 +188,18 @@ class AudioDeleteRequest(BaseModel):
 
 # === AI Enrich схемы ===
 
+class AIWordExample(BaseModel):
+    """Схема примера предложения от AI"""
+    de: str = Field(..., description="Пример на немецком")
+    ru: str = Field(..., description="Перевод примера на русский")
+
+class AIWordData(BaseModel):
+    """Схема полных данных о слове, возвращаемых AI"""
+    article: str = Field(default="", description="Артикль (der/die/das или пусто)")
+    level: LevelType = Field(default="A1", description="Уровень (A1-C1)")
+    verb_forms: str = Field(default="", description="Три формы глагола через запятую")
+    examples: List[AIWordExample] = Field(default_factory=list, description="Список примеров")
+
 class AIEnrichRequest(BaseModel):
     """Схема запроса к AI для обогащения слова"""
     de: str = Field(..., min_length=1, max_length=200, description="Немецкое слово")

@@ -3,8 +3,8 @@ import bundleAnalyzer from '@next/bundle-analyzer'
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  
-  // === PRODUCTION OPTIMIZATIONS ===
+  // === DOCKER/PRODUCTION OPTIMIZATIONS ===
+  output: 'standalone',
   
   // SWC минификация (быстрее Terser)
   swcMinify: true,
