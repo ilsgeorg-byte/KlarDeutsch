@@ -1,21 +1,43 @@
 /* Admin Panel Styles */
 
+:root {
+  --admin-bg: #f1f5f9;
+  --admin-card-bg: #ffffff;
+  --admin-text: #1e293b;
+  --admin-text-muted: #64748b;
+  --admin-border: #e2e8f0;
+  --admin-sidebar-bg: #1e293b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --admin-bg: #020617;
+    --admin-card-bg: #0f172a;
+    --admin-text: #f1f5f9;
+    --admin-text-muted: #94a3b8;
+    --admin-border: #1e293b;
+    --admin-sidebar-bg: #020617;
+  }
+}
+
 .adminLayout {
   display: flex;
   min-height: 100vh;
-  background: #f1f5f9;
+  background: var(--admin-bg);
+  color: var(--admin-text);
 }
 
 /* Sidebar */
 .adminSidebar {
   width: 280px;
-  background: #1e293b;
+  background: var(--admin-sidebar-bg);
   color: white;
   display: flex;
   flex-direction: column;
   position: fixed;
   height: 100vh;
   overflow-y: auto;
+  z-index: 50;
 }
 
 .adminSidebarHeader {
@@ -143,7 +165,7 @@
 }
 
 .adminHeader {
-  background: white;
+  background: var(--admin-card-bg);
   padding: 20px 32px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   display: flex;
@@ -157,13 +179,13 @@
 .adminHeaderTitle {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--admin-text);
   margin: 0;
 }
 
 .adminHeaderSubtitle {
   font-size: 0.875rem;
-  color: #64748b;
+  color: var(--admin-text-muted);
   margin-top: 4px;
 }
 
@@ -174,7 +196,7 @@
 
 /* Cards */
 .adminCard {
-  background: white;
+  background: var(--admin-card-bg);
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   padding: 24px;
@@ -191,7 +213,7 @@
 .adminCardTitle {
   font-size: 1.125rem;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--admin-text);
   margin: 0;
 }
 
@@ -204,7 +226,7 @@
 }
 
 .statCard {
-  background: white;
+  background: var(--admin-card-bg);
   border-radius: 12px;
   padding: 24px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -241,7 +263,7 @@
 .statCardValue {
   font-size: 1.875rem;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--admin-text);
 }
 
 .statCardChange {
@@ -260,20 +282,20 @@
 .adminTable td {
   padding: 12px 16px;
   text-align: left;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--admin-border);
 }
 
 .adminTable th {
-  background: #f8fafc;
+  background: var(--admin-bg);
   font-weight: 600;
   font-size: 0.75rem;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--admin-text-muted);
   letter-spacing: 0.05em;
 }
 
 .adminTable tr:hover {
-  background: #f8fafc;
+  background: var(--admin-bg);
 }
 
 .adminTableActions {
@@ -305,12 +327,12 @@
 }
 
 .adminBtnSecondary {
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--admin-bg);
+  color: var(--admin-text);
 }
 
 .adminBtnSecondary:hover {
-  background: #e2e8f0;
+  background: var(--admin-border);
 }
 
 .adminBtnDanger {
@@ -343,14 +365,16 @@
 .adminFormLabel {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #374151;
+  color: var(--admin-text);
 }
 
 .adminFormInput,
 .adminFormSelect,
 .adminFormTextarea {
   padding: 10px 14px;
-  border: 1px solid #d1d5db;
+  background: var(--admin-card-bg);
+  color: var(--admin-text);
+  border: 1px solid var(--admin-border);
   border-radius: 8px;
   font-size: 0.875rem;
   transition: all 0.2s;
@@ -410,8 +434,9 @@
 
 .adminPaginationBtn {
   padding: 8px 16px;
-  border: 1px solid #e2e8f0;
-  background: white;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-card-bg);
+  color: var(--admin-text);
   border-radius: 6px;
   cursor: pointer;
   font-size: 0.875rem;
@@ -419,8 +444,8 @@
 }
 
 .adminPaginationBtn:hover:not(:disabled) {
-  background: #f8fafc;
-  border-color: #cbd5e1;
+  background: var(--admin-bg);
+  border-color: var(--admin-text-muted);
 }
 
 .adminPaginationBtn:disabled {
@@ -492,7 +517,9 @@
 .adminSearchInput {
   flex: 1;
   padding: 10px 16px;
-  border: 1px solid #d1d5db;
+  background: var(--admin-card-bg);
+  color: var(--admin-text);
+  border: 1px solid var(--admin-border);
   border-radius: 8px;
   font-size: 0.875rem;
 }

@@ -34,8 +34,13 @@ export default function UploadWordsModal({ isOpen, onClose, onSuccess }: UploadW
         level: "A1",
         topic: "Личные слова",
         verb_forms: "",
+        plural: "",
         example_de: "",
-        example_ru: ""
+        example_ru: "",
+        synonyms: "",
+        antonyms: "",
+        collocations: "",
+        examples: [] as Example[]
     });
     const [singleExamples, setSingleExamples] = useState<Example[]>([]);
     const [selectedExample, setSelectedExample] = useState<number | null>(null);
@@ -86,8 +91,13 @@ export default function UploadWordsModal({ isOpen, onClose, onSuccess }: UploadW
                 article: data.article || prev.article,
                 level: data.level || prev.level,
                 verb_forms: data.verb_forms || prev.verb_forms,
+                plural: data.plural || prev.plural,
+                synonyms: data.synonyms || prev.synonyms,
+                antonyms: data.antonyms || prev.antonyms,
+                collocations: data.collocations || prev.collocations,
                 example_de: data.examples?.[0]?.de || prev.example_de,
                 example_ru: data.examples?.[0]?.ru || prev.example_ru,
+                examples: data.examples || []
             }));
             setSingleExamples(data.examples || []);
             setSelectedExample(0);
@@ -147,7 +157,8 @@ export default function UploadWordsModal({ isOpen, onClose, onSuccess }: UploadW
     const resetSingleForm = () => {
         setSingleFormData({
             de: "", ru: "", article: "", level: "A1", topic: "Личные слова",
-            verb_forms: "", example_de: "", example_ru: ""
+            verb_forms: "", plural: "", example_de: "", example_ru: "",
+            synonyms: "", antonyms: "", collocations: "", examples: []
         });
         setSingleExamples([]);
         setSelectedExample(null);
@@ -417,14 +428,44 @@ export default function UploadWordsModal({ isOpen, onClose, onSuccess }: UploadW
                                     placeholder="напр. Глаголы" />
                             </div>
 
-                            {/* Формы глагола */}
+                            {/* Формы глагола + Множественное число */}
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+                                <div>
+                                    <label style={label}>Формы глагола</label>
+                                    <input type="text" name="verb_forms" style={input}
+                                        value={singleFormData.verb_forms} onChange={handleChange}
+                                        placeholder="напр. machen, machte, hat gemacht" />
+                                </div>
+                                <div>
+                                    <label style={label}>Множественное число</label>
+                                    <input type="text" name="plural" style={input}
+                                        value={singleFormData.plural} onChange={handleChange}
+                                        placeholder="напр. die Häuser" />
+                                </div>
+                            </div>
+
+                            {/* Синонимы + Антонимы */}
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+                                <div>
+                                    <label style={label}>Синонимы</label>
+                                    <input type="text" name="synonyms" style={input}
+                                        value={singleFormData.synonyms} onChange={handleChange}
+                                        placeholder="через запятую" />
+                                </div>
+                                <div>
+                                    <label style={label}>Антонимы</label>
+                                    <input type="text" name="antonyms" style={input}
+                                        value={singleFormData.antonyms} onChange={handleChange}
+                                        placeholder="через запятую" />
+                                </div>
+                            </div>
+
+                            {/* Коллокации */}
                             <div style={{ marginBottom: "12px" }}>
-                                <label style={label}>
-                                    Формы глагола <span style={{ fontWeight: 400, color: "#94a3b8" }}>(для глаголов)</span>
-                                </label>
-                                <input type="text" name="verb_forms" style={input}
-                                    value={singleFormData.verb_forms} onChange={handleChange}
-                                    placeholder="напр. machen, machte, hat gemacht" />
+                                <label style={label}>Коллокации (фразы)</label>
+                                <input type="text" name="collocations" style={input}
+                                    value={singleFormData.collocations} onChange={handleChange}
+                                    placeholder="напр. einen Apfel essen" />
                             </div>
 
                             {/* Примеры от AI */}

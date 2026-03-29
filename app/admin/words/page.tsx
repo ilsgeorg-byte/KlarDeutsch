@@ -433,14 +433,15 @@ export default function AdminWordsPage() {
           onClick={closeModal}
         >
           <div
+            className="adminCard"
             style={{
-              background: 'white',
-              borderRadius: 12,
               padding: 32,
               width: '100%',
               maxWidth: 500,
               maxHeight: '90vh',
               overflow: 'auto',
+              border: '1px solid var(--admin-border)',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
             }}
             onClick={(e) => e.stopPropagation()}
           >

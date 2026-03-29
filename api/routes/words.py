@@ -368,9 +368,19 @@ def update_word(word_id: int):
             cur.execute("""
                 UPDATE words
                 SET de = %s, ru = %s, article = %s, level = %s, topic = %s,
-                    verb_forms = %s, example_de = %s, example_ru = %s
+                    verb_forms = %s, plural = %s, example_de = %s, example_ru = %s,
+                    synonyms = %s, antonyms = %s, collocations = %s, examples = %s
                 WHERE id = %s
-            """, (de, ru, article, level, topic, verb_forms, example_de, example_ru, word_id))
+            """, (
+                de, ru, article, level, topic, 
+                verb_forms, data.get('plural', '').strip(),
+                example_de, example_ru,
+                data.get('synonyms', '').strip(),
+                data.get('antonyms', '').strip(),
+                data.get('collocations', '').strip(),
+                json.dumps(data.get('examples', [])),
+                word_id
+            ))
 
             if cur.rowcount == 0:
                 return jsonify({"error": "Слово не найдено"}), 404
@@ -415,9 +425,19 @@ def update_word_admin(word_id: int):
             cur.execute("""
                 UPDATE words
                 SET de = %s, ru = %s, article = %s, level = %s, topic = %s,
-                    verb_forms = %s, example_de = %s, example_ru = %s
+                    verb_forms = %s, plural = %s, example_de = %s, example_ru = %s,
+                    synonyms = %s, antonyms = %s, collocations = %s, examples = %s
                 WHERE id = %s
-            """, (de, ru, article, level, topic, verb_forms, example_de, example_ru, word_id))
+            """, (
+                de, ru, article, level, topic, 
+                verb_forms, data.get('plural', '').strip(),
+                example_de, example_ru,
+                data.get('synonyms', '').strip(),
+                data.get('antonyms', '').strip(),
+                data.get('collocations', '').strip(),
+                json.dumps(data.get('examples', [])),
+                word_id
+            ))
 
             if cur.rowcount == 0:
                 return jsonify({"error": "Слово не найдено"}), 404
@@ -453,10 +473,23 @@ def add_custom_word():
         with get_db_cursor() as cur:
             try:
                 cur.execute("""
-                    INSERT INTO words (de, ru, article, level, topic, verb_forms, example_de, example_ru, user_id)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO words (
+                        de, ru, article, level, topic, 
+                        verb_forms, plural, example_de, example_ru, 
+                        synonyms, antonyms, collocations, examples, user_id
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
-                """, (de, ru, article, level, topic, verb_forms, example_de, example_ru, request.user_id))
+                """, (
+                    de, ru, article, level, topic, 
+                    verb_forms, data.get('plural', '').strip(),
+                    example_de, example_ru,
+                    data.get('synonyms', '').strip(),
+                    data.get('antonyms', '').strip(),
+                    data.get('collocations', '').strip(),
+                    json.dumps(data.get('examples', [])),
+                    request.user_id
+                ))
 
                 word_id = cur.fetchone()[0]
                 
@@ -530,6 +563,13 @@ def bulk_upload_words():
                         example_de = word_data.get('example_de') or word_data.get('example') or ''
                         example_ru = word_data.get('example_ru') or word_data.get('example_translation') or ''
                         
+                        # Дополнительные поля
+                        plural = word_data.get('plural') or ''
+                        synonyms = word_data.get('synonyms') or ''
+                        antonyms = word_data.get('antonyms') or ''
+                        collocations = word_data.get('collocations') or ''
+                        examples_json = word_data.get('examples') or []
+                        
                         # Очищаем значения
                         de = str(de).strip()
                         ru = str(ru).strip()
@@ -539,6 +579,10 @@ def bulk_upload_words():
                         verb_forms = str(verb_forms).strip()
                         example_de = str(example_de).strip()
                         example_ru = str(example_ru).strip()
+                        plural = str(plural).strip()
+                        synonyms = str(synonyms).strip()
+                        antonyms = str(antonyms).strip()
+                        collocations = str(collocations).strip()
                         
                         # Валидация обязательных полей
                         if not de or not ru:
@@ -552,11 +596,21 @@ def bulk_upload_words():
                         
                         try:
                             cur.execute("""
-                                INSERT INTO words (de, ru, article, level, topic, verb_forms, example_de, example_ru, user_id)
-                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                INSERT INTO words (
+                                    de, ru, article, level, topic, 
+                                    verb_forms, plural, example_de, example_ru, 
+                                    synonyms, antonyms, collocations, examples, user_id
+                                )
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                                 ON CONFLICT DO NOTHING
                                 RETURNING id
-                            """, (de, ru, article, level, topic, verb_forms, example_de, example_ru, user_id))
+                            """, (
+                                de, ru, article, level, topic, 
+                                verb_forms, plural, example_de, example_ru,
+                                synonyms, antonyms, collocations, 
+                                json.dumps(examples_json),
+                                user_id
+                            ))
                             
                             if cur.fetchone():
                                 added_count += 1

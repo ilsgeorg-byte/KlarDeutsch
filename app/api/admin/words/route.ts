@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { de, ru, article, level, topic, verb_forms, plural, example_de, example_ru, synonyms, antonyms, collocations } = body;
+    const { de, ru, article, level, topic, verb_forms, plural, example_de, example_ru, synonyms, antonyms, collocations, examples } = body;
 
     if (!de || !ru) {
       console.error('Missing de or ru');
@@ -173,10 +173,15 @@ export async function POST(request: NextRequest) {
     console.log('Executing INSERT query...');
     
     const result = await dbPool.query(
-      `INSERT INTO words (de, ru, article, level, topic, verb_forms, plural, example_de, example_ru, synonyms, antonyms, collocations)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      `INSERT INTO words (de, ru, article, level, topic, verb_forms, plural, example_de, example_ru, synonyms, antonyms, collocations, examples)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING id`,
-      [de, ru, article || '', level || 'A1', topic || '', verb_forms || '', plural || '', example_de || '', example_ru || '', synonyms || '', antonyms || '', collocations || '']
+      [
+        de, ru, article || '', level || 'A1', topic || '', 
+        verb_forms || '', plural || '', example_de || '', example_ru || '', 
+        synonyms || '', antonyms || '', collocations || '', 
+        JSON.stringify(examples || [])
+      ]
     );
 
     console.log('INSERT result:', result.rows[0]);
@@ -218,6 +223,7 @@ export async function PUT(request: NextRequest) {
     const synonyms = body.synonyms ?? '';
     const antonyms = body.antonyms ?? '';
     const collocations = body.collocations ?? '';
+    const examples = body.examples ?? [];
 
     console.log('PUT /api/admin/words:', { id, de, ru, level });
 
@@ -293,10 +299,10 @@ export async function PUT(request: NextRequest) {
       `UPDATE words
        SET de = $1, ru = $2, article = $3, level = $4, topic = $5,
            verb_forms = $6, plural = $7, example_de = $8, example_ru = $9,
-           synonyms = $10, antonyms = $11, collocations = $12
-       WHERE id = $13
+           synonyms = $10, antonyms = $11, collocations = $12, examples = $13
+       WHERE id = $14
        RETURNING id`,
-      [de, ru, article, level, topic, verb_forms, plural, example_de, example_ru, synonyms, antonyms, collocations, id]
+      [de, ru, article, level, topic, verb_forms, plural, example_de, example_ru, synonyms, antonyms, collocations, JSON.stringify(examples), id]
     );
 
     console.log('UPDATE result:', { rowCount: updateResult.rowCount, rows: updateResult.rows });

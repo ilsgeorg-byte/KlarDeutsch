@@ -66,11 +66,16 @@ class WordCreate(BaseModel):
     level: LevelType = Field(default="A1", description="Уровень")
     topic: Optional[str] = Field(default="Общее", max_length=100, description="Тема")
     verb_forms: Optional[str] = Field(default="", max_length=200, description="Формы глагола")
+    plural: Optional[str] = Field(default="", max_length=200, description="Множественное число")
     example_de: Optional[str] = Field(default="", max_length=500, description="Пример на немецком")
     example_ru: Optional[str] = Field(default="", max_length=500, description="Пример на русском")
+    synonyms: Optional[str] = Field(default="", max_length=500, description="Синонимы")
+    antonyms: Optional[str] = Field(default="", max_length=500, description="Антонимы")
+    collocations: Optional[str] = Field(default="", max_length=500, description="Коллокации")
+    examples: Optional[List[dict]] = Field(default_factory=list, description="Список примеров (JSON)")
     user_id: Optional[int] = None
     
-    @field_validator('de', 'ru', 'article', 'topic', 'verb_forms', 'example_de', 'example_ru')
+    @field_validator('de', 'ru', 'article', 'topic', 'verb_forms', 'plural', 'example_de', 'example_ru', 'synonyms', 'antonyms', 'collocations')
     @classmethod
     def validate_and_sanitize_strings(cls, v):
         if v is None:
@@ -227,8 +232,13 @@ class WordResponse(BaseModel):
     ru: str
     article: Optional[str]
     verb_forms: Optional[str]
-    example_de: Optional[str]
-    example_ru: Optional[str]
+    plural: Optional[str] = ""
+    example_de: Optional[str] = ""
+    example_ru: Optional[str] = ""
+    synonyms: Optional[str] = ""
+    antonyms: Optional[str] = ""
+    collocations: Optional[str] = ""
+    examples: Optional[List[dict]] = []
     audio_url: Optional[str]
     is_favorite: bool = False
 

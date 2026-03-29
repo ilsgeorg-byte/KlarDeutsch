@@ -234,6 +234,14 @@ export const wordsApi = {
     article?: string;
     level?: string;
     topic?: string;
+    verb_forms?: string;
+    plural?: string;
+    example_de?: string;
+    example_ru?: string;
+    synonyms?: string;
+    antonyms?: string;
+    collocations?: string;
+    examples?: Array<{ de: string; ru: string }>;
   }) =>
     apiClient.post<{ status: string; word_id: number }>('/words/custom', data),
 };
