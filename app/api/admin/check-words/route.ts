@@ -107,10 +107,17 @@ const ENRICH_PROMPT = `Ты - эксперт по немецкому языку.
 ЗАДАЧА:
 1. Проверь и исправь ошибки (артикль, формы глагола)
 2. Если нет примеров - создай МИНИМУМ 3 разных предложения с этим словом + перевод
-3. Если нет множественного числа (для существительных) - добавь
-4. Найди 2-3 синонима (если есть)
-5. Найди 1-2 антонима (если есть)
-6. Найди 2-3 коллокации (устойчивые сочетания)
+3. Проверь множественное число (если есть) - исправь ошибки в форме
+4. Если нет множественного числа (для существительных) - добавь
+5. Найди 2-3 синонима (если есть)
+6. Найди 1-2 антонима (если есть)
+7. Найди 2-3 коллокации (устойчивые сочетания)
+
+Правила для множественного числа:
+- Существительные муж.рода часто добавляют -e, -er, -en или умлаут
+- Существительные жен.рода часто добавляют -n или -en
+- Некоторые слова не имеют множественного числа (sing.)
+- Некоторые слова имеют только множественное (plur.)
 
 Верни ТОЛЬКО JSON:
 {
@@ -121,6 +128,7 @@ const ENRICH_PROMPT = `Ты - эксперт по немецкому языку.
   "corrected_ru": "",
   "corrected_article": "",
   "corrected_verb_forms": "",
+  "corrected_plural": "",
   "additional_translations": [],
   "examples": [
     {"de": "Ich esse einen Apfel.", "ru": "Я ем яблоко."},
@@ -195,12 +203,13 @@ async function enrichWord(de: string, ru: string, article: string, verb_forms: s
 
     const result = JSON.parse(content);
     
-    // Инициализируем пустые массивы
+    // Инициализируем пустые массивы и поля
     if (!result.additional_translations) result.additional_translations = [];
     if (!result.examples) result.examples = [];
     if (!result.synonyms) result.synonyms = [];
     if (!result.antonyms) result.antonyms = [];
     if (!result.collocations) result.collocations = [];
+    if (!result.corrected_plural) result.corrected_plural = '';
     
     return result;
   } catch (error) {
@@ -317,8 +326,13 @@ async function runWordCheck(limit: number = 500): Promise<void> {
               batchStats.examplesAdded += aiResult.examples.length;
             }
             
-            // Множественное число (только если пусто)
-            if (!word.plural && aiResult.plural) {
+            // Множественное число (ПРОВЕРЯЕМ и исправляем ошибки)
+            if (aiResult.corrected_plural && aiResult.corrected_plural !== word.plural) {
+              // Исправлена ошибка в существующем plural
+              updates.plural = aiResult.corrected_plural;
+              batchStats.pluralAdded++;
+            } else if (!word.plural && aiResult.plural) {
+              // Добавлено новое множественное число
               updates.plural = aiResult.plural;
               batchStats.pluralAdded++;
             }
