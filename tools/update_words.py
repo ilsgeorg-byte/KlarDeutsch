@@ -207,32 +207,36 @@ def word_data_is_valid(de_word, ru, synonyms, antonyms, collocations, examples_l
 
 def get_linguistic_data_groq(de_word, level):
     prompt = f"""Выведи строго JSON объект для немецкого слова "{de_word}" (уровень {level}).
+
 Обязательные правила:
-1. Каждый из 3 примеров ОБЯЗАН содержать именно слово "{de_word}" (или его грамматическую форму).
-2. Не используй синонимы или другие слова вместо "{de_word}" в примерах.
-3. Поле "de" в примерах — ТОЛЬКО на немецком языке. Никакого русского в поле "de".
-4. Поле "ru" в примерах — ТОЛЬКО перевод на русском языке.
-5. Все 3 примера должны быть разными по смыслу и структуре.
-6. synonyms, antonyms, collocations — ТОЛЬКО на немецком языке, никакого русского.
-7. Перевод — краткий, 1-3 слова на русском.
-8. Никаких лишних слов, только JSON:
+1. Если это существительное: обязательно определи артикль (der/die/das) и форму множественного числа.
+2. Если это глагол: обязательно укажи основные формы (Infinitiv, Präsens, Präteritum, Partizip II).
+3. Каждый из 3 примеров ОБЯЗАН содержать именно слово "{de_word}" (или его грамматическую форму).
+4. Не используй синонимы или другие слова вместо "{de_word}" в примерах.
+5. Поле "de" в примерах — ТОЛЬКО на немецком языке. Никакого русского в поле "de".
+6. Поле "ru" в примерах — ТОЛЬКО перевод на русском языке.
+7. synonyms, antonyms, collocations — ТОЛЬКО на немецком языке.
+8. Перевод — точный и естественный на русском.
 
 {{
-  "ru_translation": "Точный перевод на русский язык (1-3 слова)",
-  "synonyms": "2 синонима на немецком через запятую, или пустая строка",
-  "antonyms": "1 антоним на немецком, или пустая строка",
-  "collocations": "2 коротких словосочетания на немецком с словом {de_word}",
+  "article": "der|die|das|",
+  "plural": "die ...",
+  "verb_forms": "Infinitiv, Präsens, Präteritum, Partizip II",
+  "ru_translation": "Точный перевод на русский язык",
+  "synonyms": "2 синонима на немецком через запятую",
+  "antonyms": "1 антоним на немецком",
+  "collocations": "2 словосочетания на немецком",
   "examples": [
-    {{"de": "Немецкий пример 1 с {de_word}.", "ru": "Русский перевод 1."}},
-    {{"de": "Немецкий пример 2 с {de_word}.", "ru": "Русский перевод 2."}},
-    {{"de": "Немецкий пример 3 с {de_word}.", "ru": "Русский перевод 3."}}
+    {{"de": "...", "ru": "..."}},
+    {{"de": "...", "ru": "..."}},
+    {{"de": "...", "ru": "..."}}
   ]
 }}"""
     try:
         completion = groq_client.chat.completions.create(
-            model="meta-llama/llama-4-scout-17b-16e-instruct",
+            model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.8,
+            temperature=0.2,
             max_tokens=2000,
             response_format={"type": "json_object"}
         )
@@ -249,6 +253,7 @@ def get_linguistic_data_groq(de_word, level):
         if "429" in error_str:
             time.sleep(60)
             return None
+        print(f"Error fetching data for {de_word}: {e}")
         return None
 
 
@@ -265,7 +270,7 @@ def update_database():
         needs_update = []
         for row in all_words:
             word_id, de, level, examples_raw, ru, synonyms, antonyms, collocations = row
-            if examples_raw is None or ru == "перевод в процессе":
+            if examples_raw is None or ru == "перевод в процессе" or ru == "Наместник":
                 needs_update.append(row)
                 continue
             try:
@@ -287,26 +292,41 @@ def update_database():
                     print("❌ (нет данных от API)")
                     continue
 
-                ru_translation = data.get("ru_translation", "Перевод не найден")
+                ru_translation = data.get("ru_translation", ru)
                 synonyms       = data.get("synonyms", "")
                 antonyms       = data.get("antonyms", "")
                 collocations   = data.get("collocations", "")
                 examples_list  = data.get("examples", [])
+                article        = data.get("article", "")
+                plural         = data.get("plural", "")
+                verb_forms     = data.get("verb_forms", "")
 
                 valid_examples = filter_valid_examples(examples_list, de)
 
                 if len(valid_examples) < 3 or not examples_are_diverse(valid_examples):
                     print(f"❌ (примеров: {len(valid_examples)}/3)")
+                    # Если перевод был "Наместник" или "перевод в процессе", всё равно пробуем обновить хотя бы перевод и формы
+                    if ru == "Наместник" or ru == "перевод в процессе":
+                        cur.execute(
+                            "UPDATE words SET ru=%s, article=%s, plural=%s, verb_forms=%s, ai_checked_at=NOW() WHERE id=%s;",
+                            (ru_translation, article, plural, verb_forms, word_id)
+                        )
+                        conn.commit()
+                        print("⚠️ (обновлен только перевод/формы)")
                     continue
 
                 examples_json = json.dumps(valid_examples, ensure_ascii=False)
                 cur.execute(
-                    "UPDATE words SET ru=%s, synonyms=%s, antonyms=%s, collocations=%s, examples=%s::jsonb WHERE id=%s;",
-                    (ru_translation, synonyms, antonyms, collocations, examples_json, word_id)
+                    """UPDATE words 
+                       SET ru=%s, synonyms=%s, antonyms=%s, collocations=%s, examples=%s::jsonb, 
+                           article=%s, plural=%s, verb_forms=%s, ai_checked_at=NOW() 
+                       WHERE id=%s;""",
+                    (ru_translation, synonyms, antonyms, collocations, examples_json, 
+                     article, plural, verb_forms, word_id)
                 )
                 conn.commit()
                 print("✅")
-                time.sleep(2)
+                time.sleep(1)
 
             except Exception as e:
                 print(f"❌ {type(e).__name__}: {e}")
@@ -314,6 +334,7 @@ def update_database():
                 with open("update_words_errors.log", "a", encoding="utf-8") as f:
                     f.write(f"{de}\t{type(e).__name__}: {e}\n")
                 continue
+
 
         print("\n🎉 Готово!")
 
