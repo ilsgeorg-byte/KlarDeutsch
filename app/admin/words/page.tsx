@@ -18,6 +18,7 @@ interface Word {
   synonyms?: string;
   antonyms?: string;
   collocations?: string;
+  examples?: any[];
   is_favorite?: boolean;
 }
 
@@ -41,71 +42,6 @@ export default function AdminWordsPage() {
   const [total, setTotal] = useState(0);
   const limit = 20;
 
-  // Функция для закрытия модального окна со сбросом состояний
-  const closeModal = () => {
-    setEditingWord(null);
-    setFormData({ 
-      de: '', ru: '', article: '', level: 'A1', topic: '',
-      verb_forms: '', plural: '', example_de: '', example_ru: '',
-      synonyms: '', antonyms: '', collocations: ''
-    });
-    setShowModal(false);
-    setAiError('');
-    // debugInfo не сбрасываем чтобы можно было прочитать ошибку
-
-    // Принудительно проверяем через setTimeout
-    setTimeout(() => {
-      console.log('After closeModal:', { showModal: false, editingWord: null });
-    }, 100);
-  };
-
-  // Заполнение с помощью ИИ
-  const handleAiEnrich = async () => {
-    if (!formData.de || !formData.ru) {
-      setAiError('Введите немецкое слово и перевод');
-      return;
-    }
-
-    setAiLoading(true);
-    setAiError('');
-
-    try {
-      const token = localStorage.getItem('token');
-      const resp = await fetch('/api/words/ai-enrich', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ de: formData.de, ru: formData.ru }),
-      });
-
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || 'Ошибка AI');
-
-      setFormData(prev => ({
-        ...prev,
-        article: data.article || prev.article,
-        level: data.level || prev.level,
-        topic: data.topic || prev.topic,
-        verb_forms: data.verb_forms || prev.verb_forms,
-        plural: data.plural || prev.plural,
-        example_de: data.examples?.[0]?.de || prev.example_de,
-        example_ru: data.examples?.[0]?.ru || prev.example_ru,
-        synonyms: data.synonyms || prev.synonyms,
-        antonyms: data.antonyms || prev.antonyms,
-        collocations: data.collocations || prev.collocations,
-      }));
-
-      setSuccess('ИИ заполнил данные!');
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (err: any) {
-      setAiError(err.message || 'Не удалось получить данные от AI');
-    } finally {
-      setAiLoading(false);
-    }
-  };
-
   // Modal
   const [showModal, setShowModal] = useState(false);
   const [editingWord, setEditingWord] = useState<Word | null>(null);
@@ -122,6 +58,7 @@ export default function AdminWordsPage() {
     synonyms: '',
     antonyms: '',
     collocations: '',
+    examples: [] as any[],
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
@@ -164,12 +101,71 @@ export default function AdminWordsPage() {
     loadWords();
   };
 
+  const closeModal = () => {
+    setEditingWord(null);
+    setFormData({ 
+      de: '', ru: '', article: '', level: 'A1', topic: '',
+      verb_forms: '', plural: '', example_de: '', example_ru: '',
+      synonyms: '', antonyms: '', collocations: '', examples: []
+    });
+    setShowModal(false);
+    setAiError('');
+  };
+
+  const handleAiEnrich = async () => {
+    if (!formData.de || !formData.ru) {
+      setAiError('Введите немецкое слово и перевод');
+      return;
+    }
+
+    setAiLoading(true);
+    setAiError('');
+
+    try {
+      const token = localStorage.getItem('token');
+      const resp = await fetch('/api/words/ai-enrich', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ de: formData.de, ru: formData.ru }),
+      });
+
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'Ошибка ИИ');
+
+      setFormData(prev => ({
+        ...prev,
+        ru: data.ru || prev.ru,
+        article: data.article || prev.article,
+        level: data.level || prev.level,
+        topic: data.topic || prev.topic,
+        verb_forms: data.verb_forms || prev.verb_forms,
+        plural: data.plural || prev.plural,
+        example_de: data.examples?.[0]?.de || prev.example_de,
+        example_ru: data.examples?.[0]?.ru || prev.example_ru,
+        synonyms: data.synonyms || prev.synonyms,
+        antonyms: data.antonyms || prev.antonyms,
+        collocations: data.collocations || prev.collocations,
+        examples: data.examples || prev.examples,
+      }));
+
+      setSuccess('ИИ заполнил данные!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: any) {
+      setAiError(err.message || 'Не удалось получить данные от ИИ');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const openAddModal = () => {
     setEditingWord(null);
     setFormData({ 
       de: '', ru: '', article: '', level: 'A1', topic: '',
       verb_forms: '', plural: '', example_de: '', example_ru: '',
-      synonyms: '', antonyms: '', collocations: ''
+      synonyms: '', antonyms: '', collocations: '', examples: []
     });
     setShowModal(true);
   };
@@ -189,6 +185,7 @@ export default function AdminWordsPage() {
       synonyms: word.synonyms || '',
       antonyms: word.antonyms || '',
       collocations: word.collocations || '',
+      examples: Array.isArray(word.examples) ? word.examples : [],
     });
     setShowModal(true);
   };

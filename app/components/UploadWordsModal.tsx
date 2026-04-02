@@ -88,8 +88,10 @@ export default function UploadWordsModal({ isOpen, onClose, onSuccess }: UploadW
 
             setSingleFormData(prev => ({
                 ...prev,
+                ru: data.ru || prev.ru,
                 article: data.article || prev.article,
                 level: data.level || prev.level,
+                topic: data.topic || prev.topic,
                 verb_forms: data.verb_forms || prev.verb_forms,
                 plural: data.plural || prev.plural,
                 synonyms: data.synonyms || prev.synonyms,

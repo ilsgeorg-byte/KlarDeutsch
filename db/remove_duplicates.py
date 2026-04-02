@@ -52,22 +52,28 @@ def remove_smart_duplicates():
                 delete_ids = [w[0] for w in group[1:]]
 
                 for del_id in delete_ids:
-                    # Разрешаем конфликты в user_words
-                    cur.execute("SELECT user_id FROM user_words WHERE word_id = %s;", (keep_id,))
-                    users_with_keep = [r[0] for r in cur.fetchall()]
+                    # Список таблиц, которые нужно "почистить" перед удалением слова
+                    referencing_tables = ["user_words", "user_favorites", "user_word_notes"]
                     
-                    if users_with_keep:
+                    for table in referencing_tables:
+                        # Разрешаем конфликты (если у юзера есть и эталонное слово, и дубликат)
+                        cur.execute(f"SELECT user_id FROM {table} WHERE word_id = %s;", (keep_id,))
+                        users_with_keep = [r[0] for r in cur.fetchall()]
+                        
+                        if users_with_keep:
+                            # Удаляем дубликат у этих юзеров, так как у них уже есть "основное" слово
+                            cur.execute(
+                                f"DELETE FROM {table} WHERE word_id = %s AND user_id = ANY(%s);",
+                                (del_id, users_with_keep)
+                            )
+                        
+                        # Перепривязываем всех остальных юзеров от дубликата к эталону
                         cur.execute(
-                            "DELETE FROM user_words WHERE word_id = %s AND user_id = ANY(%s);",
-                            (del_id, users_with_keep)
+                            f"UPDATE {table} SET word_id = %s WHERE word_id = %s;",
+                            (keep_id, del_id)
                         )
                     
-                    cur.execute(
-                        "UPDATE user_words SET word_id = %s WHERE word_id = %s;",
-                        (keep_id, del_id)
-                    )
-                    
-                    # Удаляем дубликат
+                    # Теперь, когда все связи перенесены, удаляем дубликат из основной таблицы
                     cur.execute("DELETE FROM words WHERE id = %s;", (del_id,))
                     total_deleted += 1
                     

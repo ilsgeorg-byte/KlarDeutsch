@@ -200,12 +200,15 @@ class AIWordExample(BaseModel):
 
 class AIWordData(BaseModel):
     """Схема полных данных о слове, возвращаемых AI"""
+    ru: str = Field(default="", description="Уточненный перевод на русский (включая несколько значений через запятую, если важно)")
     article: str = Field(default="", description="Артикль (der/die/das или пусто)")
     plural: str = Field(default="", description="Форма множественного числа (напр. die Schilder)")
     level: LevelType = Field(default="A1", description="Уровень (A1-C1)")
+    topic: str = Field(default="Общее", description="Тема слова (напр. Еда, Путешествия, Работа)")
     verb_forms: str = Field(default="", description="Формы глагола: Infinitiv, Präsens(3sg), Präteritum(3sg), Partizip II")
     synonyms: str = Field(default="", description="Синонимы через запятую")
     antonyms: str = Field(default="", description="Антонимы через запятую")
+    collocations: str = Field(default="", description="Устойчивые выражения и коллокации через запятую")
     examples: List[AIWordExample] = Field(default_factory=list, description="Список примеров")
 
 class AIEnrichRequest(BaseModel):

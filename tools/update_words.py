@@ -53,6 +53,10 @@ IRREGULAR_FORMS = {
     "denken":   ["denkt", "dachte"],
     "sprechen": ["spricht", "sprach"],
     "schreiben":["schreibt", "schrieb"],
+    "stehlen":  ["stiehlt", "stahl", "stohl"],
+    "trinken":  ["trinkt", "trank", "trunk"],
+    "singen":   ["singt", "sang", "sung"],
+    "schwimmen":["schwimmt", "schwamm", "schwomm"],
 }
 
 SEPARABLE_PREFIXES = [
@@ -102,45 +106,54 @@ def get_word_root(de_word):
     return word
 
 
-def example_contains_word(example_de, de_word):
+def example_contains_word(example_de, de_word, extra_forms=None):
     def norm(text):
-        return text.lower().replace("ä","a").replace("ö","o").replace("ü","u").replace("ß","ss")
+        if not text: return ""
+        # 'Vowel-blind' нормализация для немецких корней (e/a/o/i/u/ä/ö/ü -> a)
+        # Это позволяет находить формы типа biegen -> gebogen, sehen -> sah
+        t = text.lower().replace("ß","ss")
+        for v in "eio uäöü".split(): # заменяем все гласные на 'a'
+            for char in v:
+                t = t.replace(char, "a")
+        return t
 
     example_lower = example_de.lower()
     word_lower = de_word.lower()
     example_norm = norm(example_de)
 
-    # 1. Прямое вхождение
+    # 1. Прямое вхождение (без агрессивной очистки)
     if word_lower in example_lower:
         return True
-
-    # 2. Извлекаем главный глагол (убираем sich, als, zu)
-    stop = {"sich", "als", "zu", "nicht"}
-    parts = [p for p in word_lower.split() if p not in stop]
-    main_verb = parts[0] if parts else word_lower
-
-    # 3. Неправильные формы
-    if main_verb in IRREGULAR_FORMS:
-        for form in IRREGULAR_FORMS[main_verb]:
+    
+    # 2. Поиск по дополнительным формам (присланным ИИ)
+    if extra_forms:
+        for form in extra_forms:
             if norm(form) in example_norm:
                 return True
 
-    # 4. Отделяемые глаголы (aussehen → sieht...aus)
-    prefix, stem = get_separable_parts(main_verb)
+    # 3. Извлекаем главный глагол/существительное (убираем артикли и частицы)
+    stop = {"der", "die", "das", "den", "dem", "des", "ein", "eine", "einen", "einem", "einer", "sich", "als", "zu", "nicht"}
+    parts = [p for p in word_lower.split() if p not in stop]
+    main_word = parts[0] if parts else word_lower
+
+    # 4. Неправильные формы глаголов (из нашего списка)
+    if main_word in IRREGULAR_FORMS:
+        for form in IRREGULAR_FORMS[main_word]:
+            if norm(form) in example_norm:
+                return True
+
+    # 5. Специальная логика для отделяемых приставок (anbieten → biete...an, abbiegen -> abgebogen)
+    prefix, stem = get_separable_parts(main_word)
     if prefix and stem:
-        for inf, forms in IRREGULAR_FORMS.items():
-            if norm(inf).startswith(stem):
-                if prefix in example_lower:
-                    for form in forms:
-                        if norm(form) in example_norm:
-                            return True
-        if stem in example_norm and prefix in example_lower:
+        # Проверяем наличие приставки и корня (независимо от гласных)
+        if prefix in example_lower and norm(stem) in example_norm:
             return True
 
-    # 5. Стемминг для правильных глаголов
-    root = get_word_root(main_verb)
-    if len(root) >= 4 and root in example_norm:
+    # 6. Стемминг для обычных слов (очень гибкий)
+    root = get_word_root(main_word)
+    if len(root) >= 2 and norm(root) in example_norm:
         return True
+
 
     return False
 
@@ -165,14 +178,14 @@ def examples_are_diverse(examples_list):
     return True
 
 
-def filter_valid_examples(examples_list, de_word):
+def filter_valid_examples(examples_list, de_word, extra_forms=None):
     valid = []
     fallback = []
     for ex in examples_list:
         if isinstance(ex, dict) and "de" in ex and "ru" in ex:
             if not example_is_german(ex["de"]):
                 continue
-            if not example_contains_word(ex["de"], de_word):
+            if not example_contains_word(ex["de"], de_word, extra_forms):
                 print(f"\n  ⚠️  Пример отклонён (нет слова '{de_word}'): {ex['de']}")
                 fallback.append(ex)
                 continue
@@ -234,7 +247,7 @@ def get_linguistic_data_groq(de_word, level):
 }}"""
     try:
         completion = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="llama-3.1-8b-instant",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
             max_tokens=2000,
@@ -301,7 +314,13 @@ def update_database():
                 plural         = data.get("plural", "")
                 verb_forms     = data.get("verb_forms", "")
 
-                valid_examples = filter_valid_examples(examples_list, de)
+                # Собираем все формы слова для умной валидации
+                extra_forms = []
+                if plural: extra_forms.append(plural)
+                if verb_forms:
+                    extra_forms.extend([f.strip() for f in verb_forms.split(',')])
+
+                valid_examples = filter_valid_examples(examples_list, de, extra_forms)
 
                 if len(valid_examples) < 3 or not examples_are_diverse(valid_examples):
                     print(f"❌ (примеров: {len(valid_examples)}/3)")
