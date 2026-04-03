@@ -236,7 +236,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, stats, remaining: words.length === batchSize });
+    // Получаем общее число проверенных слов в базе
+    const totalCheckedResult = await pool.query(`SELECT COUNT(*) FROM words WHERE ai_checked_at IS NOT NULL`);
+    const totalCheckedInDb = parseInt(totalCheckedResult.rows[0]?.count || '0');
+
+    return NextResponse.json({ success: true, stats, remaining: words.length === batchSize, totalCheckedInDb });
 
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

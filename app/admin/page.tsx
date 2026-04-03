@@ -136,12 +136,27 @@ export default function AdminDashboardPage() {
 
   const startCheck = async () => {
     if (checking) return;
-    
+
     setChecking(true);
     setIsStopping(false);
     stopRef.current = false;
     setError('');
-    
+
+    // Загружаем начальное состояние из БД
+    try {
+      const initRes = await fetch('/api/admin/check-words');
+      if (initRes.ok) {
+        const initData = await initRes.json();
+        setCheckStatus(prev => ({
+          ...prev,
+          totalCheckedInDb: initData.totalCheckedInDb || 0,
+          totalRemainingInDb: initData.totalRemainingInDb || 0,
+        }));
+      }
+    } catch (e) {
+      console.error('Failed to load initial check status:', e);
+    }
+
     let currentProcessed = 0;
     const batchSize = 5;
     
@@ -177,7 +192,7 @@ export default function AdminDashboardPage() {
         }
         
         const data = await res.json();
-        
+
         // Обновляем статистику сессии
         sessionStats.checked += data.stats.checked;
         sessionStats.errors += data.stats.errors;
@@ -196,6 +211,8 @@ export default function AdminDashboardPage() {
           ...prev!,
           running: true,
           totalChecked: sessionStats.checked,
+          totalCheckedInDb: data.totalCheckedInDb || sessionStats.checked,
+          totalRemainingInDb: prev!.totalRemainingInDb - data.stats.checked,
           errorsFound: sessionStats.errors,
           translationsAdded: sessionStats.translations,
           examplesAdded: sessionStats.examples,
