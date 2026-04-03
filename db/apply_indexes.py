@@ -7,8 +7,9 @@ import sys
 import logging
 from contextlib import contextmanager
 
-# Add parent directory to path
-api_dir = os.path.dirname(os.path.abspath(__file__))
+# Add api directory to path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+api_dir = os.path.join(os.path.dirname(current_dir), 'api')
 if api_dir not in sys.path:
     sys.path.insert(0, api_dir)
 
@@ -130,6 +131,31 @@ def apply_indexes():
             ON user_words (word_id)
         """)
         logger.info("✓ Created index on user_words.word_id")
+
+        # --- НОВЫЕ КРИТИЧЕСКИЕ ИНДЕКСЫ ---
+        
+        # 1. Ускорение выборки слов для ПОВТОРЕНИЯ (основной запрос тренажера)
+        # Позволяет мгновенно найти слова со статусом 'learning' и просроченной датой next_review
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_user_words_review_queue 
+            ON user_words (user_id, status, next_review ASC) 
+            WHERE status = 'learning'
+        """)
+        logger.info("✓ Created critical review queue index on user_words")
+
+        # 2. Ускорение поиска НОВЫХ слов (учет уровня и исключение уже существующих в user_words)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_words_level_id 
+            ON words (level, id)
+        """)
+        logger.info("✓ Created level-id composite index on words")
+
+        # 3. Ускорение детальной статистики (JOIN user_words и words)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_user_words_user_status_word
+            ON user_words (user_id, status, word_id)
+        """)
+        logger.info("✓ Created composite stats index on user_words")
         
         # Indexes for the user_favorites table
         logger.info("Creating indexes for user_favorites table...")
