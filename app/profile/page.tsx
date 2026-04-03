@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, CheckCircle, TrendingUp, Award, Layers, Star, Plus, Upload, ChevronRight, Settings } from "lucide-react";
+import { BookOpen, CheckCircle, TrendingUp, Award, Layers, Star, Plus, Upload, ChevronRight, Settings, X } from "lucide-react";
 import UploadWordsModal from "../components/UploadWordsModal";
 
 interface Stats {
@@ -93,6 +93,11 @@ export default function ProfilePage() {
         const data = await res.json();
         setLevelWords(Array.isArray(data) ? data : []);
         setSelectedLevel(level);
+        
+        // Плавный скролл к списку
+        setTimeout(() => {
+          document.getElementById('level-words-list')?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
       }
     } finally {
       setLoadingLevel(false);
@@ -196,6 +201,85 @@ export default function ProfilePage() {
             })}
           </div>
         </div>
+
+        {/* Список слов уровня */}
+        {selectedLevel && (
+          <div className="mb-16 animate-fade-in scroll-mt-24" id="level-words-list">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-6 mb-10 bg-white dark:bg-slate-900 p-8 rounded-[40px] border border-slate-100 dark:border-slate-800 shadow-sm">
+              <div className="flex items-center gap-5">
+                <div className="w-16 h-16 bg-indigo-600 rounded-3xl flex items-center justify-center text-white shadow-lg shadow-indigo-200 dark:shadow-none">
+                  <span className="text-2xl font-black">{selectedLevel}</span>
+                </div>
+                <div>
+                  <h2 className="text-3xl font-black text-slate-900 dark:text-white flex items-center gap-3">
+                    Слова на повторении
+                  </h2>
+                  <p className="text-slate-500 font-bold flex items-center gap-2">
+                    <span className="w-2 h-2 bg-indigo-500 rounded-full"></span>
+                    {levelWords.length} слов в вашем плане
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedLevel(null)}
+                className="self-start sm:self-center p-4 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-2xl transition-all active:scale-90 group"
+              >
+                <X size={24} className="text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200" />
+              </button>
+            </div>
+            
+            {loadingLevel ? (
+              <div className="flex flex-col items-center justify-center py-24 bg-white dark:bg-slate-900 rounded-[40px] border border-slate-100 dark:border-slate-800">
+                <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p className="text-slate-400 font-black uppercase tracking-widest text-xs">Загрузка слов...</p>
+              </div>
+            ) : levelWords.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {levelWords.map((word) => (
+                  <button
+                    key={word.id}
+                    onClick={() => router.push(`/dictionary/${word.id}`)}
+                    className="group p-8 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[40px] hover:border-indigo-400 dark:hover:border-indigo-600 transition-all text-left shadow-sm modern-shadow-hover relative flex flex-col min-h-[180px]"
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <p className="text-2xl font-black text-slate-900 dark:text-white group-hover:text-indigo-600 transition-colors">
+                        {word.article && <span className="text-indigo-500 mr-2 font-black">{word.article}</span>}
+                        {word.de}
+                      </p>
+                    </div>
+                    <p className="text-slate-500 dark:text-slate-400 font-bold text-lg mb-8">{word.ru}</p>
+                    
+                    <div className="mt-auto flex items-center justify-between pt-5 border-t border-slate-50 dark:border-slate-800">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                          {word.next_review ? `Повтор: ${new Date(word.next_review).toLocaleDateString()}` : "Новое"}
+                        </span>
+                      </div>
+                      <ChevronRight size={18} className="text-slate-300 group-hover:text-indigo-500 group-hover:translate-x-2 transition-all duration-300" />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-white dark:bg-slate-900 p-24 rounded-[48px] border-4 border-dashed border-slate-100 dark:border-slate-800 text-center">
+                <div className="w-24 h-24 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-8">
+                  <BookOpen className="text-slate-200" size={40} />
+                </div>
+                <h3 className="text-3xl font-black text-slate-900 dark:text-white mb-4">Список пуст</h3>
+                <p className="text-slate-500 max-w-sm mx-auto text-lg font-medium leading-relaxed">
+                  Похоже, вы еще не добавили ни одного слова этого уровня в свой учебный план.
+                </p>
+                <button 
+                  onClick={() => router.push("/trainer")}
+                  className="mt-10 px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-xl shadow-indigo-100 dark:shadow-none hover:bg-indigo-700 transition-all active:scale-95"
+                >
+                  Перейти в тренажер
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Избранное */}
         {favorites.length > 0 && (
