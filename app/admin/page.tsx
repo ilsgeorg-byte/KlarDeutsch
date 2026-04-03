@@ -85,7 +85,13 @@ export default function AdminDashboardPage() {
       const res = await fetch('/api/admin/check-words');
       if (!res.ok) throw new Error('Ошибка загрузки статуса проверки');
       const data = await res.json();
-      setCheckStatus(data);
+      setCheckStatus(prev => ({
+        ...prev,
+        running: data.running || false,
+        totalCheckedInDb: data.totalCheckedInDb || 0,
+        totalRemainingInDb: data.totalRemainingInDb || 0,
+        message: data.message || 'Ожидание запуска',
+      }));
     } catch (err: any) {
       console.error('Load check status error:', err);
     }
@@ -235,22 +241,27 @@ export default function AdminDashboardPage() {
     if (!confirm(all ? 'Сбросить ВСЕ проверенные слова?' : 'Сбросить последние 500 проверенных слов?')) {
       return;
     }
-    
+
     try {
       const res = await fetch('/api/admin/check-words', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ all }),
       });
-      
+
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || 'Ошибка сброса');
       }
-      
+
       const data = await res.json();
-      setCheckStatus(data);
-      loadCheckStatus();
+      setCheckStatus(prev => ({
+        ...prev,
+        running: data.running || false,
+        totalCheckedInDb: data.totalCheckedInDb || 0,
+        totalRemainingInDb: data.totalRemainingInDb || 0,
+        message: data.message || 'Сброс выполнен',
+      }));
     } catch (err: any) {
       setError(err.message);
     }

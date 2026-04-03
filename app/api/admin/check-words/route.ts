@@ -23,22 +23,26 @@ let globalCheckStatus = {
   greetingConstructions: 0,
 };
 
-function getPool() {
-  if (!POSTGRES_URL) return null;
-  
-  const isNeon = POSTGRES_URL.includes('neon') || POSTGRES_URL.includes('supabase');
-  let connectionString = POSTGRES_URL;
-  if (!connectionString.includes('sslmode=')) {
-    const separator = connectionString.includes('?') ? '&' : '?';
-    connectionString = `${connectionString}${separator}sslmode=verify-full`;
-  }
+// Глобальный пул (переиспользуется между запросами)
+let _pool: Pool | null = null;
 
-  return new Pool({
-    connectionString,
-    ssl: isNeon ? { rejectUnauthorized: false } : undefined,
-    max: 1, // Для одного запроса достаточно 1 соединения
-    connectionTimeoutMillis: 10000,
-  });
+function getPool() {
+  if (!_pool && POSTGRES_URL) {
+    const isNeon = POSTGRES_URL.includes('neon') || POSTGRES_URL.includes('supabase');
+    let connectionString = POSTGRES_URL;
+    if (!connectionString.includes('sslmode=')) {
+      const separator = connectionString.includes('?') ? '&' : '?';
+      connectionString = `${connectionString}${separator}sslmode=verify-full`;
+    }
+
+    _pool = new Pool({
+      connectionString,
+      ssl: isNeon ? { rejectUnauthorized: false } : undefined,
+      max: 5,
+      connectionTimeoutMillis: 10000,
+    });
+  }
+  return _pool;
 }
 
 const groqClient = GROQ_API_KEY ? new OpenAI({
@@ -232,11 +236,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    await pool.end();
     return NextResponse.json({ success: true, stats, remaining: words.length === batchSize });
 
   } catch (error: any) {
-    await pool.end();
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -248,19 +250,17 @@ export async function GET() {
   try {
     const result = await pool.query(`SELECT COUNT(*) FROM words WHERE ai_checked_at IS NOT NULL`);
     const totalCheckedInDb = parseInt(result.rows[0]?.count || '0');
-    
+
     const remainingResult = await pool.query(`SELECT COUNT(*) FROM words WHERE ai_checked_at IS NULL`);
     const totalRemainingInDb = parseInt(remainingResult.rows[0]?.count || '0');
 
-    await pool.end();
     return NextResponse.json({
-      running: false, // Теперь фронтенд управляет состоянием
+      running: false,
       totalCheckedInDb,
       totalRemainingInDb,
       message: totalRemainingInDb > 0 ? `Осталось проверить: ${totalRemainingInDb}` : 'Все слова проверены'
     });
   } catch (error) {
-    await pool.end();
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
@@ -272,15 +272,23 @@ export async function DELETE(request: NextRequest) {
   try {
     const body = await request.json();
     const { all = false } = body;
-    const query = all 
-      ? `UPDATE words SET ai_checked_at = NULL` 
+    const query = all
+      ? `UPDATE words SET ai_checked_at = NULL`
       : `UPDATE words SET ai_checked_at = NULL WHERE id IN (SELECT id FROM words WHERE ai_checked_at IS NOT NULL ORDER BY ai_checked_at DESC LIMIT 500)`;
-    
-    const result = await pool.query(query);
-    await pool.end();
-    return NextResponse.json({ success: true, resetCount: result.rowCount });
+
+    await pool.query(query);
+
+    // Возвращаем обновлённую статистику
+    const remainingResult = await pool.query(`SELECT COUNT(*) FROM words WHERE ai_checked_at IS NULL`);
+    const totalRemainingInDb = parseInt(remainingResult.rows[0]?.count || '0');
+
+    return NextResponse.json({
+      running: false,
+      totalCheckedInDb: 0,
+      totalRemainingInDb,
+      message: totalRemainingInDb > 0 ? `Осталось проверить: ${totalRemainingInDb}` : 'Все слова проверены'
+    });
   } catch (error: any) {
-    await pool.end();
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
