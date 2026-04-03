@@ -277,66 +277,95 @@ export default function UploadWordsModal({ isOpen, onClose, onSuccess }: UploadW
     });
 
     return (
-        <div style={{
-            position: "fixed", inset: 0,
-            backgroundColor: "rgba(15,23,42,0.55)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            zIndex: 1000, backdropFilter: "blur(5px)",
-        }} onClick={handleClose}>
-            <div style={{
-                backgroundColor: "#fff",
-                borderRadius: "20px",
-                width: "100%", maxWidth: "600px",
-                maxHeight: "90vh",
-                overflow: "auto",
-                position: "relative",
-                boxShadow: "0 24px 48px rgba(0,0,0,0.18)",
-            }} onClick={e => e.stopPropagation()}>
+        <div 
+            className="modal-overlay"
+            style={{
+                position: "fixed", inset: 0,
+                backgroundColor: "rgba(15,23,42,0.75)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                zIndex: 1000, backdropFilter: "blur(8px)",
+                padding: "20px",
+            }} 
+            onClick={handleClose}
+        >
+            <div 
+                className="modal-content"
+                style={{
+                    backgroundColor: "#fff",
+                    borderRadius: "32px",
+                    width: "100%", maxWidth: "600px",
+                    maxHeight: "90vh",
+                    overflow: "auto",
+                    position: "relative",
+                    boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+                    animation: "modal-appear 0.3s ease-out",
+                }} 
+                onClick={e => e.stopPropagation()}
+            >
 
                 {/* Закрыть */}
                 <button onClick={handleClose} style={{
-                    position: "absolute", top: 16, right: 16,
-                    background: "#f1f5f9", border: "none", borderRadius: "50%",
-                    width: 32, height: 32, cursor: "pointer",
+                    position: "absolute", top: 20, right: 20,
+                    background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "14px",
+                    width: 40, height: 40, cursor: "pointer",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    color: "#64748b",
+                    color: "#64748b", zIndex: 10,
+                    transition: "all 0.2s",
                 }}>
-                    <X size={16} />
+                    <X size={20} />
                 </button>
 
                 {/* Заголовок */}
-                <div style={{ padding: "28px 28px 20px" }}>
-                    <h2 style={{ fontSize: "1.4rem", fontWeight: 700, margin: "0 0 4px", color: "#1e293b" }}>
-                        Добавить свои слова
+                <div style={{ padding: "32px 32px 20px" }}>
+                    <h2 style={{ fontSize: "1.75rem", fontVariationSettings: "'wght' 800", fontWeight: 800, margin: "0 0 8px", color: "#0f172a", letterSpacing: "-0.02em" }}>
+                        Добавить слова
                     </h2>
-                    <p style={{ color: "#94a3b8", fontSize: "0.85rem", margin: "0" }}>
-                        Добавьте одно слово или загрузите список из файла
+                    <p style={{ color: "#64748b", fontSize: "0.95rem", margin: "0", fontWeight: 500 }}>
+                        Обогатите свой словарь новыми выражениями
                     </p>
                 </div>
 
                 {/* Табы */}
                 <div style={{
                     display: "flex",
-                    borderBottom: "1px solid #e2e8f0",
-                    marginBottom: "20px",
+                    background: "#f8fafc",
+                    margin: "0 32px 24px",
+                    padding: "6px",
+                    borderRadius: "18px",
+                    border: "1px solid #f1f5f9",
                 }}>
                     <button
-                        style={tabStyle(activeTab === 'single')}
+                        style={{
+                            ...tabStyle(activeTab === 'single'),
+                            borderRadius: "14px",
+                            borderBottom: "none",
+                            background: activeTab === 'single' ? "#fff" : "transparent",
+                            boxShadow: activeTab === 'single' ? "0 4px 6px -1px rgba(0,0,0,0.1)" : "none",
+                            fontWeight: 700,
+                        }}
                         onClick={() => setActiveTab('single')}
                     >
-                        <Plus size={16} style={{ marginRight: "6px", display: "inline" }} />
+                        <Plus size={18} style={{ marginRight: "8px", display: "inline" }} />
                         Одно слово
                     </button>
                     <button
-                        style={tabStyle(activeTab === 'bulk')}
+                        style={{
+                            ...tabStyle(activeTab === 'bulk'),
+                            borderRadius: "14px",
+                            borderBottom: "none",
+                            background: activeTab === 'bulk' ? "#fff" : "transparent",
+                            boxShadow: activeTab === 'bulk' ? "0 4px 6px -1px rgba(0,0,0,0.1)" : "none",
+                            fontWeight: 700,
+                        }}
                         onClick={() => setActiveTab('bulk')}
                     >
-                        <Upload size={16} style={{ marginRight: "6px", display: "inline" }} />
-                        Загрузить из файла
+                        <Upload size={18} style={{ marginRight: "8px", display: "inline" }} />
+                        Импорт
                     </button>
                 </div>
 
-                <div style={{ padding: "0 28px 28px" }}>
+                <div style={{ padding: "0 32px 32px" }}>
+                    {/* ... (остальной контент без изменений) */}
                     {/* ─── Одиночное добавление ─── */}
                     {activeTab === 'single' && (
                         <form onSubmit={handleSingleSubmit}>
@@ -676,7 +705,31 @@ export default function UploadWordsModal({ isOpen, onClose, onSuccess }: UploadW
                     )}
                 </div>
 
-                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                <style>{`
+                    @keyframes spin { to { transform: rotate(360deg); } }
+                    @keyframes modal-appear { 
+                        from { opacity: 0; transform: translateY(20px) scale(0.95); } 
+                        to { opacity: 1; transform: translateY(0) scale(1); } 
+                    }
+                    
+                    @media (max-width: 640px) {
+                        .modal-overlay {
+                            align-items: flex-start !important;
+                            padding: 10px !important;
+                            overflow-y: auto !important;
+                        }
+                        .modal-content {
+                            max-height: none !important;
+                            border-radius: 24px !important;
+                            margin-top: 20px !important;
+                            margin-bottom: 20px !important;
+                        }
+                        .modal-content > div {
+                            padding-left: 20px !important;
+                            padding-right: 20px !important;
+                        }
+                    }
+                `}</style>
             </div>
         </div>
     );
