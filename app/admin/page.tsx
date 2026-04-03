@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import AdminLayout from './AdminLayout';
 import { BookOpen, Users, FileText, TrendingUp, Loader2, AlertCircle, CheckCircle, XCircle, RefreshCw, Trash2 } from 'lucide-react';
 
@@ -29,15 +29,33 @@ interface CheckStatus {
   progress: { current: number; total: number };
 }
 
+const DEFAULT_CHECK_STATUS: CheckStatus = {
+  running: false,
+  lastRun: null,
+  totalChecked: 0,
+  totalCheckedInDb: 0,
+  totalRemainingInDb: 0,
+  errorsFound: 0,
+  translationsAdded: 0,
+  examplesAdded: 0,
+  pluralAdded: 0,
+  synonymsAdded: 0,
+  antonymsAdded: 0,
+  collocationsAdded: 0,
+  greetingConstructions: 0,
+  message: 'Ожидание запуска',
+  progress: { current: 0, total: 0 },
+};
+
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [checkStatus, setCheckStatus] = useState<CheckStatus | null>(null);
+  const [checkStatus, setCheckStatus] = useState<CheckStatus>(DEFAULT_CHECK_STATUS);
   const [checking, setChecking] = useState(false);
   const [checkLimit, setCheckLimit] = useState(500);
   const [isStopping, setIsStopping] = useState(false);
-  const stopRef = React.useRef(false);
+  const stopRef = useRef(false);
   
   // Состояние для конструкций приветствий
   const [greetings, setGreetings] = useState<any[]>([]);

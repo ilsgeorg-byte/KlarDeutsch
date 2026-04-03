@@ -135,7 +135,7 @@ def sanitize_user_input(data: Union[str, List, Dict[Any, Any]], max_depth: int =
 
 def validate_level(level: str) -> bool:
     """
-    Валидирует уровень (A1, A2, B1, B2, C1)
+    Валидирует уровень (A1, A2, B1, B2, C1, PERSONAL)
     
     Args:
         level: Уровень
@@ -143,7 +143,7 @@ def validate_level(level: str) -> bool:
     Returns:
         True если валидно, иначе False
     """
-    valid_levels = {"A1", "A2", "B1", "B2", "C1"}
+    valid_levels = {"A1", "A2", "B1", "B2", "C1", "PERSONAL"}
     return level.upper() in valid_levels
 
 

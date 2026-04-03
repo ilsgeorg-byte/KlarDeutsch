@@ -51,23 +51,38 @@ def get_training_words():
 
         # Определяем список уровней для выборки (кумулятивно)
         all_levels = ["A1", "A2", "B1", "B2", "C1"]
-        if query.level in all_levels:
-            target_levels = all_levels[:all_levels.index(query.level) + 1]
-        else:
-            target_levels = [query.level]
+        is_personal = query.level == "PERSONAL"
+        
+        if not is_personal:
+            if query.level in all_levels:
+                target_levels = all_levels[:all_levels.index(query.level) + 1]
+            else:
+                target_levels = [query.level]
 
         with get_db_cursor() as cur:
             # 1. Получаем слова, которые пора повторить
-            logger.info(f"Выполняем запрос на повторение: user_id={request.user_id}, levels={target_levels}")
-            cur.execute("""
-                SELECT w.id, w.level, w.topic, w.de, w.ru, w.article, w.example_de, w.example_ru,
-                       uw.interval, uw.ease_factor, uw.reps, uw.next_review
-                FROM words w
-                JOIN user_words uw ON w.id = uw.word_id
-                WHERE w.level IN %s AND uw.user_id = %s AND uw.next_review <= CURRENT_TIMESTAMP AND uw.status = 'learning'
-                ORDER BY uw.next_review ASC
-                LIMIT %s
-            """, (tuple(target_levels), request.user_id, query.limit))
+            if is_personal:
+                logger.info(f"Запрос ПЕРСОНАЛЬНЫХ слов на повторение для пользователя {request.user_id}")
+                cur.execute("""
+                    SELECT w.id, w.level, w.topic, w.de, w.ru, w.article, w.example_de, w.example_ru,
+                           uw.interval, uw.ease_factor, uw.reps, uw.next_review
+                    FROM words w
+                    JOIN user_words uw ON w.id = uw.word_id
+                    WHERE w.user_id = %s AND uw.user_id = %s AND uw.next_review <= CURRENT_TIMESTAMP AND uw.status = 'learning'
+                    ORDER BY uw.next_review ASC
+                    LIMIT %s
+                """, (request.user_id, request.user_id, query.limit))
+            else:
+                logger.info(f"Выполняем запрос на повторение: user_id={request.user_id}, levels={target_levels}")
+                cur.execute("""
+                    SELECT w.id, w.level, w.topic, w.de, w.ru, w.article, w.example_de, w.example_ru,
+                           uw.interval, uw.ease_factor, uw.reps, uw.next_review
+                    FROM words w
+                    JOIN user_words uw ON w.id = uw.word_id
+                    WHERE w.level IN %s AND uw.user_id = %s AND uw.next_review <= CURRENT_TIMESTAMP AND uw.status = 'learning'
+                    ORDER BY uw.next_review ASC
+                    LIMIT %s
+                """, (tuple(target_levels), request.user_id, query.limit))
 
             columns = [desc[0] for desc in cur.description]
             cards_to_review = [dict(zip(columns, row)) for row in cur.fetchall()]
@@ -77,14 +92,24 @@ def get_training_words():
             remaining = query.limit - len(cards_to_review)
             if remaining > 0:
                 logger.info(f"Добавляем {remaining} новых слов")
-                cur.execute("""
-                    SELECT w.id, w.level, w.topic, w.de, w.ru, w.article, w.example_de, w.example_ru
-                    FROM words w
-                    LEFT JOIN user_words uw ON w.id = uw.word_id AND uw.user_id = %s
-                    WHERE w.level IN %s AND uw.word_id IS NULL
-                    ORDER BY RANDOM()
-                    LIMIT %s
-                """, (request.user_id, tuple(target_levels), remaining))
+                if is_personal:
+                    cur.execute("""
+                        SELECT w.id, w.level, w.topic, w.de, w.ru, w.article, w.example_de, w.example_ru
+                        FROM words w
+                        LEFT JOIN user_words uw ON w.id = uw.word_id AND uw.user_id = %s
+                        WHERE w.user_id = %s AND uw.word_id IS NULL
+                        ORDER BY RANDOM()
+                        LIMIT %s
+                    """, (request.user_id, request.user_id, remaining))
+                else:
+                    cur.execute("""
+                        SELECT w.id, w.level, w.topic, w.de, w.ru, w.article, w.example_de, w.example_ru
+                        FROM words w
+                        LEFT JOIN user_words uw ON w.id = uw.word_id AND uw.user_id = %s
+                        WHERE w.level IN %s AND uw.word_id IS NULL
+                        ORDER BY RANDOM()
+                        LIMIT %s
+                    """, (request.user_id, tuple(target_levels), remaining))
 
                 columns = [desc[0] for desc in cur.description]
                 new_words = [dict(zip(columns, row)) for row in cur.fetchall()]

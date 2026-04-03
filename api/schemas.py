@@ -19,8 +19,8 @@ from utils.sanitization_utils import (
 
 # === Общие типы ===
 
-LevelType = Literal["A1", "A2", "B1", "B2", "C1"]
-VALID_LEVELS = {"A1", "A2", "B1", "B2", "C1"}
+LevelType = Literal["A1", "A2", "B1", "B2", "C1", "PERSONAL"]
+VALID_LEVELS = {"A1", "A2", "B1", "B2", "C1", "PERSONAL"}
 
 
 # === Auth схемы ===
@@ -86,7 +86,7 @@ class WordCreate(BaseModel):
     @classmethod
     def validate_level_field(cls, v):
         if not validate_level_func(v):
-            raise ValueError(f'Неверный уровень: {v}. Допустимые значения: A1, A2, B1, B2, C1')
+            raise ValueError(f'Неверный уровень: {v}. Допустимые значения: A1, A2, B1, B2, C1, PERSONAL')
         return v
 
 
@@ -111,7 +111,7 @@ class WordQuery(BaseModel):
     @classmethod
     def validate_level_field(cls, v):
         if not validate_level_func(v):
-            raise ValueError(f'Неверный уровень: {v}. Допустимые значения: A1, A2, B1, B2, C1')
+            raise ValueError(f'Неверный уровень: {v}. Допустимые значения: A1, A2, B1, B2, C1, PERSONAL')
         return v
 
 
@@ -139,7 +139,7 @@ class TrainingQuery(BaseModel):
     @classmethod
     def validate_level_field(cls, v):
         if not validate_level_func(v):
-            raise ValueError(f'Неверный уровень: {v}. Допустимые значения: A1, A2, B1, B2, C1')
+            raise ValueError(f'Неверный уровень: {v}. Допустимые значения: A1, A2, B1, B2, C1, PERSONAL')
         return v
 
 

@@ -308,8 +308,8 @@ export default function TrainerPage() {
     >
       <main className="flex-1 flex flex-col items-center px-4 w-full pt-8 pb-12">
         {/* Стильный переключатель уровней */}
-        <div className="flex bg-white dark:bg-gray-800 p-1.5 rounded-2xl shadow-sm border border-slate-200 dark:border-gray-700 mb-4 w-full max-w-md overflow-x-auto">
-          {["A1", "A2", "B1", "B2", "C1"].map((lvl) => (
+        <div className="flex bg-white dark:bg-gray-800 p-1.5 rounded-2xl shadow-sm border border-slate-200 dark:border-gray-700 mb-4 w-full max-w-md overflow-x-auto no-scrollbar">
+          {["A1", "A2", "B1", "B2", "C1", "PERSONAL"].map((lvl) => (
             <button
               key={lvl}
               onClick={() => {
@@ -317,13 +317,13 @@ export default function TrainerPage() {
                 setIndex(0);
                 setLevel(lvl);
               }}
-              className={`flex-1 min-w-[60px] py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ${
+              className={`flex-1 min-w-[60px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-black transition-all duration-300 whitespace-nowrap ${
                 level === lvl
                   ? "bg-blue-600 text-white shadow-md shadow-blue-500/30 transform scale-105"
                   : "bg-transparent text-slate-500 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-gray-700"
               }`}
             >
-              {lvl}
+              {lvl === "PERSONAL" ? "Мои слова" : lvl}
             </button>
           ))}
         </div>
