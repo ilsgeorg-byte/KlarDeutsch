@@ -35,6 +35,8 @@ export default function AdminDashboardPage() {
   const [checkStatus, setCheckStatus] = useState<CheckStatus | null>(null);
   const [checking, setChecking] = useState(false);
   const [checkLimit, setCheckLimit] = useState(500);
+  const [isStopping, setIsStopping] = useState(false);
+  const stopRef = React.useRef(false);
   
   // Состояние для конструкций приветствий
   const [greetings, setGreetings] = useState<any[]>([]);
@@ -44,16 +46,7 @@ export default function AdminDashboardPage() {
     loadStats();
     loadCheckStatus();
     loadGreetings();
-
-    // Обновляем статус проверки каждые 2 секунды если запущена
-    const interval = setInterval(() => {
-      if (checkStatus?.running) {
-        loadCheckStatus();
-      }
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, [checkStatus?.running]);
+  }, []);
 
   const loadStats = async () => {
     try {
@@ -117,30 +110,106 @@ export default function AdminDashboardPage() {
   };
 
   const startCheck = async () => {
+    if (checking) return;
+    
     setChecking(true);
+    setIsStopping(false);
+    stopRef.current = false;
+    setError('');
+    
+    let currentProcessed = 0;
+    const batchSize = 5;
+    
+    // Инициализируем локальную статистику сессии
+    const sessionStats = {
+      checked: 0,
+      errors: 0,
+      translations: 0,
+      examples: 0,
+      plural: 0,
+      synonyms: 0,
+      antonyms: 0,
+      collocations: 0,
+      greetings: 0
+    };
+
     try {
-      const res = await fetch('/api/admin/check-words', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ limit: checkLimit }),
-      });
-      
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || 'Ошибка запуска проверки');
+      while (currentProcessed < checkLimit) {
+        // Проверка на остановку
+        if (stopRef.current) {
+            break;
+        }
+
+        const res = await fetch('/api/admin/check-words', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ batchSize }),
+        });
+        
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || 'Ошибка в процессе проверки');
+        }
+        
+        const data = await res.json();
+        
+        // Обновляем статистику сессии
+        sessionStats.checked += data.stats.checked;
+        sessionStats.errors += data.stats.errors;
+        sessionStats.translations += data.stats.translations;
+        sessionStats.examples += data.stats.examples;
+        sessionStats.plural += data.stats.plural;
+        sessionStats.synonyms += data.stats.synonyms;
+        sessionStats.antonyms += data.stats.antonyms;
+        sessionStats.collocations += data.stats.collocations;
+        sessionStats.greetings += data.stats.greetings;
+
+        currentProcessed += data.stats.checked;
+
+        // Обновляем UI статус
+        setCheckStatus(prev => ({
+          ...prev!,
+          running: true,
+          totalChecked: sessionStats.checked,
+          errorsFound: sessionStats.errors,
+          translationsAdded: sessionStats.translations,
+          examplesAdded: sessionStats.examples,
+          pluralAdded: sessionStats.plural,
+          synonymsAdded: sessionStats.synonyms,
+          antonymsAdded: sessionStats.antonyms,
+          collocationsAdded: sessionStats.collocations,
+          greetingConstructions: sessionStats.greetings,
+          progress: { current: currentProcessed, total: checkLimit },
+          message: stopRef.current ? 'Остановка...' : `Обработка: ${currentProcessed} / ${checkLimit}`
+        }));
+
+        if (!data.remaining || data.stats.checked === 0) {
+          break; // Больше нет слов для проверки
+        }
+
+        // Небольшая пауза между батчами для стабильности API
+        await new Promise(r => setTimeout(r, 800));
       }
       
-      const data = await res.json();
-      if (data.status === 'already_running') {
-        setError('Проверка уже запущена');
-      } else {
-        setChecking(false);
-        loadCheckStatus();
-      }
+      setCheckStatus(prev => ({ 
+        ...prev!, 
+        running: false, 
+        message: stopRef.current ? 'Проверка остановлена пользователем' : 'Проверка завершена' 
+      }));
+      loadStats();
+      loadGreetings();
     } catch (err: any) {
       setError(err.message);
+    } finally {
       setChecking(false);
+      setIsStopping(false);
+      stopRef.current = false;
     }
+  };
+
+  const stopCheck = () => {
+    setIsStopping(true);
+    stopRef.current = true;
   };
 
   const resetCheck = async (all = false) => {
@@ -365,24 +434,27 @@ export default function AdminDashboardPage() {
               <option value={5000}>5000 слов</option>
             </select>
 
-            <button
-              onClick={startCheck}
-              disabled={checking || checkStatus?.running}
-              className="adminBtn adminBtnPrimary"
-              style={{ opacity: (checking || checkStatus?.running) ? 0.6 : 1 }}
-            >
-              {checking || checkStatus?.running ? (
-                <>
-                  <RefreshCw size={18} className="animate-spin" />
-                  Проверка...
-                </>
-              ) : (
-                <>
-                  <CheckCircle size={18} />
-                  Запустить проверку
-                </>
-              )}
-            </button>
+            {checking ? (
+              <button
+                onClick={stopCheck}
+                disabled={isStopping}
+                className="adminBtn adminBtnDanger"
+                style={{ opacity: isStopping ? 0.6 : 1 }}
+              >
+                <XCircle size={18} />
+                {isStopping ? 'Остановка...' : 'Остановить'}
+              </button>
+            ) : (
+              <button
+                onClick={startCheck}
+                disabled={checking || (checkStatus?.totalRemainingInDb === 0)}
+                className="adminBtn adminBtnPrimary"
+                style={{ opacity: (checking || (checkStatus?.totalRemainingInDb === 0)) ? 0.6 : 1 }}
+              >
+                <CheckCircle size={18} />
+                Запустить проверку
+              </button>
+            )}
 
             <button
               onClick={() => resetCheck(false)}
