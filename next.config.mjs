@@ -10,10 +10,10 @@ const nextConfig = {
   swcMinify: true,
   
   // Compiler оптимизации
-  compiler: {
-    // Удаляем console.log в production
-    removeConsole: process.env.NODE_ENV === 'production',
-  },
+  // compiler: {
+  //   // Удаляем console.log в production
+  //   removeConsole: process.env.NODE_ENV === 'production',
+  // },
   
   // === IMAGE OPTIMIZATION ===
   images: {
