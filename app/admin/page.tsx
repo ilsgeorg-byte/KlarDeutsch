@@ -16,6 +16,7 @@ interface CheckStatus {
   lastRun: string | null;
   totalChecked: number;
   totalCheckedInDb: number;
+  totalRemainingInDb: number;
   errorsFound: number;
   translationsAdded: number;
   examplesAdded: number;
