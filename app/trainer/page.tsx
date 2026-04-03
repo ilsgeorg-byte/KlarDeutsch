@@ -181,14 +181,6 @@ export default function TrainerPage() {
         setWords(data);
         setIndex(0);
         setShowAnswer(false);
-        // Сброс статистики при загрузке новых слов
-        setSessionStats({
-          total: 0,
-          correct: 0,
-          hard: 0,
-          known: 0,
-          startTime: Date.now(),
-        });
       }
     } catch (e) {
       setAudioStatus("Ошибка загрузки слов");

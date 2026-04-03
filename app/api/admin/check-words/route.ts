@@ -279,7 +279,7 @@ async function runWordCheck(limit: number = 500): Promise<void> {
             // Перевод (обогащаем если ИИ дал больше значений)
             if (aiResult.ru && aiResult.ru !== word.ru) {
               updates.ru = aiResult.ru;
-              batchStats.translationsAdded++;
+              checkStatus.translationsAdded++;
             }
             
             // Тема
@@ -292,31 +292,31 @@ async function runWordCheck(limit: number = 500): Promise<void> {
               updates.example_de = aiResult.examples[0].de;
               updates.example_ru = aiResult.examples[0].ru || '';
               updates.examples = JSON.stringify(aiResult.examples);
-              batchStats.examplesAdded += aiResult.examples.length;
+              checkStatus.examplesAdded += aiResult.examples.length;
             }
             
             // Множественное число
             if (aiResult.corrected_plural && aiResult.corrected_plural !== word.plural) {
               updates.plural = aiResult.corrected_plural;
-              batchStats.pluralAdded++;
+              checkStatus.pluralAdded++;
             }
             
             // Синонимы
             if (!word.synonyms && aiResult.synonyms?.length > 0) {
               updates.synonyms = aiResult.synonyms.join(', ');
-              batchStats.synonymsAdded += aiResult.synonyms.length;
+              checkStatus.synonymsAdded += aiResult.synonyms.length;
             }
             
             // Антонимы
             if (!word.antonyms && aiResult.antonyms?.length > 0) {
               updates.antonyms = aiResult.antonyms.join(', ');
-              batchStats.antonymsAdded += aiResult.antonyms.length;
+              checkStatus.antonymsAdded += aiResult.antonyms.length;
             }
             
             // Коллокации
             if (!word.collocations && aiResult.collocations?.length > 0) {
               updates.collocations = aiResult.collocations.join(', ');
-              batchStats.collocationsAdded += aiResult.collocations.length;
+              checkStatus.collocationsAdded += aiResult.collocations.length;
             }
             
             // Исправления

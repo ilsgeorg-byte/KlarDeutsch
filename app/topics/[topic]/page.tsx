@@ -12,7 +12,7 @@ import styles from "../../styles/Shared.module.css";
 export default function TopicPage() {
     const params = useParams();
     const router = useRouter();
-    const topic = typeof params.topic === 'string' ? decodeURIComponent(params.topic) : "";
+    const topic = params && typeof params.topic === 'string' ? decodeURIComponent(params.topic) : "";
     
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
     const [page, setPage] = useState(0);
