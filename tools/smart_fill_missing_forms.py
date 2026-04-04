@@ -42,8 +42,8 @@ client = OpenAI(
 )
 
 # Используем Qwen 3 32B - быстрее и стабильнее для пакетной обработки
-# Альтернативы: 'llama-3.3-70b-versatile', 'mixtral-8x7b-32768', 'gemma2-9b-it'
-MODEL_NAME = "qwen-3-32b"
+# Альтернативы: 'qwen-3-32b, llama-3.3-70b-versatile', 'mixtral-8x7b-32768', 'gemma2-9b-it'
+MODEL_NAME = "llama-3.3-70b-versatile"
 
 # === Подключение к БД ===
 def get_db_connection():

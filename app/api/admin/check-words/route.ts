@@ -132,7 +132,7 @@ const ENRICH_PROMPT = `Ты - эксперт по немецкому языку.
 
 async function enrichWord(de: string, ru: string, article: string, verb_forms: string, example: string, plural: string) {
   if (isGreetingConstruction(de)) {
-    return { valid: false, errors: ['Конструкция приветствия'], is_greeting_construction: true };
+    return { valid: true, is_greeting_construction: true, errors: [] };
   }
 
   if (!groqClient) return { valid: false, errors: ['Groq client not configured'], confidence: 0 };
@@ -273,7 +273,7 @@ export async function POST(request: NextRequest) {
         } else {
           stats.errors++;
           // НЕ устанавливаем ai_checked_at если ошибка AI, чтобы попробовать еще раз
-          console.error(`Word ${word.id} enrichment failed: `, aiResult.errors);
+          console.error(`!!! Word ${word.id} (${word.de}) enrichment failed:`, aiResult.errors);
         }
       } catch (e) {
         console.error(`Word ${word.id} processing error:`, e);
