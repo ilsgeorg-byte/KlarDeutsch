@@ -108,7 +108,7 @@ const ENRICH_PROMPT = `Ты - эксперт по немецкому языку.
 9. СИНОНИМЫ/АНТОНИМЫ/КОЛЛОКАЦИИ: Найди по 2-3 наиболее употребимых.
 
 Верни ТОЛЬКО JSON:
-{{
+{
   "word_type": "noun|verb|adjective|phrase",
   "valid": true,
   "errors": [],
@@ -119,16 +119,16 @@ const ENRICH_PROMPT = `Ты - эксперт по немецкому языку.
   "corrected_plural": "форма множественного числа или - если нет, иначе пустая строка",
   "corrected_verb_forms": "Infinitiv, Präsens, Präteritum, Partizip II для глаголов, иначе пустая строка",
   "examples": [
-    {{"de": "...", "ru": "..."}},
-    {{"de": "...", "ru": "..."}},
-    {{"de": "...", "ru": "..."}}
+    {"de": "...", "ru": "..."},
+    {"de": "...", "ru": "..."},
+    {"de": "...", "ru": "..."}
   ],
   "synonyms": ["син1", "син2"],
   "antonyms": ["ант1", "ант2"],
   "collocations": ["колл1", "колл2", "колл3"],
   "confidence": 1.0,
   "is_greeting_construction": false
-}}`;
+}`;
 
 async function enrichWord(de: string, ru: string, article: string, verb_forms: string, example: string, plural: string) {
   if (isGreetingConstruction(de)) {
@@ -272,11 +272,18 @@ export async function POST(request: NextRequest) {
           }
         } else {
           stats.errors++;
-          // НЕ устанавливаем ai_checked_at если ошибка AI, чтобы попробовать еще раз
+          // Устанавливаем ai_checked_at даже при ошибке, чтобы не зацикливаться на проблемных словах
+          await pool.query(`UPDATE words SET ai_checked_at = NOW() WHERE id = $1`, [word.id]);
           console.error(`!!! Word ${word.id} (${word.de}) enrichment failed:`, aiResult.errors);
         }
       } catch (e) {
         console.error(`Word ${word.id} processing error:`, e);
+        // Даже при фатальной ошибке в цикле пытаемся пометить слово, чтобы очередь шла дальше
+        try {
+          await pool.query(`UPDATE words SET ai_checked_at = NOW() WHERE id = $1`, [word.id]);
+        } catch (dbErr) {
+          console.error(`Failed to mark word ${word.id} even after error:`, dbErr);
+        }
       }
     }
 
