@@ -204,15 +204,16 @@ export default function AdminDashboardPage() {
         sessionStats.collocations += data.stats.collocations;
         sessionStats.greetings += data.stats.greetings;
 
-        currentProcessed += data.stats.checked;
+        currentProcessed = sessionStats.checked;
 
         // Обновляем UI статус
         setCheckStatus(prev => ({
           ...prev!,
           running: true,
+          lastRun: new Date().toISOString(), // Добавляем дату, чтобы статистика отображалась
           totalChecked: sessionStats.checked,
           totalCheckedInDb: data.totalCheckedInDb || sessionStats.checked,
-          totalRemainingInDb: prev!.totalRemainingInDb - data.stats.checked,
+          totalRemainingInDb: data.totalRemainingInDb ?? (prev!.totalRemainingInDb - data.stats.checked),
           errorsFound: sessionStats.errors,
           translationsAdded: sessionStats.translations,
           examplesAdded: sessionStats.examples,
@@ -225,8 +226,10 @@ export default function AdminDashboardPage() {
           message: stopRef.current ? 'Остановка...' : `Обработка: ${currentProcessed} / ${checkLimit}`
         }));
 
-        if (!data.remaining || data.stats.checked === 0) {
-          break; // Больше нет слов для проверки
+        // Останавливаемся только если сервер явно сказал, что слов больше нет (data.remaining === false)
+        // ИЛИ если мы действительно ничего не обработали за этот батч (stats.checked === 0)
+        if (data.remaining === false || (data.stats.checked === 0 && data.stats.errors === 0)) {
+          break; 
         }
 
         // Небольшая пауза между батчами для стабильности API

@@ -284,7 +284,26 @@ export async function POST(request: NextRequest) {
     const totalCheckedResult = await pool.query(`SELECT COUNT(*) FROM words WHERE ai_checked_at IS NOT NULL`);
     const totalCheckedInDb = parseInt(totalCheckedResult.rows[0]?.count || '0');
 
-    return NextResponse.json({ success: true, stats, remaining: words.length === batchSize, totalCheckedInDb });
+    // Получаем количество оставшихся
+    const remainingCountResult = await pool.query(`
+      SELECT COUNT(*) FROM words 
+      WHERE ai_checked_at IS NULL 
+      OR (
+          ai_checked_at < '2026-04-04' AND (
+            (de ~* '^(der|die|das) ' AND (plural IS NULL OR plural = '' OR plural = '—' OR plural = '-')) OR
+            ((article IS NULL OR article = '') AND (verb_forms IS NULL OR verb_forms = '' OR (LENGTH(verb_forms) - LENGTH(REPLACE(verb_forms, ',', ''))) < 3) AND de !~ ' ' AND length(de) > 2 AND length(ru) > 2)
+          )
+        )
+    `);
+    const totalRemainingInDb = parseInt(remainingCountResult.rows[0]?.count || '0');
+
+    return NextResponse.json({ 
+      success: true, 
+      stats, 
+      remaining: words.length === batchSize && totalRemainingInDb > 0, 
+      totalCheckedInDb,
+      totalRemainingInDb 
+    });
 
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
