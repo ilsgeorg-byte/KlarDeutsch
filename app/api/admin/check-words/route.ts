@@ -6,6 +6,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
 import OpenAI from 'openai';
 
+export const dynamic = 'force-dynamic';
+
 const POSTGRES_URL = process.env.POSTGRES_URL || '';
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 
@@ -221,7 +223,7 @@ export async function POST(request: NextRequest) {
 
           if (aiResult.is_greeting_construction) {
             stats.greetings++;
-            await pool.query(\`UPDATE words SET ai_checked_at = NOW() WHERE id = $1\`, [word.id]);
+            await pool.query(`UPDATE words SET ai_checked_at = NOW() WHERE id = $1`, [word.id]);
             continue;
           }
 
@@ -262,24 +264,24 @@ export async function POST(request: NextRequest) {
           }
 
           if (Object.keys(updates).length > 0) {
-            const fields = Object.keys(updates).map((f, i) => \`\${f} = $\${i + 1}\`).join(', ');
+            const fields = Object.keys(updates).map((f, i) => `${f} = $${i + 1}`).join(', ');
             const values = Object.values(updates);
-            await pool.query(\`UPDATE words SET \${fields}, ai_checked_at = NOW() WHERE id = $\${values.length + 1}\`, [...values, word.id]);
+            await pool.query(`UPDATE words SET ${fields}, ai_checked_at = NOW() WHERE id = $${values.length + 1}`, [...values, word.id]);
           } else {
-            await pool.query(\`UPDATE words SET ai_checked_at = NOW() WHERE id = $1\`, [word.id]);
+            await pool.query(`UPDATE words SET ai_checked_at = NOW() WHERE id = $1`, [word.id]);
           }
         } else {
           stats.errors++;
           // НЕ устанавливаем ai_checked_at если ошибка AI, чтобы попробовать еще раз
-          console.error(\`Word \${word.id} enrichment failed: \`, aiResult.errors);
+          console.error(`Word ${word.id} enrichment failed: `, aiResult.errors);
         }
       } catch (e) {
-        console.error(\`Word \${word.id} processing error:\`, e);
+        console.error(`Word ${word.id} processing error:`, e);
       }
     }
 
     // Получаем общее число проверенных слов в базе (настоящих)
-    const totalCheckedResult = await pool.query(\`SELECT COUNT(*) FROM words WHERE ai_checked_at IS NOT NULL\`);
+    const totalCheckedResult = await pool.query(`SELECT COUNT(*) FROM words WHERE ai_checked_at IS NOT NULL`);
     const totalCheckedInDb = parseInt(totalCheckedResult.rows[0]?.count || '0');
 
     return NextResponse.json({ success: true, stats, remaining: words.length === batchSize, totalCheckedInDb });
@@ -294,7 +296,7 @@ export async function GET() {
   if (!pool) return NextResponse.json({ error: 'DB not connected' }, { status: 500 });
 
   try {
-    const result = await pool.query(\`SELECT COUNT(*) FROM words WHERE ai_checked_at IS NOT NULL\`);
+    const result = await pool.query(`SELECT COUNT(*) FROM words WHERE ai_checked_at IS NOT NULL`);
     const totalCheckedInDb = parseInt(result.rows[0]?.count || '0');
 
     const remainingResult = await pool.query(`
@@ -314,7 +316,7 @@ export async function GET() {
       running: false,
       totalCheckedInDb,
       totalRemainingInDb,
-      message: totalRemainingInDb > 0 ? \`Осталось проверить/исправить: \${totalRemainingInDb}\` : 'Все слова проверены'
+      message: totalRemainingInDb > 0 ? `Осталось проверить/исправить: ${totalRemainingInDb}` : 'Все слова проверены'
     });
   } catch (error) {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

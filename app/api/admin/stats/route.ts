@@ -5,6 +5,8 @@
 import { NextResponse } from 'next/server';
 import { Pool } from 'pg';
 
+export const dynamic = 'force-dynamic';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
 const POSTGRES_URL = process.env.POSTGRES_URL || '';
 

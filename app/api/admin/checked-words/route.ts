@@ -6,6 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
 
+export const dynamic = 'force-dynamic';
+
 const POSTGRES_URL = process.env.POSTGRES_URL || '';
 
 function getPool() {
