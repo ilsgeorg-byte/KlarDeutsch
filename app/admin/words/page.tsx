@@ -569,7 +569,7 @@ export default function AdminWordsPage() {
                   value={formData.plural}
                   onChange={(e) => setFormData({ ...formData, plural: e.target.value })}
                   className="adminFormInput"
-                  placeholder="напр. die Häuser"
+                  placeholder="напр. die Häuser или — если нет мн.ч."
                 />
               </div>
 

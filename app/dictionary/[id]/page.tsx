@@ -210,7 +210,11 @@ export default function WordDetailPage() {
               <div className="flex gap-3 mb-6 flex-wrap">
                 {word.plural && (
                   <span className="bg-slate-100 dark:bg-gray-700 text-slate-600 dark:text-gray-300 px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 dark:border-gray-600">
-                    Pl: <span className="text-slate-800 dark:text-white font-bold">{word.plural}</span>
+                    {word.plural === '—' ? (
+                      <span className="text-slate-400 dark:text-gray-500">Pl: <span className="font-medium">нет мн.ч.</span></span>
+                    ) : (
+                      <>Pl: <span className="text-slate-800 dark:text-white font-bold">{word.plural}</span></>
+                    )}
                   </span>
                 )}
                 {word.verb_forms && (

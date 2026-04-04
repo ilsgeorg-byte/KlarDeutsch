@@ -97,7 +97,11 @@ export default function WordCard({ word, onPlayAudio, onToggleFavorite }: WordCa
                     <div className="flex flex-wrap gap-2 mb-6">
                         {word.plural && (
                             <span className="text-xs px-2.5 py-1 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-500">
-                                Pl: <span className="font-bold text-slate-700 dark:text-slate-300">{word.plural}</span>
+                                {word.plural === '—' ? (
+                                    <span className="text-slate-400 dark:text-slate-500">Pl: <span className="font-medium">нет мн.ч.</span></span>
+                                ) : (
+                                    <>Pl: <span className="font-bold text-slate-700 dark:text-slate-300">{word.plural}</span></>
+                                )}
                             </span>
                         )}
                         {word.verb_forms && (
