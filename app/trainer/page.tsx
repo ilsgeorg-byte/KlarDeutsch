@@ -317,13 +317,13 @@ export default function TrainerPage() {
                 setIndex(0);
                 setLevel(lvl);
               }}
-              className={`flex-1 min-w-[60px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-black transition-all duration-300 whitespace-nowrap ${
+              className={`flex-1 min-w-[60px] py-2.5 px-2 rounded-xl text-[10px] font-black transition-all duration-300 whitespace-normal leading-tight ${
                 level === lvl
                   ? "bg-gradient-to-br from-blue-700 to-purple-700 text-white shadow-lg shadow-blue-500/40 transform scale-105"
                   : "bg-transparent text-slate-500 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-gray-700"
               }`}
             >
-              {lvl === "PERSONAL" ? "Мои слова" : lvl}
+              {lvl === "PERSONAL" ? "Мои\nслова" : lvl}
             </button>
           ))}
         </div>
