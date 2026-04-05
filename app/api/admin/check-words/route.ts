@@ -132,7 +132,7 @@ async function enrichWord(de: string, ru: string, article: string, verb_forms: s
         .replace('{plural}', plural || 'пусто');
 
       const response = await groqClient.chat.completions.create({
-        model: 'llama-3.1-8b-instant', // Используем более быструю и стабильную модель
+        model: 'qwen-3-32b', // Используем Qwen 3 32B - стабильная альтернатива
         messages: [
           { role: 'system', content: 'Ты - лингвистический эксперт по немецкому языку. Возвращай ТОЛЬКО валидный JSON без комментариев.' },
           { role: 'user', content: prompt }
@@ -167,18 +167,33 @@ async function enrichWord(de: string, ru: string, article: string, verb_forms: s
       return { ...result, valid: true }; // Явно устанавливаем valid: true если распарсили
     } catch (error) {
       lastError = error instanceof Error ? error : new Error('Unknown error');
-      console.error(`AI enrich error (attempt ${attempt}/${retries}) for "${de}":`, lastError.message);
       
-      // Если это rate limit или таймаут - ждём и повторяем
+      // Проверяем rate limit
       const isRateLimit = lastError.message.includes('429') || 
                           lastError.message.includes('rate_limit') ||
                           lastError.message.includes('quota');
+      
+      if (isRateLimit) {
+        // При rate limit сразу возвращаем ошибку для остановки
+        console.error(`⛔ RATE LIMIT для "${de}": ${lastError.message}`);
+        return { 
+          valid: false, 
+          errors: [lastError.message], 
+          confidence: 0,
+          isRateLimit: true // Сигнал для остановки
+        };
+      }
+      
+      // Для других ошибок (не rate limit) логируем
+      console.error(`AI enrich error (attempt ${attempt}/${retries}) for "${de}":`, lastError.message);
+      
       const isTimeout = lastError.message.includes('timeout') || 
                         lastError.message.includes('ETIMEDOUT');
       
-      if ((isRateLimit || isTimeout) && attempt < retries) {
+      // Повторяем только для таймаутов/сетевых ошибок (не для rate limit)
+      if (isTimeout && attempt < retries) {
         const delay = RETRY_DELAY_MS * Math.pow(2, attempt - 1); // Экспоненциальная задержка: 2s, 4s, 8s
-        console.log(`⏳ Rate limit/timeout, waiting ${delay/1000}s before retry...`);
+        console.log(`⏳ Timeout, waiting ${delay/1000}s before retry...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
@@ -311,7 +326,23 @@ export async function POST(request: NextRequest) {
           if ((aiResult as any).retriesExhausted) {
             stats.retries++;
           }
-          // Устанавливаем ai_checked_at даже при ошибке, чтобы не зацикливаться на проблемных словах
+          
+          // Проверяем rate limit - останавливаем весь цикл
+          if ((aiResult as any).isRateLimit) {
+            console.error(`⛔ RATE LIMIT DETECTED - stopping batch processing`);
+            // НЕ устанавливаем ai_checked_at для этого слова, чтобы оно попало в следующую партию
+            return NextResponse.json({ 
+              success: true, 
+              stats, 
+              remaining: true, // Всегда true, чтобы фронтенд знал, что есть ещё слова
+              totalCheckedInDb: 0,
+              totalRemainingInDb: 0,
+              hitRateLimit: true, // Сигнал для фронтенда
+              rateLimitMessage: aiResult.errors[0] || 'Rate limit reached'
+            });
+          }
+          
+          // Устанавливаем ai_checked_at даже при ошибке (кроме rate limit)
           await pool.query(`UPDATE words SET ai_checked_at = NOW() WHERE id = $1`, [word.id]);
           console.error(`!!! Word ${word.id} (${word.de}) enrichment failed:`, aiResult.errors);
         }

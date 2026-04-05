@@ -231,10 +231,16 @@ export default function AdminDashboardPage() {
           message: stopRef.current ? 'Остановка...' : `Обработка: ${currentProcessed} / ${checkLimit}`
         }));
 
+        // Проверяем rate limit - останавливаем и показываем сообщение
+        if (data.hitRateLimit) {
+          setError(`⛔ Лимит API Groq исчерпан. Подождите или смените модель в app/api/admin/check-words/route.ts. ${data.rateLimitMessage || ''}`);
+          break;
+        }
+
         // Останавливаемся только если сервер явно сказал, что слов больше нет (data.remaining === false)
         // ИЛИ если мы действительно ничего не обработали за этот батч (stats.checked === 0)
         if (data.remaining === false || (data.stats.checked === 0 && data.stats.errors === 0)) {
-          break; 
+          break;
         }
 
         // Небольшая пауза между батчами для стабильности API
