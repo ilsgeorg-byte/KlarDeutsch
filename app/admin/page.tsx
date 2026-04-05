@@ -18,6 +18,7 @@ interface CheckStatus {
   totalCheckedInDb: number;
   totalRemainingInDb: number;
   errorsFound: number;
+  retriesCount: number; // Добавляем счётчик повторных попыток
   translationsAdded: number;
   examplesAdded: number;
   pluralAdded: number;
@@ -36,6 +37,7 @@ const DEFAULT_CHECK_STATUS: CheckStatus = {
   totalCheckedInDb: 0,
   totalRemainingInDb: 0,
   errorsFound: 0,
+  retriesCount: 0,
   translationsAdded: 0,
   examplesAdded: 0,
   pluralAdded: 0,
@@ -158,12 +160,13 @@ export default function AdminDashboardPage() {
     }
 
     let currentProcessed = 0;
-    const batchSize = 5;
+    const batchSize = 10; // Увеличено с 5 до 10 для более быстрой обработки
     
     // Инициализируем локальную статистику сессии
     const sessionStats = {
       checked: 0,
       errors: 0,
+      retries: 0,
       translations: 0,
       examples: 0,
       plural: 0,
@@ -185,17 +188,18 @@ export default function AdminDashboardPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ batchSize }),
         });
-        
+
         if (!res.ok) {
           const errorData = await res.json();
           throw new Error(errorData.error || 'Ошибка в процессе проверки');
         }
-        
+
         const data = await res.json();
 
         // Обновляем статистику сессии
         sessionStats.checked += data.stats.checked;
         sessionStats.errors += data.stats.errors;
+        sessionStats.retries += data.stats.retries || 0;
         sessionStats.translations += data.stats.translations;
         sessionStats.examples += data.stats.examples;
         sessionStats.plural += data.stats.plural;
@@ -215,6 +219,7 @@ export default function AdminDashboardPage() {
           totalCheckedInDb: data.totalCheckedInDb || sessionStats.checked,
           totalRemainingInDb: data.totalRemainingInDb ?? (prev!.totalRemainingInDb - data.stats.checked),
           errorsFound: sessionStats.errors,
+          retriesCount: sessionStats.retries,
           translationsAdded: sessionStats.translations,
           examplesAdded: sessionStats.examples,
           pluralAdded: sessionStats.plural,
@@ -601,6 +606,12 @@ export default function AdminDashboardPage() {
                     <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Ошибки</div>
                     <div style={{ fontSize: '1.125rem', fontWeight: 700, color: checkStatus.errorsFound > 0 ? '#dc2626' : '#22c55e' }}>
                       {checkStatus.errorsFound}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Повторные попытки</div>
+                    <div style={{ fontSize: '1.125rem', fontWeight: 700, color: checkStatus.retriesCount > 0 ? '#f59e0b' : '#22c55e' }}>
+                      {checkStatus.retriesCount}
                     </div>
                   </div>
                   <div>

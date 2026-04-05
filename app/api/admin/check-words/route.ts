@@ -50,8 +50,11 @@ function getPool() {
 const groqClient = GROQ_API_KEY ? new OpenAI({
   apiKey: GROQ_API_KEY,
   baseURL: 'https://api.groq.com/openai/v1',
-  timeout: 45000, // Увеличиваем таймаут для LLM
+  timeout: 60000, // Увеличиваем таймаут для LLM (60 секунд)
 }) : null;
+
+const MAX_RETRIES = 3; // Максимум повторных попыток при ошибках API
+const RETRY_DELAY_MS = 2000; // Задержка между попытками (2 секунды)
 
 const GREETING_PATTERNS = [
   /^guten\s+tag$/i, /^guten\s+abend$/i, /^guten\s+morgen$/i, /^gute\s+nacht$/i,
@@ -130,47 +133,76 @@ const ENRICH_PROMPT = `Ты - эксперт по немецкому языку.
   "is_greeting_construction": false
 }`;
 
-async function enrichWord(de: string, ru: string, article: string, verb_forms: string, example: string, plural: string) {
+async function enrichWord(de: string, ru: string, article: string, verb_forms: string, example: string, plural: string, retries = MAX_RETRIES) {
   if (isGreetingConstruction(de)) {
     return { valid: true, is_greeting_construction: true, errors: [] };
   }
 
   if (!groqClient) return { valid: false, errors: ['Groq client not configured'], confidence: 0 };
 
-  try {
-    const prompt = ENRICH_PROMPT
-      .replace('{de}', de)
-      .replace('{ru}', ru)
-      .replace('{article}', article || 'пусто')
-      .replace('{verb_forms}', verb_forms || 'пусто')
-      .replace('{example}', example || 'пусто')
-      .replace('{plural}', plural || 'пусто');
+  let lastError: Error | null = null;
+  
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const prompt = ENRICH_PROMPT
+        .replace('{de}', de)
+        .replace('{ru}', ru)
+        .replace('{article}', article || 'пусто')
+        .replace('{verb_forms}', verb_forms || 'пусто')
+        .replace('{example}', example || 'пусто')
+        .replace('{plural}', plural || 'пусто');
 
-    const response = await groqClient.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages: [
-        { role: 'system', content: 'Ты - лингвистический эксперт. Возвращай только валидный JSON.' },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.1, // Снижаем температуру для большей стабильности
-      max_tokens: 1500,
-      response_format: { type: "json_object" }
-    });
+      const response = await groqClient.chat.completions.create({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: 'Ты - лингвистический эксперт. Возвращай только валидный JSON.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.1, // Снижаем температуру для большей стабильности
+        max_tokens: 1500,
+        response_format: { type: "json_object" }
+      });
 
-    const content = response.choices[0]?.message?.content?.trim() || '{}';
-    const result = JSON.parse(content);
-    
-    // Минимальная валидация
-    if (!result.word_type) {
-        return { valid: false, errors: ['Missing word_type in AI response'] };
+      const content = response.choices[0]?.message?.content?.trim() || '{}';
+      const result = JSON.parse(content);
+
+      // Минимальная валидация
+      if (!result.word_type) {
+          return { valid: false, errors: ['Missing word_type in AI response'] };
+      }
+
+      if (!result.examples) result.examples = [];
+      return { ...result, valid: true }; // Явно устанавливаем valid: true если распарсили
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Unknown error');
+      console.error(`AI enrich error (attempt ${attempt}/${retries}) for "${de}":`, lastError.message);
+      
+      // Если это rate limit или таймаут - ждём и повторяем
+      const isRateLimit = lastError.message.includes('429') || 
+                          lastError.message.includes('rate_limit') ||
+                          lastError.message.includes('quota');
+      const isTimeout = lastError.message.includes('timeout') || 
+                        lastError.message.includes('ETIMEDOUT');
+      
+      if ((isRateLimit || isTimeout) && attempt < retries) {
+        const delay = RETRY_DELAY_MS * Math.pow(2, attempt - 1); // Экспоненциальная задержка: 2s, 4s, 8s
+        console.log(`⏳ Rate limit/timeout, waiting ${delay/1000}s before retry...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      
+      // Для других ошибок или последней попытки - выходим
+      break;
     }
-
-    if (!result.examples) result.examples = [];
-    return { ...result, valid: true }; // Явно устанавливаем valid: true если распарсили
-  } catch (error) {
-    console.error('AI enrich error:', error);
-    return { valid: false, errors: [error instanceof Error ? error.message : 'Unknown error'], confidence: 0 };
   }
+
+  // Все попытки исчерпаны
+  return { 
+    valid: false, 
+    errors: [lastError?.message || 'Unknown error after retries'], 
+    confidence: 0,
+    retriesExhausted: true
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -211,6 +243,7 @@ export async function POST(request: NextRequest) {
     const stats = {
       checked: 0,
       errors: 0,
+      retries: 0, // Добавляем счётчик повторных попыток
       translations: 0,
       examples: 0,
       plural: 0,
@@ -226,7 +259,7 @@ export async function POST(request: NextRequest) {
           word.de, word.ru, word.article, word.verb_forms,
           word.example_de || '', word.plural || ''
         );
-        
+
         if (aiResult.valid) {
           stats.checked++;
           const updates: any = {};
@@ -282,6 +315,10 @@ export async function POST(request: NextRequest) {
           }
         } else {
           stats.errors++;
+          // Считаем повторные попытки
+          if ((aiResult as any).retriesExhausted) {
+            stats.retries++;
+          }
           // Устанавливаем ai_checked_at даже при ошибке, чтобы не зацикливаться на проблемных словах
           await pool.query(`UPDATE words SET ai_checked_at = NOW() WHERE id = $1`, [word.id]);
           console.error(`!!! Word ${word.id} (${word.de}) enrichment failed:`, aiResult.errors);
