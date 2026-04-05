@@ -132,7 +132,7 @@ async function enrichWord(de: string, ru: string, article: string, verb_forms: s
         .replace('{plural}', plural || 'пусто');
 
       const response = await groqClient.chat.completions.create({
-        model: 'qwen-3-32b', // Используем qwen-3-32b — проверенная рабочая модель
+        model: 'llama-3.1-8b-instant', // Используем llama-3.1-8b-instant — проверенная рабочая модель
         messages: [
           { role: 'system', content: 'Ты - лингвистический эксперт по немецкому языку. Возвращай ТОЛЬКО валидный JSON без комментариев.' },
           { role: 'user', content: prompt }
