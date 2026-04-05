@@ -331,12 +331,31 @@ export async function POST(request: NextRequest) {
           if ((aiResult as any).isRateLimit) {
             console.error(`⛔ RATE LIMIT DETECTED - stopping batch processing`);
             // НЕ устанавливаем ai_checked_at для этого слова, чтобы оно попало в следующую партию
-            return NextResponse.json({ 
-              success: true, 
-              stats, 
+            
+            // Получаем реальную статистику из БД перед возвратом
+            const totalCheckedResult = await pool.query(`SELECT COUNT(*) FROM words WHERE ai_checked_at IS NOT NULL`);
+            const realTotalCheckedInDb = parseInt(totalCheckedResult.rows[0]?.count || '0');
+            
+            const remainingResult = await pool.query(`
+              SELECT COUNT(*) FROM words 
+              WHERE ai_checked_at IS NULL 
+              OR plural IS NULL OR plural = ''
+              OR article IS NULL OR article = ''
+              OR verb_forms IS NULL OR verb_forms = ''
+              OR example_de IS NULL OR example_de = ''
+              OR synonyms IS NULL OR synonyms = ''
+              OR antonyms IS NULL OR antonyms = ''
+              OR collocations IS NULL OR collocations = ''
+              OR topic IS NULL OR topic = '' OR topic = 'Общее'
+            `);
+            const realTotalRemainingInDb = parseInt(remainingResult.rows[0]?.count || '0');
+            
+            return NextResponse.json({
+              success: true,
+              stats,
               remaining: true, // Всегда true, чтобы фронтенд знал, что есть ещё слова
-              totalCheckedInDb: 0,
-              totalRemainingInDb: 0,
+              totalCheckedInDb: realTotalCheckedInDb,
+              totalRemainingInDb: realTotalRemainingInDb,
               hitRateLimit: true, // Сигнал для фронтенда
               rateLimitMessage: aiResult.errors[0] || 'Rate limit reached'
             });
