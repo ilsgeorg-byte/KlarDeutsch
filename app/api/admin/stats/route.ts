@@ -15,9 +15,16 @@ let pool: Pool | null = null;
 
 function getPool() {
   if (!pool && POSTGRES_URL) {
+    const isNeon = POSTGRES_URL.includes('neon') || POSTGRES_URL.includes('supabase');
+    let connectionString = POSTGRES_URL;
+    if (!connectionString.includes('sslmode=')) {
+      const separator = connectionString.includes('?') ? '&' : '?';
+      connectionString = `${connectionString}${separator}sslmode=verify-full`;
+    }
+
     pool = new Pool({
-      connectionString: POSTGRES_URL,
-      ssl: POSTGRES_URL.includes('neon') ? { rejectUnauthorized: false } : undefined,
+      connectionString,
+      ssl: isNeon ? { rejectUnauthorized: false } : undefined,
     });
   }
   return pool;
