@@ -33,7 +33,8 @@ app = Flask(__name__)
 # Инициализируем Limiter для ограничения частоты запросов
 limiter = Limiter(
     key_func=get_remote_address,  # Используем IP-адрес клиента как ключ
-    default_limits=["100 per hour"]  # Ограничение по умолчанию: 100 запросов в час
+    default_limits=["100 per hour"],  # Ограничение по умолчанию: 100 запросов в час
+    storage_uri="memory://"  # Явно указываем in-memory хранилище (без предупреждения)
 )
 limiter.init_app(app)
 
