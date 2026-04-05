@@ -181,19 +181,29 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { batchSize = 5 } = body; 
 
-    // Выбираем слова: либо еще не проверенные, либо проверенные до сегодня с пропущенными формами
+    // Выбираем слова для обогащения:
+    // 1. Никогда не проверялись (ai_checked_at IS NULL)
+    // 2. ИЛИ имеют пропущенные поля (независимо от ai_checked_at)
     const result = await pool.query(`
       SELECT id, de, ru, article, verb_forms, level, topic, example_de, example_ru, plural, synonyms, antonyms, collocations, examples
       FROM words
-      WHERE 
-        ai_checked_at IS NULL 
-        OR (
-          ai_checked_at < '2026-04-04' AND (
-            (de ~* '^(der|die|das) ' AND (plural IS NULL OR plural = '' OR plural = '—' OR plural = '-')) OR
-            ((article IS NULL OR article = '') AND (verb_forms IS NULL OR verb_forms = '' OR (LENGTH(verb_forms) - LENGTH(REPLACE(verb_forms, ',', ''))) < 3) AND de !~ ' ' AND length(de) > 2 AND length(ru) > 2)
-          )
-        )
-      ORDER BY ai_checked_at NULLS FIRST, id
+      WHERE
+        ai_checked_at IS NULL
+        OR plural IS NULL OR plural = ''
+        OR article IS NULL OR article = ''
+        OR verb_forms IS NULL OR verb_forms = ''
+        OR example_de IS NULL OR example_de = ''
+        OR synonyms IS NULL OR synonyms = ''
+        OR antonyms IS NULL OR antonyms = ''
+        OR collocations IS NULL OR collocations = ''
+        OR topic IS NULL OR topic = '' OR topic = 'Общее'
+      ORDER BY 
+        CASE 
+          WHEN ai_checked_at IS NULL THEN 0
+          ELSE 1
+        END,
+        ai_checked_at ASC NULLS FIRST, 
+        id
       LIMIT $1
     `, [batchSize]);
 
@@ -295,12 +305,14 @@ export async function POST(request: NextRequest) {
     const remainingCountResult = await pool.query(`
       SELECT COUNT(*) FROM words 
       WHERE ai_checked_at IS NULL 
-      OR (
-          ai_checked_at < '2026-04-04' AND (
-            (de ~* '^(der|die|das) ' AND (plural IS NULL OR plural = '' OR plural = '—' OR plural = '-')) OR
-            ((article IS NULL OR article = '') AND (verb_forms IS NULL OR verb_forms = '' OR (LENGTH(verb_forms) - LENGTH(REPLACE(verb_forms, ',', ''))) < 3) AND de !~ ' ' AND length(de) > 2 AND length(ru) > 2)
-          )
-        )
+      OR plural IS NULL OR plural = ''
+      OR article IS NULL OR article = ''
+      OR verb_forms IS NULL OR verb_forms = ''
+      OR example_de IS NULL OR example_de = ''
+      OR synonyms IS NULL OR synonyms = ''
+      OR antonyms IS NULL OR antonyms = ''
+      OR collocations IS NULL OR collocations = ''
+      OR topic IS NULL OR topic = '' OR topic = 'Общее'
     `);
     const totalRemainingInDb = parseInt(remainingCountResult.rows[0]?.count || '0');
 
@@ -328,12 +340,14 @@ export async function GET() {
     const remainingResult = await pool.query(`
       SELECT COUNT(*) FROM words 
       WHERE ai_checked_at IS NULL 
-      OR (
-          ai_checked_at < '2026-04-04' AND (
-            (de ~* '^(der|die|das) ' AND (plural IS NULL OR plural = '' OR plural = '—' OR plural = '-')) OR
-            ((article IS NULL OR article = '') AND (verb_forms IS NULL OR verb_forms = '' OR (LENGTH(verb_forms) - LENGTH(REPLACE(verb_forms, ',', ''))) < 3) AND de !~ ' ' AND length(de) > 2 AND length(ru) > 2)
-          )
-        )
+      OR plural IS NULL OR plural = ''
+      OR article IS NULL OR article = ''
+      OR verb_forms IS NULL OR verb_forms = ''
+      OR example_de IS NULL OR example_de = ''
+      OR synonyms IS NULL OR synonyms = ''
+      OR antonyms IS NULL OR antonyms = ''
+      OR collocations IS NULL OR collocations = ''
+      OR topic IS NULL OR topic = '' OR topic = 'Общее'
     `);
 
     const totalRemainingInDb = parseInt(remainingResult.rows[0]?.count || '0');
