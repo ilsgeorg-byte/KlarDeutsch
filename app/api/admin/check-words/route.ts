@@ -83,53 +83,32 @@ function hasMixedAlphabet(text: string): boolean {
 
 const ENRICH_PROMPT = `Ты - эксперт по немецкому языку. Обогати слово данными для учебного приложения.
 
-Слово: {de}
-Текущий перевод: {ru}
+Слово (немецкий): {de}
+Перевод (русский): {ru}
 Артикль: {article}
 Формы глагола: {verb_forms}
-Пример: {example}
 Множественное число: {plural}
 
 ЗАДАЧА:
-1. Определи тип слова (noun/verb/adjective/phrase)
-2. Проверь и исправь ошибки.
-3. ПЕРЕВОД (ru): Дай точный перевод.
-4. ТЕМА (topic): Определи тему.
-5. СУЩЕСТВИТЕЛЬНЫЕ (word_type = "noun"):
-   - corrected_article: ОБЯЗАТЕЛЬНО укажи артикль (der/die/das), даже если он уже есть в поле article
-   - corrected_plural: ОБЯЗАТЕЛЬНО укажи форму множественного числа. Если слово не имеет множественного числа, верни "-" (дефис).
-   - Примеры: die Unterschrift -> die Unterschriften, das Geld -> - (нет множественного числа)
-   - corrected_verb_forms: ОБЯЗАТЕЛЬНО пустая строка ""
-6. ГЛАГОЛЫ (word_type = "verb"):
-   - corrected_verb_forms: ОБЯЗАТЕЛЬНО укажи 4 формы через запятую: "Infinitiv, Präsens(3sg), Präteritum(3sg), Partizip II"
-   - Примеры: gehen -> "gehen, geht, ging, ist gegangen", essen -> "essen, isst, aß, hat gegessen"
-   - corrected_article и corrected_plural: ОБЯЗАТЕЛЬНО пустые строки ""
-7. ПРИЛАГАТЕЛЬНЫЕ (word_type = "adjective"):
-   - corrected_article, corrected_plural, corrected_verb_forms: ОБЯЗАТЕЛЬНО пустые строки ""
-   - Примеры: groß (большой), neu (новый), schnell (быстрый)
-8. ПРИМЕРЫ (examples): Создай МИНИМУМ 3 предложения с переводом.
-9. СИНОНИМЫ/АНТОНИМЫ/КОЛЛОКАЦИИ: Найди по 2-3 наиболее употребимых.
+1. Определи тип слова: noun (существительное), verb (глагол), adjective (прилагательное), phrase (фраза)
+2. Для существительных: укажи артикль (der/die/das) и форму множественного числа (или "-" если нет мн.ч.)
+3. Для глаголов: укажи 4 формы через запятую: "Infinitiv, Präsens, Präteritum, Partizip II"
+4. Для прилагательных: оставь article, plural, verb_forms пустыми ("")
+5. Добавь 2-3 примера предложений с переводом
+6. Добавь 2-3 синонима, антонима и коллокации (если есть)
 
-Верни ТОЛЬКО JSON:
+Верни ТОЛЬКО JSON (без комментариев и markdown):
 {
-  "word_type": "noun|verb|adjective|phrase",
-  "valid": true,
-  "errors": [],
-  "corrected_de": "",
+  "word_type": "noun",
   "ru": "перевод",
   "topic": "Тема",
-  "corrected_article": "der/die/das для существительных, иначе пустая строка",
-  "corrected_plural": "форма множественного числа или - если нет, иначе пустая строка",
-  "corrected_verb_forms": "Infinitiv, Präsens, Präteritum, Partizip II для глаголов, иначе пустая строка",
-  "examples": [
-    {"de": "...", "ru": "..."},
-    {"de": "...", "ru": "..."},
-    {"de": "...", "ru": "..."}
-  ],
-  "synonyms": ["син1", "син2"],
-  "antonyms": ["ант1", "ант2"],
-  "collocations": ["колл1", "колл2", "колл3"],
-  "confidence": 1.0,
+  "corrected_article": "der",
+  "corrected_plural": "die Formen",
+  "corrected_verb_forms": "",
+  "examples": [{"de": "Beispielsatz", "ru": "перевод"}],
+  "synonyms": ["син1"],
+  "antonyms": ["ант1"],
+  "collocations": ["колл1"],
   "is_greeting_construction": false
 }`;
 
@@ -153,9 +132,9 @@ async function enrichWord(de: string, ru: string, article: string, verb_forms: s
         .replace('{plural}', plural || 'пусто');
 
       const response = await groqClient.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
+        model: 'llama-3.1-8b-instant', // Используем более быструю и стабильную модель
         messages: [
-          { role: 'system', content: 'Ты - лингвистический эксперт. Возвращай только валидный JSON.' },
+          { role: 'system', content: 'Ты - лингвистический эксперт по немецкому языку. Возвращай ТОЛЬКО валидный JSON без комментариев.' },
           { role: 'user', content: prompt }
         ],
         temperature: 0.1, // Снижаем температуру для большей стабильности
@@ -164,7 +143,15 @@ async function enrichWord(de: string, ru: string, article: string, verb_forms: s
       });
 
       const content = response.choices[0]?.message?.content?.trim() || '{}';
-      const result = JSON.parse(content);
+      
+      // Извлекаем JSON из markdown (AI иногда оборачивает в ```)
+      let jsonStr = content;
+      const jsonMatch = content.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
+      if (jsonMatch) {
+        jsonStr = jsonMatch[1].trim();
+      }
+      
+      const result = JSON.parse(jsonStr);
 
       // Минимальная валидация
       if (!result.word_type) {
@@ -172,6 +159,11 @@ async function enrichWord(de: string, ru: string, article: string, verb_forms: s
       }
 
       if (!result.examples) result.examples = [];
+      if (!result.synonyms) result.synonyms = [];
+      if (!result.antonyms) result.antonyms = [];
+      if (!result.collocations) result.collocations = [];
+      if (result.is_greeting_construction === undefined) result.is_greeting_construction = false;
+      
       return { ...result, valid: true }; // Явно устанавливаем valid: true если распарсили
     } catch (error) {
       lastError = error instanceof Error ? error : new Error('Unknown error');
@@ -358,7 +350,8 @@ export async function POST(request: NextRequest) {
       stats, 
       remaining: words.length === batchSize && totalRemainingInDb > 0, 
       totalCheckedInDb,
-      totalRemainingInDb 
+      totalRemainingInDb,
+      firstError: stats.errors > 0 ? 'Проверьте логи сервера для деталей' : null // Добавляем подсказку
     });
 
   } catch (error: any) {
