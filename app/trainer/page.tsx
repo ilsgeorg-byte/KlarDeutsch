@@ -319,7 +319,7 @@ export default function TrainerPage() {
               }}
               className={`flex-1 min-w-[60px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-black transition-all duration-300 whitespace-nowrap ${
                 level === lvl
-                  ? "bg-blue-600 text-white shadow-md shadow-blue-500/30 transform scale-105"
+                  ? "bg-gradient-to-br from-blue-700 to-purple-700 text-white shadow-lg shadow-blue-500/40 transform scale-105"
                   : "bg-transparent text-slate-500 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-gray-700"
               }`}
             >
