@@ -231,6 +231,16 @@ export default function TrainerPage() {
     setRatingInProgress(true);
     try {
       await rateWord(currentWord.id, rating as 0 | 1 | 3 | 5);
+      
+      // Обновляем статистику сессии
+      setSessionStats(prev => ({
+        ...prev,
+        total: prev.total + 1,
+        correct: rating >= 3 ? prev.correct + 1 : prev.correct,
+        hard: rating === 1 ? prev.hard + 1 : prev.hard,
+        known: rating === 0 ? prev.known + 1 : prev.known,
+      }));
+
       handleNext();
     } catch (err) {
       console.error("Rate error:", err);
