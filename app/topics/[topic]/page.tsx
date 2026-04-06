@@ -18,7 +18,7 @@ export default function TopicPage() {
     const [page, setPage] = useState(0);
     const limit = 20;
 
-    const { words, total, isLoading, isError } = useWordsByTopic(topic, page * limit, limit);
+    const { words, total, isLoading, error } = useWordsByTopic(topic, page * limit, limit);
 
     const playAudio = (url: string) => {
         const audio = new Audio(url);
@@ -74,7 +74,7 @@ export default function TopicPage() {
                         <Loader2 className="animate-spin text-blue-600 mb-4" size={48} />
                         <p className="text-slate-500 font-medium">Загружаем слова из темы...</p>
                     </div>
-                ) : isError ? (
+                ) : error ? (
                     <div className="bg-red-50 border border-red-200 text-red-700 p-6 rounded-xl text-center">
                         <p className="font-bold text-lg mb-2">Упс! Ошибка загрузки</p>
                         <p>Не удалось получить слова для этой темы. Пожалуйста, попробуйте позже.</p>

@@ -32,8 +32,8 @@ export interface Word {
   article?: string;
   plural?: string;
   verb_forms?: string;
-  level?: string;
-  topic?: string;
+  level: string;
+  topic: string;
   example_de?: string;
   example_ru?: string;
   synonyms?: string;

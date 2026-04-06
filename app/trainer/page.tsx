@@ -72,6 +72,15 @@ export default function TrainerPage() {
   const [words, setWords] = useState<TrainerWord[]>([]);
   const [ratingInProgress, setRatingInProgress] = useState(false);
 
+  // Статистика сессии
+  const [sessionStats, setSessionStats] = useState({
+    total: 0,      // Всего пройдено
+    correct: 0,    // Правильных ответов (3, 4, 5)
+    hard: 0,       // Сложных (1)
+    known: 0,      // Знаю (0)
+    startTime: Date.now(),
+  });
+
   // Проверка авторизации
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -121,7 +130,6 @@ export default function TrainerPage() {
 
   // --- ЛОГИКА ЗАПИСИ ---
   const [isRecording, setIsRecording] = useState(false);
-  const [ratingInProgress, setRatingInProgress] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
 
