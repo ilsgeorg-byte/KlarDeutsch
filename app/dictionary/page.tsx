@@ -1,75 +1,26 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import styles from "../styles/Shared.module.css";
 import WordCard from "../components/WordCard";
 import { Search, Loader2, BookOpen } from "lucide-react";
-
-interface Word {
-    id: number;
-    de: string;
-    ru: string;
-    article?: string;
-    verb_forms?: string;
-    plural?: string;
-    level: string;
-    topic: string;
-    example_de?: string;
-    example_ru?: string;
-    examples?: { de: string; ru: string }[];
-    synonyms?: string;
-    antonyms?: string;
-    collocations?: string;
-    audio_url?: string;
-    is_favorite?: boolean;
-}
+import { useWordSearch } from "../lib/hooks";
 
 export default function DictionaryPage() {
     const [query, setQuery] = useState("");
-    const [words, setWords] = useState<Word[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState("");
+    
+    // Используем хук вместо ручного fetch
+    // Debounce 300ms делаем на уровне query
+    const [debouncedQuery, setDebouncedQuery] = useState("");
 
-    const searchWords = useCallback(async (searchQuery: string) => {
-        if (searchQuery.length < 2) {
-            setWords([]);
-            setMessage("");
-            return;
-        }
-
-        setLoading(true);
-        try {
-            const token = localStorage.getItem("token");
-            const response = await fetch(`/api/words/search?q=${encodeURIComponent(searchQuery)}`, {
-                headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-            });
-            const data = await response.json();
-
-            if (data.data) {
-                setWords(data.data);
-                if (data.data.length === 0) {
-                    setMessage("Ничего не найдено");
-                } else {
-                    setMessage("");
-                }
-            } else {
-                setMessage(data.error || "Ошибка при поиске");
-            }
-        } catch (error: any) {
-            console.error("Search error:", error);
-            setMessage(error.message || "Ошибка соединения с сервером");
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    // Debounce search
     useEffect(() => {
         const timer = setTimeout(() => {
-            searchWords(query);
+            setDebouncedQuery(query);
         }, 300);
         return () => clearTimeout(timer);
-    }, [query, searchWords]);
+    }, [query]);
+
+    const { results: words, isLoading, error } = useWordSearch(debouncedQuery, 50);
 
     const playAudio = (url: string) => {
         const audio = new Audio(url);
@@ -93,7 +44,7 @@ export default function DictionaryPage() {
                         transform: 'translateY(-50%)',
                         color: '#94a3b8'
                     }}>
-                        {loading ? <Loader2 className="animate-spin" size={20} /> : <Search size={20} />}
+                        {isLoading ? <Loader2 className="animate-spin" size={20} /> : <Search size={20} />}
                     </div>
                     <input
                         type="text"
@@ -114,8 +65,17 @@ export default function DictionaryPage() {
                     />
                 </div>
 
-                {message && (
-                    <p className="text-slate-500 dark:text-gray-400" style={{ textAlign: 'center', marginTop: '20px' }}>{message}</p>
+                {isLoading && (
+                    <p className="text-slate-500 dark:text-gray-400" style={{ textAlign: 'center', marginTop: '20px' }}>
+                        <Loader2 className="animate-spin inline mr-2" size={16} />
+                        Поиск...
+                    </p>
+                )}
+
+                {error && (
+                    <p className="text-red-500" style={{ textAlign: 'center', marginTop: '20px' }}>
+                        {error.message || "Ошибка при поиске"}
+                    </p>
                 )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }} className="dark">

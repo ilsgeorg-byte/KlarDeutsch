@@ -2,18 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, CheckCircle, TrendingUp, Award, Layers, Star, Plus, Upload, ChevronRight, Settings, X } from "lucide-react";
+import { BookOpen, CheckCircle, TrendingUp, Layers, Star, Plus, Upload, ChevronRight, X } from "lucide-react";
 import UploadWordsModal from "../components/UploadWordsModal";
-
-interface Stats {
-  total_words: { [key: string]: number };
-  user_progress: { [key: string]: number };
-  detailed: Array<{
-    level: string;
-    status: string;
-    count: number;
-  }>;
-}
+import { useStats, useFavorites } from "../lib/hooks";
 
 interface Word {
   id: number;
@@ -32,54 +23,22 @@ interface Word {
 }
 
 export default function ProfilePage() {
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [favorites, setFavorites] = useState<Word[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
   const [selectedLevel, setSelectedLevel] = useState<string | null>(null);
   const [levelWords, setLevelWords] = useState<Word[]>([]);
   const [loadingLevel, setLoadingLevel] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const router = useRouter();
 
+  // Используем хуки вместо ручных fetch
+  const { stats, isLoading: statsLoading, error: statsError } = useStats();
+  const { favorites, isLoading: favLoading } = useFavorites();
+
+  // Проверка авторизации
   useEffect(() => {
-    const fetchData = async () => {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        router.push("/login");
-        return;
-      }
-
-      try {
-        setError(null);
-        const statsRes = await fetch("/api/trainer/stats", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        
-        if (statsRes.status === 401) {
-          localStorage.removeItem("token");
-          router.push("/login");
-          return;
-        }
-        
-        const statsData = await statsRes.json();
-        setStats(statsData);
-
-        const favsRes = await fetch("/api/favorites", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        
-        if (favsRes.ok) {
-          const favsData = await favsRes.json();
-          setFavorites(Array.isArray(favsData) ? favsData : []);
-        }
-      } catch (err) {
-        setError("Ошибка загрузки профиля");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
+    const token = localStorage.getItem("token");
+    if (!token) {
+      router.push("/login");
+    }
   }, [router]);
 
   const loadLevelWords = async (level: string) => {
@@ -108,7 +67,9 @@ export default function ProfilePage() {
   const knownWords = stats?.user_progress["known"] || 0;
   const learningWords = stats?.user_progress["learning"] || 0;
 
-  if (loading) return (
+  const isLoading = statsLoading || favLoading;
+
+  if (isLoading) return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex justify-center items-center">
       <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
     </div>

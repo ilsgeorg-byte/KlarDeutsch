@@ -4,16 +4,28 @@ import React, { useState, useEffect } from "react";
 import styles from "./Diary.module.css";
 import { Sparkles, CheckCircle2, AlertCircle, Loader2, Trash2, Calendar, Clock } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { 
+  useDiaryHistory, 
+  useCorrectText, 
+  useDeleteDiaryEntry,
+  useExtractWords,
+  useAddDiaryWords
+} from "../lib/hooks";
 
 export default function DiaryPage() {
   const [text, setText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<{ corrected: string; explanation: string } | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [history, setHistory] = useState<any[]>([]);
   const [extractedWords, setExtractedWords] = useState<any[]>([]);
   const [isAddingWords, setIsAddingWords] = useState(false);
   const router = useRouter();
+
+  // Используем хуки вместо ручных fetch
+  const { entries: history, isLoading: historyLoading, mutate: mutateHistory } = useDiaryHistory();
+  const { correctText } = useCorrectText();
+  const { deleteEntry } = useDeleteDiaryEntry();
+  const { extractWords } = useExtractWords();
+  const { addWords } = useAddDiaryWords();
 
   // Проверка авторизации
   useEffect(() => {
@@ -21,68 +33,45 @@ export default function DiaryPage() {
     if (!token) {
       router.push("/login");
     }
-  }, []);
+  }, [router]);
 
-  const loadHistory = async () => {
+  const handleCheck = async () => {
+    if (!text.trim()) return;
+
+    setIsLoading(true);
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch("/api/diary/history", {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      if (res.status === 401) {
-        router.push("/login");
+      const correction = await correctText(text);
+      
+      if (!correction) {
+        console.error("Correction returned undefined");
         return;
       }
-      if (res.ok) {
-        const data = await res.json();
-        setHistory(data);
-      }
-    } catch (err) {
-      console.error("Ошибка загрузки истории:", err);
+
+      setResult({
+        corrected: correction.corrected,
+        explanation: correction.explanation,
+      });
+
+      // Извлекаем слова для изучения
+      const words = await extractWords(text, correction.corrected);
+      setExtractedWords(words || []);
+
+      // Обновляем историю
+      mutateHistory();
+    } catch (err: any) {
+      console.error("Ошибка проверки:", err);
+    } finally {
+      setIsLoading(false);
     }
   };
-
-  useEffect(() => {
-    loadHistory();
-  }, []);
 
   const handleDelete = async (id: number) => {
     if (!confirm("Удалить эту запись из истории?")) return;
 
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`/api/diary/history/${id}`, {
-        method: "DELETE",
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      if (res.ok) {
-        setHistory(prev => prev.filter(item => item.id !== id));
-      } else {
-        alert("Ошибка при удалении");
-      }
+      await deleteEntry(id);
     } catch (err) {
       console.error("Ошибка удаления:", err);
-      alert("Ошибка сети");
-    }
-  };
-
-  const handleExtractWords = async (original: string, corrected: string) => {
-    try {
-      const token = localStorage.getItem("token");
-      const res = await fetch("/api/diary/extract-words", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ original, corrected }),
-      });
-      if (res.ok) {
-        const words = await res.json();
-        setExtractedWords(words);
-      }
-    } catch (err) {
-      console.error("Ошибка при извлечении слов:", err);
     }
   };
 
@@ -90,64 +79,13 @@ export default function DiaryPage() {
     if (extractedWords.length === 0) return;
     setIsAddingWords(true);
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch("/api/diary/add-words", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify(extractedWords),
-      });
-      if (res.ok) {
-        alert(`Добавлено ${extractedWords.length} слов в тренажер!`);
-        setExtractedWords([]);
-      }
+      await addWords(extractedWords);
+      alert(`Добавлено ${extractedWords.length} слов в тренажер!`);
+      setExtractedWords([]);
     } catch (err) {
       console.error("Ошибка при добавлении слов:", err);
     } finally {
       setIsAddingWords(false);
-    }
-  };
-
-  const handleCheck = async () => {
-    if (!text.trim()) return;
-
-    setIsLoading(true);
-    setError(null);
-    setResult(null);
-
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch("/api/diary/correct", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ text }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Ошибка при проверке текста");
-      }
-
-      setResult({
-        corrected: data.corrected,
-        explanation: data.explanation,
-      });
-
-      // Извлекаем слова для изучения
-      handleExtractWords(text, data.corrected);
-
-      // Обновляем историю после успешной проверки
-      loadHistory();
-    } catch (err: any) {
-      setError(err.message || "Произошла ошибка. Попробуйте позже.");
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -212,13 +150,6 @@ export default function DiaryPage() {
               )}
             </button>
 
-            {error && (
-              <div className="text-red-500 dark:text-red-400" style={{ marginTop: '20px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <AlertCircle size={20} />
-                <span>{error}</span>
-              </div>
-            )}
-
             {result && (
               <div className={`${styles.resultSection} dark:bg-gray-700 dark:border-gray-600`}>
                 <h3 className={`${styles.resultTitle} text-slate-800 dark:text-white`}>
@@ -275,7 +206,11 @@ export default function DiaryPage() {
 
         <aside className={styles.historySection}>
           <h3 className={`${styles.resultTitle} text-slate-800 dark:text-white`}>История записей</h3>
-          {history.length === 0 ? (
+          {historyLoading ? (
+            <div className="flex justify-center items-center py-12">
+              <Loader2 className="animate-spin text-blue-600" size={32} />
+            </div>
+          ) : history.length === 0 ? (
             <p className="text-slate-500 dark:text-gray-400" style={{ textAlign: 'center', marginTop: '40px' }}>У вас пока нет записей</p>
           ) : (
             <div className={`${styles.historyList} dark:bg-gray-800 dark:border-gray-700`}>
