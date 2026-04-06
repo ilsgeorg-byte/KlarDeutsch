@@ -87,14 +87,38 @@ export default function TrainerPage() {
     if (!token) router.push("/login");
   }, [router]);
 
-  // Обновляем локальные слова когда приходят данные из хука
+  // Инициализируем слова только при первой загрузке или смене уровня
+  const [currentLevel, setCurrentLevel] = useState(level);
+  const hasShuffled = useRef(false);
+
   useEffect(() => {
-    if (wordsFromHook.length > 0) {
+    if (wordsFromHook.length > 0 && level === currentLevel) {
       setWords(wordsFromHook);
       setIndex(0);
       setShowAnswer(false);
     }
-  }, [wordsFromHook]);
+  }, []); // Только при маунте
+
+  // При смене уровня — перезагружаем слова
+  useEffect(() => {
+    if (level !== currentLevel) {
+      setCurrentLevel(level);
+      hasShuffled.current = false;
+    }
+  }, [level, currentLevel]);
+
+  useEffect(() => {
+    if (wordsFromHook.length > 0 && level === currentLevel) {
+      // Перемешиваем только если ещё не перемешивали
+      if (!hasShuffled.current) {
+        setWords((prev) => {
+          const merged = prev.length > 0 ? prev : wordsFromHook;
+          return shuffleArray<TrainerWord>([...merged]);
+        });
+        hasShuffled.current = true;
+      }
+    }
+  }, [currentLevel]);
 
   const renderWordWithArticle = (wordObj: any) => {
     let text = wordObj.de || "";
@@ -184,22 +208,6 @@ export default function TrainerPage() {
       setAudioStatus("Ошибка сети");
     }
   };
-
-  // Гарантированное перемешивание после загрузки массива
-  const hasShuffled = useRef(false);
-
-  useEffect(() => {
-    // Если массив не пустой и мы его ещё не перемешивали для текущего уровня
-    if (words.length > 1 && !hasShuffled.current) {
-      setWords((prev) => shuffleArray<TrainerWord>([...prev]));
-      hasShuffled.current = true;
-    }
-  }, [words]);
-
-  // Сбрасываем флаг перемешивания при смене уровня
-  useEffect(() => {
-    hasShuffled.current = false;
-  }, [level]);
 
 
   const handleNext = () => {

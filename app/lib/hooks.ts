@@ -442,9 +442,8 @@ export function useRateWord() {
   const rateWord = useCallback(async (wordId: number, rating: 0 | 1 | 3 | 5) => {
     const result = await apiCall(() => trainerApi.rateWord(wordId, rating));
     if (result.error) throw new Error(result.error.details || result.error.error);
-    // Обновляем статистику и слова для тренировки
+    // Обновляем только статистику (слова управляются локально в тренажёре)
     globalMutate('/trainer/stats');
-    globalMutate((key: string) => typeof key === 'string' && key.startsWith('/trainer/words'));
     return result.data;
   }, [revalidateStats]);
 
