@@ -89,36 +89,28 @@ export default function TrainerPage() {
 
   // Инициализируем слова только при первой загрузке или смене уровня
   const [currentLevel, setCurrentLevel] = useState(level);
+  const hasInitialized = useRef(false);
   const hasShuffled = useRef(false);
 
-  useEffect(() => {
-    if (wordsFromHook.length > 0 && level === currentLevel) {
-      setWords(wordsFromHook);
-      setIndex(0);
-      setShowAnswer(false);
-    }
-  }, []); // Только при маунте
-
-  // При смене уровня — перезагружаем слова
+  // При смене уровня — сбрасываем флаг инициализации
   useEffect(() => {
     if (level !== currentLevel) {
       setCurrentLevel(level);
+      hasInitialized.current = false;
       hasShuffled.current = false;
     }
   }, [level, currentLevel]);
 
+  // Инициализация слов при первой загрузке (или смене уровня)
   useEffect(() => {
-    if (wordsFromHook.length > 0 && level === currentLevel) {
-      // Перемешиваем только если ещё не перемешивали
-      if (!hasShuffled.current) {
-        setWords((prev) => {
-          const merged = prev.length > 0 ? prev : wordsFromHook;
-          return shuffleArray<TrainerWord>([...merged]);
-        });
-        hasShuffled.current = true;
-      }
+    if (wordsFromHook.length > 0 && level === currentLevel && !hasInitialized.current) {
+      setWords(shuffleArray<TrainerWord>([...wordsFromHook]));
+      setIndex(0);
+      setShowAnswer(false);
+      hasInitialized.current = true;
+      hasShuffled.current = true;
     }
-  }, [currentLevel]);
+  }, [wordsFromHook, level, currentLevel]);
 
   const renderWordWithArticle = (wordObj: any) => {
     let text = wordObj.de || "";
