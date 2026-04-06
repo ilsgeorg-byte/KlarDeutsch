@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 import { Mic, Square, Volume2, Eye, Loader2, Star } from "lucide-react";
 import styles from "../styles/Shared.module.css";
 import { useTheme } from "../context/ThemeContext";
+import { 
+  useTrainingWords, 
+  useRateWord, 
+  useAddFavorite, 
+  useRemoveFavorite 
+} from "../lib/hooks";
 
 interface Word {
   id: number;
@@ -49,29 +55,37 @@ const formatTime = (ms: number): string => {
 };
 
 export default function TrainerPage() {
-  const [words, setWords] = useState<TrainerWord[]>([]);
   const [level, setLevel] = useState("A1");
   const [index, setIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [audioStatus, setAudioStatus] = useState<string | null>(null);
   const { theme } = useTheme(); // Глобальная тема
   const router = useRouter();
 
-  // Статистика сессии
-  const [sessionStats, setSessionStats] = useState({
-    total: 0,      // Всего пройдено
-    correct: 0,    // Правильных ответов (3, 4, 5)
-    hard: 0,       // Сложных (1)
-    known: 0,      // Знаю (0)
-    startTime: Date.now(),
-  });
+  // Используем хуки вместо ручных fetch
+  const { words: wordsFromHook, isLoading, mutate: mutateWords } = useTrainingWords(level, 50);
+  const { rateWord } = useRateWord();
+  const { addFavorite } = useAddFavorite();
+  const { removeFavorite } = useRemoveFavorite();
+
+  // Локальное состояние слов для манипуляций (удаление, перемешивание)
+  const [words, setWords] = useState<TrainerWord[]>([]);
+  const [ratingInProgress, setRatingInProgress] = useState(false);
 
   // Проверка авторизации
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) router.push("/login");
   }, [router]);
+
+  // Обновляем локальные слова когда приходят данные из хука
+  useEffect(() => {
+    if (wordsFromHook.length > 0) {
+      setWords(wordsFromHook);
+      setIndex(0);
+      setShowAnswer(false);
+    }
+  }, [wordsFromHook]);
 
   const renderWordWithArticle = (wordObj: any) => {
     let text = wordObj.de || "";
@@ -163,41 +177,7 @@ export default function TrainerPage() {
     }
   };
 
-      const loadWords = async (isManual = false) => {
-        if (!isManual) setLoading(true);
-        try {
-          const token = localStorage.getItem("token");
-          const res = await fetch(`/api/trainer/words?level=${level}`, {
-            headers: { Authorization: `Bearer ${token}` },
-            cache: 'no-store'
-        });
-      if (res.status === 401) return router.push("/login");
-      if (!res.ok) throw new Error("Failed");
-      const data = await res.json();
-
-      if (isManual) {
-        setWords((prev) => [...prev, ...data]);
-      } else {
-        setWords(data);
-        setIndex(0);
-        setShowAnswer(false);
-      }
-    } catch (e) {
-      setAudioStatus("Ошибка загрузки слов");
-    } finally {
-      if (!isManual) setLoading(false);
-    }
-  };
-
-
-
-
-  useEffect(() => {
-    loadWords();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [level]);
-
-    // Гарантированное перемешивание после загрузки массива
+  // Гарантированное перемешивание после загрузки массива
   const hasShuffled = useRef(false);
 
   useEffect(() => {
@@ -220,8 +200,10 @@ export default function TrainerPage() {
     const newWords = [...words];
     newWords.splice(index, 1);
 
-    if (newWords.length === 0) loadWords();
-    else {
+    if (newWords.length === 0) {
+      // Реалим кэш для загрузки новых слов
+      mutateWords();
+    } else {
       setWords(newWords);
       if (index >= newWords.length) setIndex(0);
     }
@@ -229,39 +211,14 @@ export default function TrainerPage() {
 
   const handleRate = async (rating: number) => {
     if (!currentWord || ratingInProgress) return;
-    
+
     setRatingInProgress(true);
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch("/api/trainer/rate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ word_id: currentWord.id, rating }),
-      });
-      
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        console.error(`API error: ${res.status}`, errorData);
-        setAudioStatus(`Ошибка: ${errorData.error || 'Не удалось сохранить прогресс'}`);
-        return;
-      }
-      
-      // Обновляем статистику
-      setSessionStats(prev => ({
-        ...prev,
-        total: prev.total + 1,
-        correct: rating >= 3 ? prev.correct + 1 : prev.correct,
-        hard: rating === 1 ? prev.hard + 1 : prev.hard,
-        known: rating === 0 ? prev.known + 1 : prev.known,
-      }));
-      
+      await rateWord(currentWord.id, rating as 0 | 1 | 3 | 5);
       handleNext();
     } catch (err) {
       console.error("Rate error:", err);
-      setAudioStatus("Ошибка сети. Проверьте подключение к серверу.");
+      setAudioStatus("Не удалось сохранить прогресс. Попробуйте ещё раз.");
     } finally {
       setRatingInProgress(false);
     }
@@ -276,20 +233,16 @@ export default function TrainerPage() {
 
   const toggleFavorite = async (wordId: number) => {
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        alert("Пожалуйста, войдите в систему, чтобы добавлять слова в избранное");
-        return;
+      const word = words.find(w => w.id === wordId);
+      if (!word) return;
+
+      if (word.is_favorite) {
+        await removeFavorite(wordId);
+      } else {
+        await addFavorite(wordId);
       }
 
-      const res = await fetch(`/api/words/${wordId}/favorite`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!res.ok) return;
-
-      // Локально переворачиваем флаг, чтобы звезда перекрасилась
+      // Локально обновляем флаг
       setWords(prev =>
         prev.map(w =>
           w.id === wordId ? { ...w, is_favorite: !w.is_favorite } : w
@@ -297,6 +250,7 @@ export default function TrainerPage() {
       );
     } catch (err) {
       console.error("Favorite error:", err);
+      setAudioStatus("Не удалось изменить статус избранного");
     }
   };
 
@@ -362,7 +316,7 @@ export default function TrainerPage() {
 
         {/* Контейнер карточки */}
         <div className="w-full max-w-md relative perspective-1000">
-          {loading ? (
+          {isLoading ? (
             <div className="w-full h-[400px] bg-white dark:bg-gray-800 rounded-3xl shadow-xl flex flex-col items-center justify-center border border-slate-100 dark:border-gray-700">
               <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-4" />
               <p className="text-slate-500 dark:text-gray-400 font-medium animate-pulse">

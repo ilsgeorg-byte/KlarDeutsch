@@ -11,7 +11,8 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 // Ключ для хранения токена в localStorage
-const TOKEN_KEY = 'klardeutsch_token';
+// ВАЖНО: Использовать 'token' для совместимости со всеми компонентами
+const TOKEN_KEY = 'token';
 
 /**
  * Получает токен из localStorage
@@ -72,19 +73,18 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     if (error.response?.status === 401) {
-      // Токен истёк или недействителен - удаляем его
+      // Токен истёк или недействителен - удаляем его и редиректим на логин
       removeToken();
-      // Можно добавить редирект на страницу входа
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('auth-error'));
+        window.location.href = '/login';
       }
     }
-    
+
     console.error('API Response Error:', {
       status: error.response?.status,
       message: (error.response?.data as any)?.error || error.message,
     });
-    
+
     return Promise.reject(error);
   }
 );
@@ -338,6 +338,88 @@ export const audioApi = {
    */
   deleteAudio: (filename: string) =>
     apiClient.post<{ status: string }>('/delete_audio', { filename }),
+};
+
+export const adminApi = {
+  /**
+   * Получить статистику приложения
+   */
+  getStats: () =>
+    apiClient.get<{
+      total_users: number;
+      total_words: number;
+      total_diary_entries: number;
+      total_audio_files: number;
+      active_users_today: number;
+    }>('/admin/stats'),
+
+  /**
+   * Получить список пользователей
+   */
+  getUsers: (params?: { skip?: number; limit?: number }) =>
+    apiClient.get<{ data: Array<{ id: number; username: string; email: string; created_at: string }>; total: number }>('/admin/users', { params }),
+
+  /**
+   * Удалить пользователя
+   */
+  deleteUser: (userId: number) =>
+    apiClient.delete<{ status: string }>(`/admin/users/${userId}`),
+
+  /**
+   * Получить слова для проверки
+   */
+  getWordsToCheck: (params?: { skip?: number; limit?: number; status?: string }) =>
+    apiClient.get<{ data: any[]; total: number }>('/admin/check-words', { params }),
+
+  /**
+   * Одобрить слово
+   */
+  approveWord: (wordId: number) =>
+    apiClient.post<{ status: string }>(`/admin/words/${wordId}/approve`),
+
+  /**
+   * Отклонить слово
+   */
+  rejectWord: (wordId: number) =>
+    apiClient.post<{ status: string }>(`/admin/words/${wordId}/reject`),
+
+  /**
+   * Обновить слово
+   */
+  updateWord: (wordId: number, data: any) =>
+    apiClient.put<{ status: string; word: any }>(`/admin/words/${wordId}`, data),
+
+  /**
+   * Удалить слово
+   */
+  deleteWord: (wordId: number) =>
+    apiClient.delete<{ status: string }>(`/admin/words/${wordId}`),
+
+  /**
+   * Массовая загрузка слов
+   */
+  bulkUploadWords: (words: any[]) =>
+    apiClient.post<{ status: string; added_count: number; errors: string[] }>('/admin/words/bulk', { words }),
+
+  /**
+   * Получить статистику проверки слов
+   */
+  getCheckWordsStats: () =>
+    apiClient.get<{ total: number; pending: number; approved: number; rejected: number }>('/admin/check-words/stats'),
+};
+
+export const topicsApi = {
+  /**
+   * Получить все темы
+   */
+  getTopics: () =>
+    apiClient.get<Array<{ name: string; slug: string; description: string; word_count: number }>>('/topics'),
+
+  /**
+   * Получить тему по slug
+   */
+  getTopic: (slug: string) =>
+    apiClient.get<{ name: string; slug: string; description: string; words: any[] }>(`/topics/${slug}`),
 };
 
 export default apiClient;
