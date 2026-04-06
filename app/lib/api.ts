@@ -7,8 +7,10 @@
 
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
-// Базовый URL API (берётся из переменных окружения или по умолчанию)
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+// Базовый URL API
+// Используем относительный путь для работы через Next.js proxy
+// В production Next.js будет проксировать /api/* на Flask backend
+const API_BASE_URL = '/api';
 
 // Ключ для хранения токена в localStorage
 // ВАЖНО: Использовать 'token' для совместимости со всеми компонентами
