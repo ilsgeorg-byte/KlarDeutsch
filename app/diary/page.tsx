@@ -192,8 +192,8 @@ export default function DiaryPage() {
                       {extractedWords.map((w, idx) => (
                         <div key={idx} className="bg-white px-3 py-1.5 rounded-xl text-sm shadow-sm border border-blue-100 flex items-center gap-2 hover:border-blue-300 transition-colors group">
                           {w.article && <span className="text-blue-500 font-bold opacity-70 group-hover:opacity-100">{w.article}</span>}
-                          <span className="font-semibold text-gray-800">{w.de}</span>
-                          <span className="text-gray-400 font-medium">— {w.ru}</span>
+                          <span className="font-semibold text-gray-900">{w.de}</span> {/* Changed from text-gray-800 */}
+                          <span className="text-gray-700 font-medium">— {w.ru}</span> {/* Changed from text-gray-400 */}
                         </div>
                       ))}
                     </div>
