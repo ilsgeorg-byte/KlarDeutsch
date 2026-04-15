@@ -64,6 +64,7 @@ try:
     from routes.auth import auth_bp
     from routes.ai_enrich import ai_enrich_bp
     from routes.learning import learning_bp
+    from routes.admin import admin_bp # Импорт нового блюпринта
     from db import init_db
 except ImportError:
     from .routes.words import words_bp
@@ -73,6 +74,7 @@ except ImportError:
     from .routes.auth import auth_bp
     from .routes.ai_enrich import ai_enrich_bp
     from .routes.learning import learning_bp
+    from .routes.admin import admin_bp # Импорт нового блюпринта
     from .db import init_db
 
 # Инициализируем базу данных (создаем таблицы если их нет)
@@ -85,6 +87,7 @@ app.register_blueprint(trainer_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(ai_enrich_bp)
 app.register_blueprint(learning_bp)
+app.register_blueprint(admin_bp) # Регистрация нового блюпринта
 
 
 # === Управление соединением с БД на уровне запроса ===
@@ -160,4 +163,4 @@ limiter.limit("100 per hour")(words_bp)
 limiter.limit("100 per hour")(trainer_bp)
 limiter.limit("100 per hour")(diary_bp)
 limiter.limit("100 per hour")(learning_bp)
-
+limiter.limit("100 per hour")(admin_bp) # Ограничение для нового админского блюпринта
