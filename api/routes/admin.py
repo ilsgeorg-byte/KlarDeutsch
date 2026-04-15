@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, g
-from .db import get_db
+from ..db import get_db
 from .schemas import UserSchema # Предполагаем, что схема пользователя есть в schemas.py
 from datetime import datetime
 import logging
