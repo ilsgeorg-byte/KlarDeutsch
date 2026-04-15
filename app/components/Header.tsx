@@ -6,7 +6,6 @@ import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "../context/ThemeContext";
 
-
 export default function Header() {
     const pathname = usePathname();
     const router = useRouter();
@@ -14,18 +13,39 @@ export default function Header() {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isMounted, setIsMounted] = useState(false);
     const [scrolled, setScrolled] = useState(false);
+    const [isAuthenticated, setIsAuthenticated] = useState(false); // New state for authentication
 
     useEffect(() => {
         setIsMounted(true);
         const handleScroll = () => setScrolled(window.scrollY > 20);
         window.addEventListener("scroll", handleScroll);
-        return () => window.removeEventListener("scroll", handleScroll);
+
+        // Check authentication status on mount
+        const token = localStorage.getItem("token");
+        if (token) {
+            setIsAuthenticated(true);
+        }
+
+        return () => {
+            window.removeEventListener("scroll", handleScroll);
+        };
     }, []);
 
     const handleLogout = () => {
         localStorage.removeItem("token");
+        setIsAuthenticated(false); // Update auth state
         setIsMenuOpen(false);
         router.push("/login");
+    };
+
+    const handleLogin = () => {
+        setIsMenuOpen(false);
+        router.push("/login");
+    };
+
+    const handleRegister = () => {
+        setIsMenuOpen(false);
+        router.push("/register");
     };
 
     useEffect(() => {
@@ -40,12 +60,17 @@ export default function Header() {
         }
     }, [isMenuOpen]);
 
-    const navLinks = [
+    // Define nav links, filter based on authentication status
+    const allNavLinks = [
         { href: "/", label: "Главная" },
         { href: "/dictionary", label: "Словарь" },
         { href: "/trainer", label: "Тренажер" },
         { href: "/diary", label: "Записи" },
     ];
+
+    const displayedNavLinks = isAuthenticated
+        ? allNavLinks
+        : allNavLinks.filter(link => link.href === "/"); // Only show "Главная" if not authenticated
 
     const isActive = (path: string) => {
         if (path === '/' && pathname !== '/') return false;
@@ -56,8 +81,8 @@ export default function Header() {
 
     return (
         <header className={`w-full sticky top-0 z-[100] transition-all duration-300 ${
-            scrolled 
-            ? "bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl border-b border-slate-200/60 dark:border-slate-800/60 shadow-lg shadow-slate-200/20 dark:shadow-none py-2" 
+            scrolled
+            ? "bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl border-b border-slate-200/60 dark:border-slate-800/60 shadow-lg shadow-slate-200/20 dark:shadow-none py-2"
             : "bg-transparent py-4"
         }`}>
             <div className="max-w-7xl mx-auto px-6 flex items-center justify-between gap-4">
@@ -74,7 +99,7 @@ export default function Header() {
 
                 {/* Десктопная навигация */}
                 <nav className="hidden md:flex items-center bg-slate-100/50 dark:bg-slate-800/50 p-1.5 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 backdrop-blur-sm">
-                    {navLinks.map((link) => (
+                    {displayedNavLinks.map((link) => ( // Use filtered links
                         <Link
                             key={link.href}
                             href={link.href}
@@ -97,24 +122,45 @@ export default function Header() {
                     >
                         {theme === 'dark' ? <Sun size={20} className="text-amber-400" /> : <Moon size={20} />}
                     </button>
-                    
+
                     <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-800 mx-1" />
 
-                    <Link
-                        href="/profile"
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
-                    >
-                        <User size={18} className="text-slate-400" />
-                        Профиль
-                    </Link>
+                    {isAuthenticated ? (
+                        <>
+                            <Link
+                                href="/profile"
+                                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+                            >
+                                <User size={18} className="text-slate-400" />
+                                Профиль
+                            </Link>
 
-                    <button
-                        onClick={handleLogout}
-                        className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-900/20 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-all active:scale-90"
-                        title="Выйти"
-                    >
-                        <LogOut size={20} />
-                    </button>
+                            <button
+                                onClick={handleLogout}
+                                className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-900/20 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-all active:scale-90"
+                                title="Выйти"
+                            >
+                                <LogOut size={20} />
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <Link
+                                href="/login"
+                                onClick={handleLogin}
+                                className="px-4 py-2.5 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+                            >
+                                Войти
+                            </Link>
+                            <Link
+                                href="/register"
+                                onClick={handleRegister}
+                                className="px-4 py-2.5 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+                            >
+                                Зарегистрироваться
+                            </Link>
+                        </>
+                    )}
                 </div>
 
                 {/* Мобильное меню */}
@@ -139,7 +185,7 @@ export default function Header() {
                     ${isMenuOpen ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-full pointer-events-none"}
                 `}>
                     <div className="flex flex-col gap-2">
-                        {navLinks.map((link) => (
+                        {displayedNavLinks.map((link) => ( // Use filtered links for mobile too
                             <Link
                                 key={link.href}
                                 href={link.href}
@@ -154,20 +200,43 @@ export default function Header() {
                     </div>
 
                     <div className="mt-auto mb-10 grid grid-cols-2 gap-4">
-                        <Link
-                            href="/profile"
-                            className="flex items-center justify-center gap-2 py-4 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-2xl font-bold"
-                        >
-                            <User size={20} />
-                            Профиль
-                        </Link>
-                        <button
-                            onClick={handleLogout}
-                            className="flex items-center justify-center gap-2 py-4 bg-rose-50 text-rose-600 rounded-2xl font-bold"
-                        >
-                            <LogOut size={20} />
-                            Выйти
-                        </button>
+                        {isAuthenticated ? (
+                            <>
+                                <Link
+                                    href="/profile"
+                                    className="flex items-center justify-center gap-2 py-4 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-2xl font-bold"
+                                >
+                                    <User size={20} />
+                                    Профиль
+                                </Link>
+                                <button
+                                    onClick={handleLogout}
+                                    className="flex items-center justify-center gap-2 py-4 bg-rose-50 text-rose-600 rounded-2xl font-bold"
+                                >
+                                    <LogOut size={20} />
+                                    Выйти
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <Link
+                                    href="/login"
+                                    onClick={handleLogin}
+                                    className="flex items-center justify-center gap-2 py-4 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-2xl font-bold"
+                                >
+                                    <User size={20} /> {/* Re-using User icon for Login button for now */}
+                                    Войти
+                                </Link>
+                                <Link
+                                    href="/register"
+                                    onClick={handleRegister}
+                                    className="flex items-center justify-center gap-2 py-4 bg-indigo-600 text-white rounded-2xl font-bold"
+                                >
+                                    <Sparkles size={20} /> {/* Re-using Sparkles icon for Register button for now */}
+                                    Зарегистрироваться
+                                </Link>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
