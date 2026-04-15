@@ -49,8 +49,11 @@ export default function Header() {
     };
 
     useEffect(() => {
-        setIsMenuOpen(false);
-    }, [pathname]);
+        setIsMenuOpen(false); // This closes the mobile menu
+        // Re-check authentication status when pathname changes
+        const token = localStorage.getItem("token");
+        setIsAuthenticated(!!token); // Update state based on token presence
+    }, [pathname]); // Dependency on pathname
 
     useEffect(() => {
         if (isMenuOpen) {
